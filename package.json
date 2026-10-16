@@ -17,7 +17,8 @@
 		"test:coverage": "pnpm -r test:coverage",
 		"test:e2e": "pnpm --filter @where/web test:e2e",
 		"verify": "pnpm build && pnpm check && pnpm lint && pnpm test:coverage && pnpm test:e2e",
-		"dev": "pnpm build:packages && pnpm --filter @where/web dev"
+		"dev": "pnpm build:packages && pnpm --filter @where/web dev",
+		"cli": "pnpm build:packages && pnpm --filter @where/cli build && node apps/cli/dist/index.js"
 	},
 	"devDependencies": {
 		"@eslint/js": "catalog:",

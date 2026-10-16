@@ -1,0 +1,35 @@
+{
+	"name": "@where/cli",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/cli.d.ts",
+			"import": "./dist/cli.js"
+		}
+	},
+	"bin": {
+		"where": "./dist/index.js"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"check": "tsc --noEmit -p tsconfig.json",
+		"lint": "prettier --ignore-path ../../.prettierignore --check . && eslint .",
+		"format": "prettier --ignore-path ../../.prettierignore --write .",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@where/config": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "catalog:",
+		"@vitest/coverage-v8": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

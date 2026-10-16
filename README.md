@@ -5,10 +5,10 @@ right link. The dashboard will be driven by one mounted YAML file.
 
 ## Current state
 
-This snapshot wires a compiled `@where/config` package into the server-rendered
-placeholder. The page displays its supported configuration format version. This
-is package plumbing only: no YAML schema/loading/validation, authentication,
-dashboard links, or CLI is implemented yet.
+This snapshot adds CLI help and honest unsupported-command errors alongside the
+compiled config package and server-rendered placeholder. The page and CLI share
+the supported configuration format version. YAML schema/loading/validation,
+authentication, and dashboard links are not implemented yet.
 
 ## Development
 
@@ -25,5 +25,12 @@ Open `http://localhost:5173`. The placeholder should render with JavaScript
 disabled, too. Linux browser prerequisites and other commands are documented in
 [development](docs/development.md).
 
-See [agent instructions](AGENTS.md) for the review workflow. CI and publishing
-are not part of this snapshot.
+The CLI currently supports help only:
+
+```sh
+pnpm cli -- --help
+```
+
+Unsupported commands, including `validate`, exit nonzero rather than pretending
+to validate configuration. See [agent instructions](AGENTS.md) for the review
+workflow. CI and publishing are not part of this snapshot.
