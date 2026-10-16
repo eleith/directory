@@ -8,15 +8,25 @@
 		"pnpm": "11.9.0"
 	},
 	"scripts": {
+		"build": "pnpm -r build",
+		"check": "pnpm -r check",
 		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write ."
+		"format": "prettier --write .",
+		"test": "pnpm -r test",
+		"test:coverage": "pnpm -r test:coverage",
+		"test:e2e": "pnpm --filter @where/web test:e2e",
+		"verify": "pnpm build && pnpm check && pnpm lint && pnpm test:coverage && pnpm test:e2e",
+		"dev": "pnpm --filter @where/web dev"
 	},
 	"devDependencies": {
 		"@eslint/js": "catalog:",
 		"eslint": "catalog:",
 		"eslint-config-prettier": "catalog:",
+		"eslint-plugin-svelte": "catalog:",
 		"globals": "catalog:",
 		"prettier": "catalog:",
+		"prettier-plugin-svelte": "catalog:",
+		"svelte": "catalog:",
 		"typescript": "catalog:",
 		"typescript-eslint": "catalog:"
 	}
