@@ -1,10 +1,11 @@
 # Development
 
-## Web bootstrap scope
+## Web/config bootstrap scope
 
-This snapshot adds `apps/web`: a SvelteKit placeholder that renders title and copy
-on the server. There is no YAML loader, shared configuration package, CLI,
-authentication, dashboard, or CI yet. Those arrive in separate commits.
+This snapshot adds the compiled `packages/config` workspace and wires its literal
+`configurationVersion` into the SSR placeholder. The package exposes ESM and
+TypeScript declarations, not a YAML schema or loader yet. CLI, authentication,
+dashboard, and CI work remain in later commits.
 
 ## Toolchain
 
@@ -42,23 +43,32 @@ revision matching the pinned Playwright version after changing that dependency.
 
 | Command                            | What it does                                                                |
 | ---------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm build`                       | Builds the adapter-node production server.                                  |
-| `pnpm check`                       | Runs SvelteKit sync and Svelte/TypeScript diagnostics.                      |
+| `pnpm build`                       | Builds config, then the adapter-node production server.                     |
+| `pnpm check`                       | Checks config TypeScript plus web Svelte/TypeScript diagnostics.            |
 | `pnpm lint` / `pnpm format`        | Checks or writes root/workspace Prettier formatting; lint also runs ESLint. |
-| `pnpm test` / `pnpm test:coverage` | Runs the route-load unit test with diagnostic coverage.                     |
+| `pnpm test` / `pnpm test:coverage` | Tests compiled config exports and route loading, with diagnostic coverage.  |
 | `pnpm test:e2e`                    | Runs Chromium against the existing production build.                        |
 | `pnpm verify`                      | Builds, checks types/lint, runs coverage tests, then E2E.                   |
-| `pnpm dev`                         | Starts Vite on `127.0.0.1:5173`.                                            |
+| `pnpm dev`                         | Builds config, then starts Vite on `127.0.0.1:5173`.                        |
+
+`pnpm build:packages` rebuilds just shared output. Package exports deliberately
+resolve `dist/index.js` and `dist/index.d.ts`, with no source aliases or custom
+loader. Build before independent checks/tests; `pnpm verify` does this in order.
+After editing config source during development, rebuild shared output to make it
+visible to Vite; there is no automatic config-source compiler/watch process.
 
 Browser tests launch `node build/index.js` from the web workspace on
 `127.0.0.1:4183`. They refuse to reuse an existing server and stop their server
 afterwards. Build before invoking E2E independently. Tests use no personal
 configuration, credentials, or development server. Unit discovery is separate
 from browser specs. Coverage measures TypeScript modules, not Svelte markup;
-there is no arbitrary percentage gate or claim of full UI coverage.
+there is no arbitrary percentage gate or claim of full UI coverage. The config
+smoke test imports built output, so its pass does not imply source instrumentation
+coverage of `src/index.ts`.
 
-Root commands cover the workspaces that actually exist. The web workspace's own
-lint/format commands explicitly share the root ignore file, so formatting after a
+Root commands cover both existing workspaces, ordered by their declared package
+dependency. Each workspace's lint/format commands explicitly share the root ignore
+file, so formatting after a
 build/test run must not rewrite generated output. Build output, coverage,
 operator configuration, local plans, and prototypes remain outside formatting.
 
@@ -73,7 +83,8 @@ image is provided in this commit.
 2. Run the setup above, then `pnpm dev`. Open the placeholder at desktop and
    narrow widths, check wrapping/overflow and the map-pin favicon, and switch OS
    light/dark settings.
-3. Disable JavaScript and reload: the title and description should remain visible.
+3. Disable JavaScript and reload: title, description, and `Configuration format 1`
+   should remain visible. No YAML file is read to render this bootstrap page.
 4. For production output, run `pnpm build`, then from the repository root:
 
    ```sh

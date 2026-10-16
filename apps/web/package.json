@@ -13,6 +13,9 @@
 		"test:coverage": "vitest run --coverage",
 		"test:e2e": "playwright test"
 	},
+	"dependencies": {
+		"@where/config": "workspace:*"
+	},
 	"devDependencies": {
 		"@playwright/test": "catalog:",
 		"@sveltejs/adapter-node": "catalog:",

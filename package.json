@@ -8,6 +8,7 @@
 		"pnpm": "11.9.0"
 	},
 	"scripts": {
+		"build:packages": "pnpm --filter './packages/*' -r build",
 		"build": "pnpm -r build",
 		"check": "pnpm -r check",
 		"lint": "prettier --check . && eslint .",
@@ -16,7 +17,7 @@
 		"test:coverage": "pnpm -r test:coverage",
 		"test:e2e": "pnpm --filter @where/web test:e2e",
 		"verify": "pnpm build && pnpm check && pnpm lint && pnpm test:coverage && pnpm test:e2e",
-		"dev": "pnpm --filter @where/web dev"
+		"dev": "pnpm build:packages && pnpm --filter @where/web dev"
 	},
 	"devDependencies": {
 		"@eslint/js": "catalog:",

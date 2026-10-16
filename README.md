@@ -5,9 +5,10 @@ right link. The dashboard will be driven by one mounted YAML file.
 
 ## Current state
 
-This snapshot adds a standalone, server-rendered placeholder web app and its
-quality checks. It does not load YAML, authenticate visitors, or render dashboard
-links. The shared configuration package and CLI arrive in later commits.
+This snapshot wires a compiled `@where/config` package into the server-rendered
+placeholder. The page displays its supported configuration format version. This
+is package plumbing only: no YAML schema/loading/validation, authentication,
+dashboard links, or CLI is implemented yet.
 
 ## Development
 
