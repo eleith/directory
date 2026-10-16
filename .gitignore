@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+.svelte-kit/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+/config/where.yaml
+/apps/web/config/where.yaml
+/public/
