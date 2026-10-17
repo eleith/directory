@@ -1,0 +1,73 @@
+name: CI (Web App)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*'
+      - docs/**
+      - .github/workflows/**
+      - .woodpecker/**
+      - apps/web/**
+      - packages/**
+  pull_request:
+    paths:
+      - '*'
+      - docs/**
+      - .github/workflows/**
+      - .woodpecker/**
+      - apps/web/**
+      - packages/**
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Web checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared packages
+        run: pnpm build:packages
+      - name: Check types
+        run: pnpm --filter @where/web check
+      - name: Lint root and workspace
+        run: |
+          pnpm lint
+          pnpm --filter @where/web lint
+      - name: Unit tests
+        run: pnpm --filter @where/web test:coverage
+
+  e2e:
+    name: Web E2E
+    needs: check
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/eleith/containers-playwright:1.61.1-node26@sha256:31ca7ae8b89997e60b60dec15487ea25ac9ea7b1eea45ea967f0f873c89af1ab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Check image toolchain
+        run: |
+          node --version
+          pnpm --version
+          node --eval "if (process.versions.node !== '26.5.0') throw new Error('Expected Node 26.5.0')"
+          test "$(pnpm --version)" = "11.9.0"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build web and shared dependencies
+        run: pnpm --filter '@where/web...' build
+      - name: Browser tests
+        run: pnpm --filter @where/web test:e2e

@@ -1,14 +1,16 @@
 # Development
 
-## CLI bootstrap scope
+## Bootstrap scope
 
-This snapshot adds `apps/cli` to the compiled config package and SSR web scaffold.
-CLI help and the web page read the same supported configuration format version.
-There is no YAML schema/loader/validator, authentication, dashboard, or CI yet.
+The bootstrap contains all three workspaces, local quality gates, and non-publishing
+Woodpecker/GitHub workflow definitions. CLI help and the SSR placeholder read the
+same supported configuration format version. YAML schema validation and loading,
+authentication, the dashboard, application images, and releases are not implemented
+yet.
 
 ## Toolchain
 
-`mise.toml` pins Node **26.4.0** and pnpm **11.9.0**. The shared catalog pins direct
+`mise.toml` pins Node **26.5.0** and pnpm **11.9.0**. The shared catalog pins direct
 dependencies exactly, including:
 
 | Tool                              | Version         |
@@ -97,27 +99,124 @@ ignore file, so formatting after a build/test run must not rewrite generated
 output. Build output, coverage, operator configuration, local plans, and
 prototypes remain outside formatting.
 
-There are no schema/validation/image/release commands yet. Axe and PageSpeed remain
-owner-run manual checks, not automated gates. Neither hosted CI nor a production
-image is provided in this commit.
+## Continuous integration
 
-## Manual checks for this commit
+Each provider has separate `config.yml`, `cli.yml`, and `web.yml` pipelines,
+matching `when`: [.github/workflows](../.github/workflows/) and
+[.woodpecker](../.woodpecker/). `pnpm verify` remains the local all-workspace
+aggregate, not a pipeline. Every selected pipeline uses a frozen full-workspace
+install, then package-scoped build, type checks, lint, and coverage tests. Config
+exports and CLI executables are built before their artifact tests. Web alone has
+production browser tests, with an explicit production build before Playwright.
+Each pipeline also runs root `pnpm lint` so global formatting/ESLint remains
+covered; this intentionally overlaps workspace lint.
 
-1. Verify the exact staged snapshot in isolation, rather than the combined local
-   worktree, which may contain later unstaged commits' files.
-2. Run the CLI examples above. Check help wording, stdout versus stderr, and
-   exit status (`echo $?` immediately after each command). Help should return 0;
-   unknown arguments, no command, and `validate` should return 1.
-3. Run the setup above, then `pnpm dev`. The existing placeholder should remain
-   unchanged, including `Configuration format 1` when JavaScript is disabled.
-4. For production output, run `pnpm build`, then from the repository root:
+Path filters include dependencies and shared tooling, not just app directories:
+
+- `packages/config/**` runs config, CLI, and web checks.
+- `apps/cli/**` or `apps/web/**` selects that application's pipeline.
+- Root files (`'*'`, including dotfiles), `docs/**`, and both workflow directories
+  run all three. This covers the lockfile, catalog, package manager/Node pins,
+  base TypeScript, ESLint/Prettier settings, docs, and workflow changes.
+
+Both providers check main pushes and pull requests. Keep these filters and the
+package gates current when adding shared tools or commands.
+
+- GitHub Actions uses `ubuntu-24.04`, Node 26.5.0, pnpm from the `packageManager`
+  pin, and a pnpm store cache. Job names are distinct: `Config checks`, `CLI
+checks`, `Web checks`, and `Web E2E`. Only web has a dependent E2E job, using
+  `ghcr.io/eleith/containers-playwright:1.61.1-node26` pinned to its verified
+  manifest digest. That separate checkout gets another frozen install and builds
+  only web and its shared dependencies before browser tests.
+- Each Woodpecker pipeline shares `/workspace/src` across ordered preparation,
+  package build/check/lint/test steps, and web E2E where applicable. Plain Node
+  steps use `node:26.5.0-bookworm`, pinned Corepack 0.36.0, and pnpm 11.9.0.
+  Corepack's shared cache is under the ignored `.pnpm-store/corepack`; the pnpm
+  store is local too. Later steps reuse dependencies and output. Web E2E uses
+  `git.eleith.com/eleith.private/playwright:1.61.1-node26` without overriding its
+  baked Corepack cache settings.
+
+The browser images contain Playwright 1.61.1's browsers and Ubuntu 24.04 system
+libraries; CI does not download browsers or run APT for each application check.
+Keep both image references (and the GitHub digest) paired with the catalog's
+Playwright version. A `node26` image tag alone does not pin a Node patch: browser
+steps explicitly require Node 26.5.0 and pnpm 11.9.0. The public GHCR image's
+contents were inspected; the separately built Gitea image still needs its first
+runner-side pull/version check. A mismatched image fails rather than silently
+using another toolchain. Local development still needs its own matching browser
+installation as described above.
+
+These workflows do not inject operator YAML or application credentials, write
+package versions, publish images, or deploy. Release/tag jobs remain deferred.
+GitHub's checkout token has only `contents: read`; the public GHCR image requires
+no registry login. The Woodpecker runner needs pull access to the existing Gitea
+CI image, as for `when`. Configure read access at the CI platform, not by exposing
+publishing credentials to application commands or pull requests.
+
+### Woodpecker email notifications
+
+Every package pipeline has one `notify` step using
+`deblan/woodpecker-email:3.3.0`, with `status: [failure, success]`. It runs only on
+main pushes, never PRs. The plugin infers the result from the CI status, so no
+explicit `level` setting or duplicate steps are needed. Configure or confirm these existing secret names
+in the effective repository/organization/global secret scope:
+
+- `woodpecker_email_dsn`
+- `woodpecker_email_from_address`
+- `woodpecker_email_from_name`
+- `woodpecker_email_recipient`
+
+Restrict all four secrets server-side to the `push` event and the email plugin
+image/tag (`deblan/woodpecker-email:3.3.0`). Ensure the allowlist includes this
+version; retain tags still required by other repositories sharing these secrets.
+Do not enable PR access: YAML conditions alone cannot protect secrets
+from a PR that changes the workflow. Bind secrets only in notification settings,
+not application commands. Missing SMTP settings/delivery remain operator setup,
+not a passing notification test. Common-path changes can produce three package
+emails rather than one aggregate message.
+
+Enable the repository in Woodpecker with a Linux amd64 container-backed runner
+that can pull the CI images, and place/enable the workflow in the intended GitHub
+repository or mirror. A Gitea pull request does not automatically create a GitHub
+pull request or trigger that provider's PR event. Check actual runs on each
+provider separately; YAML checks, image inspection, and local `pnpm verify` are
+not successful hosted CI runs. Review branch-protection/required-check settings
+before enabling path filters: GitHub can leave a required check pending when its
+entire workflow is skipped. Do not blindly require every selectively triggered
+package check. Distinct job names avoid ambiguous statuses but do not solve that
+provider policy issue.
+
+There are no schema/validation/image/release commands yet. Axe and PageSpeed
+remain owner-run manual checks, not automated gates.
+
+## Manual checks for the bootstrap handoff
+
+1. Follow the clean setup in an isolated export of the staged commit. Check the
+   root verification and CLI help/error examples without personal config.
+2. After the reviewed CI commit is authorized and pushed, inspect a Woodpecker PR
+   run and a GitHub PR/main run on the configured providers. Confirm package
+   routing: config/root/tooling/docs/workflow changes fan out; application-only
+   changes select their own pipeline. Check pinned tools, frozen install, package
+   gates, and web's preinstalled browsers/production E2E. Review required-check
+   policy against skipped workflows. An absent runner or GitHub mirror remains
+   an outstanding operator setup task, not a passing check.
+3. Review events and permissions: PR checks must not receive SMTP or publishing/
+   deployment secrets and must not send email or push images. Confirm SMTP event/
+   plugin restrictions at the server, including any higher-priority secret
+   overrides. On an authorized main run, check package notifications actually
+   arrive. Verify failure delivery in a controlled runner test, not by breaking
+   main. Do not inject operator YAML or credentials into application checks.
+4. Run `pnpm dev`; check the placeholder at desktop/narrow widths, OS light/dark,
+   and with JavaScript disabled. CLI behavior and the page should be unchanged by
+   the CI/toolchain commit. For production output, after `pnpm build`, run:
 
    ```sh
    HOST=127.0.0.1 PORT=3000 ORIGIN=http://127.0.0.1:3000 node apps/web/build/index.js
    ```
 
-   Open `http://127.0.0.1:3000` and compare the same content. Stop the server when
-   finished; no dashboard controls are expected yet.
+   Open `http://127.0.0.1:3000`, then stop the server when finished. No dashboard
+   controls are expected. Run manual axe/PageSpeed when the actual UI exists;
+   placeholder scores do not establish final-app accessibility/performance.
 
 Complete agent review before staged owner review. Stage only one coherent commit
 at a time when requested, and wait for manual review and explicit permission

@@ -1,0 +1,51 @@
+name: CI (CLI App)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*'
+      - docs/**
+      - .github/workflows/**
+      - .woodpecker/**
+      - apps/cli/**
+      - packages/**
+  pull_request:
+    paths:
+      - '*'
+      - docs/**
+      - .github/workflows/**
+      - .woodpecker/**
+      - apps/cli/**
+      - packages/**
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: CLI checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build CLI and shared dependencies
+        run: pnpm --filter '@where/cli...' build
+      - name: Check types
+        run: pnpm --filter @where/cli check
+      - name: Lint root and workspace
+        run: |
+          pnpm lint
+          pnpm --filter @where/cli lint
+      - name: Unit and artifact tests
+        run: pnpm --filter @where/cli test:coverage

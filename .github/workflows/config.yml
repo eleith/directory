@@ -1,0 +1,49 @@
+name: CI (Config Package)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*'
+      - docs/**
+      - .github/workflows/**
+      - .woodpecker/**
+      - packages/config/**
+  pull_request:
+    paths:
+      - '*'
+      - docs/**
+      - .github/workflows/**
+      - .woodpecker/**
+      - packages/config/**
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: Config checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build config
+        run: pnpm --filter '@where/config...' build
+      - name: Check types
+        run: pnpm --filter @where/config check
+      - name: Lint root and workspace
+        run: |
+          pnpm lint
+          pnpm --filter @where/config lint
+      - name: Unit and artifact tests
+        run: pnpm --filter @where/config test:coverage

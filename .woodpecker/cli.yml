@@ -1,0 +1,84 @@
+workspace:
+  base: /workspace
+  path: src
+
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - '*'
+        - docs/**
+        - .github/workflows/**
+        - .woodpecker/**
+        - apps/cli/**
+        - packages/**
+  - event: pull_request
+    path:
+      include:
+        - '*'
+        - docs/**
+        - .github/workflows/**
+        - .woodpecker/**
+        - apps/cli/**
+        - packages/**
+
+steps:
+  prepare:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - corepack install --global pnpm@11.9.0
+      - pnpm config set store-dir .pnpm-store
+      - pnpm install --frozen-lockfile
+      - pnpm build:packages
+
+  build:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - pnpm --filter @where/cli build
+
+  lint:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - pnpm --filter @where/cli check
+      - pnpm lint
+      - pnpm --filter @where/cli lint
+
+  test:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - pnpm --filter @where/cli test:coverage
+
+  notify:
+    image: deblan/woodpecker-email:3.3.0
+    settings:
+      dsn:
+        from_secret: woodpecker_email_dsn
+      from:
+        address:
+          from_secret: woodpecker_email_from_address
+        name:
+          from_secret: woodpecker_email_from_name
+      recipients:
+        from_secret: woodpecker_email_recipient
+      recipients_only: true
+    when:
+      - event: push
+        branch: main
+        status: [failure, success]

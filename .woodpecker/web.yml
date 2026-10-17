@@ -1,0 +1,93 @@
+workspace:
+  base: /workspace
+  path: src
+
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - '*'
+        - docs/**
+        - .github/workflows/**
+        - .woodpecker/**
+        - apps/web/**
+        - packages/**
+  - event: pull_request
+    path:
+      include:
+        - '*'
+        - docs/**
+        - .github/workflows/**
+        - .woodpecker/**
+        - apps/web/**
+        - packages/**
+
+steps:
+  prepare:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - corepack install --global pnpm@11.9.0
+      - pnpm config set store-dir .pnpm-store
+      - pnpm install --frozen-lockfile
+      - pnpm build:packages
+
+  lint:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - pnpm --filter @where/web check
+      - pnpm lint
+      - pnpm --filter @where/web lint
+
+  test:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - pnpm --filter @where/web test:coverage
+
+  build:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - pnpm --filter @where/web build
+
+  e2e:
+    image: git.eleith.com/eleith.private/playwright:1.61.1-node26
+    commands:
+      - node --version
+      - pnpm --version
+      - node --eval "if (process.versions.node !== '26.5.0') throw new Error('Expected Node 26.5.0')"
+      - test "$(pnpm --version)" = "11.9.0"
+      - pnpm --filter @where/web test:e2e
+
+  notify:
+    image: deblan/woodpecker-email:3.3.0
+    settings:
+      dsn:
+        from_secret: woodpecker_email_dsn
+      from:
+        address:
+          from_secret: woodpecker_email_from_address
+        name:
+          from_secret: woodpecker_email_from_name
+      recipients:
+        from_secret: woodpecker_email_recipient
+      recipients_only: true
+    when:
+      - event: push
+        branch: main
+        status: [failure, success]
