@@ -5,9 +5,10 @@
 The bootstrap contains all three workspaces, local quality gates, and non-publishing
 Woodpecker/GitHub workflow definitions. CLI help and the SSR placeholder read the
 same supported configuration format version. The TypeBox schema, inferred types
-and deterministic editor-schema generation are implemented; see
-[configuration](config.md). YAML loading, CLI validation, authentication, the
-dashboard, application images and releases are not implemented yet.
+and deterministic editor-schema generation are implemented, along with YAML
+loading, environment interpolation and standalone CLI validation; see
+[configuration](config.md). Authentication, dashboard rendering, application
+images and releases are not implemented yet.
 
 ## Toolchain
 
@@ -62,30 +63,45 @@ never relies on an existing `dist`. Build before independent workspace
 checks/tests; `pnpm verify` does this in order.
 After editing config source during development, rebuild shared output to make it
 visible to Vite; there is no automatic config-source compiler/watch process.
+The config package pins YAML **2.9.1**. The CLI uses **Gunshi 0.35.1** for
+commands, arguments and generated help, matching When. It uses catalog-pinned esbuild
+**0.28.2** for its Node bundle; dependency install scripts are disabled for
+esbuild because the platform binary ships as an optional dependency.
 
-### CLI help and errors
+### CLI validation
 
 ```sh
 pnpm cli -- --help
-pnpm cli -- -h
-pnpm cli -- --unknown
+pnpm cli -- validate apps/web/config/where.example.yml
 ```
 
 The root command builds shared config and the CLI, then runs its compiled Node
-entrypoint. Help returns 0 on stdout; missing/unsupported arguments return 1 on
-stderr. The pnpm wrapper also emits build logs; these stream guarantees refer to
-the compiled CLI entrypoint itself. `validate` is deliberately unsupported until the real loader/validator
-exists. Exactly one leading `--` is accepted for package-manager forwarding;
-extra arguments and repeated separators are rejected. No YAML or environment
-configuration is read by this bootstrap command.
+entrypoint. The wrapper also emits build logs; the following stream guarantees
+refer to the compiled CLI itself:
 
-The package exposes a side-effect-free `runCli` API independently of its executable
-entrypoint. Unit tests inject output sinks; subprocess tests invoke the built
-entry from an unrelated working directory, check exits/output/shebang, and verify
-importing the API does not execute main. The artifact still depends on compiled
-`@where/config` in the workspace; these are not standalone-distribution tests.
-Config compiled-module and CLI subprocess tests do not contribute to source
-coverage; passing them is not a claim of full source coverage.
+- Help returns 0 on stdout without loading configuration.
+- `where validate [path]` returns 0 on stdout for a valid file, otherwise 1 on
+  stderr. It checks the actual environment, with no weaker structure-only mode.
+- Missing commands, unknown options and extra paths return 1 on stderr. Exactly
+  one leading `--` is accepted for package-manager forwarding; repeated or
+  mid-command separators are rejected. Gunshi handles help in its normal flag
+  positions, including after a path, without loading configuration.
+- Output contains no configuration values, filenames or parser snippets. See
+  [configuration](config.md) for paths, interpolation and safe error codes.
+
+The package's build command runs TypeScript and esbuild directly, following
+When's pattern. It cleans `dist`, emits declarations, and bundles `index.js` and
+the side-effect-free `cli.js`. Only Node built-ins remain external. The
+executable keeps its shebang and executable mode; it needs no source, workspace
+resolution or `node_modules` at runtime. `runCli` is async and accepts injected
+output sinks and an optional environment map.
+
+Artifact tests copy only those two bundles outside the workspace, run from that
+temporary directory, and compare acceptance/errors with the shared loader. They
+cover configuration paths, auth/environment failures, secret sentinels, help,
+arguments and API import without executing main. Config compiled-module and CLI
+subprocess tests do not contribute to source coverage; passing them is not a
+claim of full source coverage.
 
 ### Browser checks
 
@@ -194,15 +210,18 @@ entire workflow is skipped. Do not blindly require every selectively triggered
 package check. Distinct job names avoid ambiguous statuses but do not solve that
 provider policy issue.
 
-Schema generation/drift commands are available; YAML loading, CLI validation,
-image and release commands are not. Axe and PageSpeed
-remain owner-run manual checks, not automated gates.
+Schema generation, YAML loading and CLI validation are available. Image and
+release commands remain deferred. Axe and PageSpeed remain owner-run manual
+checks, not automated gates.
 
-## Manual checks for the bootstrap handoff
+## Manual checks
 
-1. Follow the clean setup in an isolated export of the staged commit. Check the
-   root verification and CLI help/error examples without personal config.
-2. After the reviewed CI commit is authorized and pushed, inspect a Woodpecker PR
+1. Follow the clean setup in an isolated export of the staged commit. Check root
+   verification, CLI help and validation of the documented example without
+   personal config. Use a disposable file with a missing environment reference
+   or malformed YAML and check the failure output stays redacted. In a YAML-aware
+   editor, check template syntax and required-field diagnostics.
+2. After changes are authorized and pushed, inspect a Woodpecker PR
    run and a GitHub PR/main run on the configured providers. Confirm package
    routing: config/root/tooling/docs/workflow changes fan out; application-only
    changes select their own pipeline. Check pinned tools, frozen install, package
@@ -216,8 +235,8 @@ remain owner-run manual checks, not automated gates.
    arrive. Verify failure delivery in a controlled runner test, not by breaking
    main. Do not inject operator YAML or credentials into application checks.
 4. Run `pnpm dev`; check the placeholder at desktop/narrow widths, OS light/dark,
-   and with JavaScript disabled. CLI behavior and the page should be unchanged by
-   the CI/toolchain commit. For production output, after `pnpm build`, run:
+   and with JavaScript disabled. The web page still shows no operator configuration.
+   For production output, after `pnpm build`, run:
 
    ```sh
    HOST=127.0.0.1 PORT=3000 ORIGIN=http://127.0.0.1:3000 node apps/web/build/index.js

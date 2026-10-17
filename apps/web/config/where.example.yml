@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../../../packages/config/src/config.schema.json
-# Schema example only: the bootstrap does not load this file or enable authentication yet.
+# The CLI can validate this file; the web page does not load it or enforce authentication yet.
 version: 1
 site:
   title: Home Server

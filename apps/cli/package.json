@@ -16,7 +16,7 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "rm -rf dist && tsc -p tsconfig.build.json && esbuild src/index.ts src/cli.ts --bundle --platform=neutral --format=esm --target=node26 --outdir=dist --main-fields=module,main --conditions=import --external:node:*",
 		"check": "tsc --noEmit -p tsconfig.json",
 		"lint": "prettier --ignore-path ../../.prettierignore --check . && eslint .",
 		"format": "prettier --ignore-path ../../.prettierignore --write .",
@@ -24,11 +24,13 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"@where/config": "workspace:*"
+		"@where/config": "workspace:*",
+		"gunshi": "0.35.1"
 	},
 	"devDependencies": {
 		"@types/node": "catalog:",
 		"@vitest/coverage-v8": "catalog:",
+		"esbuild": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}

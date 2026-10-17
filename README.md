@@ -6,10 +6,10 @@ right link. The dashboard will be driven by one mounted YAML file.
 ## Current state
 
 The bootstrap includes a server-rendered placeholder, a compiled shared config
-package, CLI help/error handling, and non-publishing CI definitions. The page and
-CLI share the supported configuration format version. The TypeBox configuration
-contract and generated editor schema are now available. YAML loading, CLI
-validation, authentication, and dashboard links are not implemented yet.
+package, and non-publishing CI definitions. The shared loader reads YAML, applies
+defaults, expands environment values, and validates the TypeBox contract. The
+standalone CLI uses that same loader. The web page still shows a placeholder;
+authentication and dashboard links are not implemented yet.
 See the [configuration contract](docs/config.md) and
 [example](apps/web/config/where.example.yml).
 
@@ -28,15 +28,17 @@ Open `http://localhost:5173`. The placeholder should render with JavaScript
 disabled, too. Linux browser prerequisites and other commands are documented in
 [development](docs/development.md).
 
-The CLI currently supports help only:
+Validate the example or your own configuration:
 
 ```sh
 pnpm cli -- --help
+pnpm cli -- validate apps/web/config/where.example.yml
 ```
 
-Unsupported commands, including `validate`, exit nonzero rather than pretending
-to validate configuration. See [agent instructions](AGENTS.md) for the review
-workflow.
+Validation returns 0 for a valid file and nonzero for unreadable or invalid input.
+It checks environment references without printing configuration values. See
+[configuration](docs/config.md) for paths, interpolation and safe errors, and
+[agent instructions](AGENTS.md) for the review workflow.
 
 ## Continuous integration
 
@@ -51,5 +53,4 @@ Each Woodpecker pipeline has one status-aware email step for main pushes, using 
 notification secret names. Confirm those bindings and Gitea CI-image pull access
 on the actual provider; a Gitea PR does not itself trigger GitHub Actions. See
 [development](docs/development.md) for routing, safe secret setup, first-run
-checks, and scope limits. Configuration loading and CLI validation are the next
-commit; this schema-only step does not enable them.
+checks, and scope limits.

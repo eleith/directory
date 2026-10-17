@@ -1,13 +1,28 @@
 import { readFileSync } from 'node:fs';
 import { Type } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import { describe, expect, it } from 'vitest';
 import { createEditorSchema } from './editor-schema.js';
-import { configurationReferences, WhereConfigurationSchema } from './schema.js';
+import {
+	configurationReferences,
+	HexColorSchema,
+	HttpUrlSchema,
+	LocalImagePathSchema,
+	SiteSchema,
+	WhereConfigurationSchema
+} from './schema.js';
 
 type ObjectSchema = Record<string, unknown>;
 const object = (value: unknown) => value as ObjectSchema;
 const property = (schema: ObjectSchema, key: string) => object(object(schema.properties)[key]);
 const definition = (schema: ObjectSchema, key: string) => object(object(schema.$defs)[key]);
+
+function interpolationPattern(schema: ObjectSchema): RegExp {
+	const branches = schema.anyOf as ObjectSchema[];
+	expect(branches).toHaveLength(2);
+	expect(branches[1]).toEqual({ type: 'string', pattern: expect.any(String) });
+	return new RegExp(String(branches[1]!.pattern));
+}
 
 describe('default-aware editor schema', () => {
 	it('keeps links/title/URL/credentials required while relaxing loaded defaults', () => {
@@ -36,7 +51,7 @@ describe('default-aware editor schema', () => {
 		expect(authBranches.map((branch) => branch.required)).toEqual([['oidc'], ['credentials']]);
 		expect(authBranches.every((branch) => branch.additionalProperties === false)).toBe(true);
 		expect(property(editor, 'links').additionalProperties).toBe(false);
-		expect(definition(editor, 'HttpUrl').format).toBe('uri');
+		expect(object((definition(editor, 'HttpUrl').anyOf as unknown[])[0]).format).toBe('uri');
 	});
 
 	it('produces only resolvable local references, with no invented publication URL', () => {
@@ -63,19 +78,25 @@ describe('default-aware editor schema', () => {
 		expect(references).toBeGreaterThan(10);
 	});
 
-	it('matches the committed JSON artifact without mutating canonical schema', () => {
-		const before = JSON.stringify([WhereConfigurationSchema, configurationReferences]);
-		const editor = createEditorSchema();
+	it('matches the committed JSON artifact', () => {
 		expect(
 			JSON.parse(readFileSync(new URL('./config.schema.json', import.meta.url), 'utf8'))
-		).toEqual(editor);
+		).toEqual(createEditorSchema());
+	});
+
+	it('does not mutate canonical schemas and produces repeatable output', () => {
+		const before = JSON.stringify([WhereConfigurationSchema, configurationReferences]);
+		const editor = createEditorSchema();
 		expect(JSON.stringify([WhereConfigurationSchema, configurationReferences])).toBe(before);
 		expect(createEditorSchema()).toEqual(editor);
 	});
 
 	it('walks map values, additional properties, arrays, unions and referenced defaults', () => {
 		const namedDefault = Type.String({ $id: 'Text/with~default', default: 'ready' });
-		const member = Type.Object({ title: Type.String(), enabled: Type.Boolean({ default: true }) });
+		const member = Type.Object({
+			title: Type.String({ pattern: '\\S' }),
+			enabled: Type.Boolean({ default: true })
+		});
 		const fixture = Type.Object({
 			text: Type.Unsafe<string>(Type.Ref(namedDefault.$id!)),
 			map: Type.Record(Type.String(), member),
@@ -91,12 +112,21 @@ describe('default-aware editor schema', () => {
 		expect(
 			object(Object.values(object(property(editor, 'map').patternProperties))[0]).required
 		).toEqual(['title']);
-		expect(object(property(editor, 'array').items).required).toEqual(['title']);
+		const arrayMember = object(property(editor, 'array').items);
+		expect(arrayMember.required).toEqual(['title']);
+		expect(interpolationPattern(property(arrayMember, 'title')).test('${TITLE}')).toBe(true);
 		expect(
 			(property(editor, 'union').anyOf as ObjectSchema[]).map((branch) => branch.required)
 		).toEqual([['title'], ['url']]);
+		const unionMember = (property(editor, 'union').anyOf as ObjectSchema[])[0]!;
+		expect(interpolationPattern(property(unionMember, 'title')).test('${TITLE}')).toBe(true);
 		const additional = createEditorSchema(Type.Object({}, { additionalProperties: member }), []);
 		expect(object(additional.additionalProperties).required).toEqual(['title']);
+		expect(
+			interpolationPattern(property(object(additional.additionalProperties), 'title')).test(
+				'${TITLE}'
+			)
+		).toBe(true);
 	});
 
 	it('preserves annotation data rather than treating defaults as schemas', () => {
@@ -104,10 +134,171 @@ describe('default-aware editor schema', () => {
 			required: ['keep'],
 			properties: { keep: { default: 'annotation' } },
 			$ref: 'literal-data',
-			$id: 'literal-id'
+			$id: 'literal-id',
+			type: 'string',
+			pattern: 'literal-pattern',
+			const: 'literal-constant',
+			anyOf: [{ type: 'string', pattern: 'annotation-pattern' }]
 		};
 		const editor = createEditorSchema(Type.Object({ data: Type.Unknown({ default: data }) }), []);
 		expect(property(editor, 'data').default).toEqual(data);
+	});
+
+	it('separates literal constraints from the environment-token branch', () => {
+		const editor = createEditorSchema();
+		for (const canonical of [HttpUrlSchema, LocalImagePathSchema, HexColorSchema]) {
+			const adapted = definition(editor, canonical.$id!);
+			const literal: ObjectSchema = { type: 'string', pattern: canonical.pattern };
+			if (canonical.format) literal.format = 'uri';
+			expect(adapted.anyOf).toEqual([literal, { type: 'string', pattern: expect.any(String) }]);
+			expect(adapted.pattern).toBeUndefined();
+			expect(adapted.format).toBeUndefined();
+			expect(adapted.description).toBe(canonical.description);
+		}
+		const order = property(definition(editor, 'Site'), 'order');
+		expect(order.default).toBe('configured');
+		expect(order.description).toBe(SiteSchema.properties.order.description);
+		const choices = order.anyOf as ObjectSchema[];
+		expect(choices.map((choice) => (choice.anyOf as ObjectSchema[])[0])).toEqual([
+			{ type: 'string', const: 'configured' },
+			{ type: 'string', const: 'alphabetical' }
+		]);
+		for (const choice of choices) {
+			expect(choice.const).toBeUndefined();
+			expect(interpolationPattern(choice).test('${ORDER:-configured}')).toBe(true);
+		}
+	});
+
+	it.each([
+		'${HOST}',
+		'${_HOST_2}',
+		'${HOST:-}',
+		'${HOST:-literal fallback}',
+		'${HOST:-line one\nline two}',
+		'${HOST:-${OTHER}}',
+		'prefix ${HOST} suffix',
+		'$$${HOST}',
+		'$$$$${HOST}',
+		'$${ESCAPED} then ${HOST}',
+		'javascript:${CODE}',
+		'${HOST:-javascript:alert(1)}'
+	])('recognizes a supported unescaped token in %j', (value) => {
+		const editor = createEditorSchema();
+		for (const name of ['HttpUrl', 'LocalImagePath', 'HexColor']) {
+			expect(interpolationPattern(definition(editor, name)).test(value)).toBe(true);
+		}
+	});
+
+	it.each([
+		'',
+		'${host}',
+		'${1HOST}',
+		'${HÖST}',
+		'${HOST.NAME}',
+		'${HOST-NAME}',
+		'${ HOST}',
+		'${HOST:default}',
+		'${HOST-default}',
+		'${HOST:=default}',
+		'${HOST',
+		'$HOST',
+		'$${HOST}',
+		'$$$${HOST}',
+		'$$$$$${HOST}',
+		'prefix $${HOST:-fallback}',
+		'javascript:alert(1)',
+		'javascript:$${CODE}',
+		'data:text/html,test',
+		'file:///etc/passwd',
+		'/relative',
+		'https://',
+		'https://[broken'
+	])('does not grant the placeholder exception to %j', (value) => {
+		const editor = createEditorSchema();
+		for (const name of ['HttpUrl', 'LocalImagePath', 'HexColor']) {
+			expect(interpolationPattern(definition(editor, name)).test(value)).toBe(false);
+		}
+	});
+
+	it('relaxes constrained string leaves while preserving types, annotations and falsy defaults', () => {
+		const examples = [{ type: 'string', const: 'annotation', $ref: 'literal' }];
+		const fixture = Type.Object({
+			choice: Type.String({ enum: ['first', 'second'], default: '', examples }),
+			constant: Type.Literal('fixed'),
+			text: Type.String(),
+			limited: Type.String({ minLength: 2, maxLength: 5, title: 'Limited text' }),
+			flag: Type.Boolean({ default: false }),
+			count: Type.Number({ default: 0 }),
+			version: Type.Literal(1)
+		});
+		const editor = createEditorSchema(fixture, []);
+		expect(editor.required).toEqual(['constant', 'text', 'limited', 'version']);
+		expect(property(editor, 'choice')).toMatchObject({ default: '', examples });
+		expect((property(editor, 'choice').anyOf as ObjectSchema[])[0]).toEqual({
+			type: 'string',
+			enum: ['first', 'second']
+		});
+		expect((property(editor, 'constant').anyOf as ObjectSchema[])[0]).toEqual({
+			type: 'string',
+			const: 'fixed'
+		});
+		expect(property(editor, 'text')).toEqual({ type: 'string' });
+		expect(property(editor, 'limited').title).toBe('Limited text');
+		expect((property(editor, 'limited').anyOf as ObjectSchema[])[0]).toEqual({
+			type: 'string',
+			minLength: 2,
+			maxLength: 5
+		});
+		expect(property(editor, 'flag')).toEqual({ type: 'boolean', default: false });
+		expect(property(editor, 'count')).toEqual({ type: 'number', default: 0 });
+		expect(property(editor, 'version')).toEqual({ type: 'number', const: 1 });
+	});
+
+	it('keeps object-key and slug-map constraints literal while relaxing their values', () => {
+		const value = Type.String({ pattern: '^ready$' });
+		const editor = createEditorSchema(
+			Type.Record(Type.String({ pattern: '^[a-z]+$' }), value, {
+				propertyNames: Type.String({ pattern: '^allowed$', enum: ['allowed'] }),
+				additionalProperties: false
+			}),
+			[]
+		);
+		expect(editor.propertyNames).toEqual({
+			type: 'string',
+			pattern: '^allowed$',
+			enum: ['allowed']
+		});
+		expect(Object.keys(object(editor.patternProperties))).toEqual(['^[a-z]+$']);
+		expect(editor.additionalProperties).toBe(false);
+		expect(
+			interpolationPattern(object(object(editor.patternProperties)['^[a-z]+$'])).test('${VALUE}')
+		).toBe(true);
+		const links = property(createEditorSchema(), 'links');
+		const canonicalLinks = WhereConfigurationSchema.properties.links;
+		expect(Object.keys(object(links.patternProperties))).toEqual(
+			Object.keys(canonicalLinks.patternProperties)
+		);
+		for (const pattern of Object.keys(object(links.patternProperties))) {
+			expect(new RegExp(pattern).test('${SLUG}')).toBe(false);
+		}
+	});
+
+	it('leaves canonical validation strict for placeholders and expanded values', () => {
+		for (const schema of [HttpUrlSchema, LocalImagePathSchema, HexColorSchema]) {
+			expect(Value.Check(schema, '${VALUE}')).toBe(false);
+			expect(Value.Check(schema, false)).toBe(false);
+			expect(Value.Check(schema, 1)).toBe(false);
+		}
+		for (const url of ['javascript:alert(1)', 'https://', 'https://[broken']) {
+			expect(Value.Check(HttpUrlSchema, url)).toBe(false);
+		}
+		expect(Value.Check(HttpUrlSchema, 'https://example.com')).toBe(true);
+		expect(Value.Check(LocalImagePathSchema, '/public/../logo.svg')).toBe(false);
+		expect(Value.Check(LocalImagePathSchema, '/public/logo.svg')).toBe(true);
+		expect(Value.Check(HexColorSchema, 'red')).toBe(false);
+		expect(Value.Check(HexColorSchema, '#abc')).toBe(true);
+		expect(Value.Check(SiteSchema.properties.order, '${ORDER}')).toBe(false);
+		expect(Value.Check(SiteSchema.properties.order, 'alphabetical')).toBe(true);
 	});
 
 	it('rejects missing/duplicate IDs and dangling references', () => {

@@ -23,25 +23,51 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$defs": {
 		"HttpUrl": {
-			"format": "uri",
-			"pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^\\s]+$",
 			"description": "An absolute HTTP or HTTPS URL. Relative and executable URLs are not accepted.",
-			"type": "string"
+			"type": "string",
+			"anyOf": [
+				{ "type": "string", "format": "uri", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^\\s]+$" },
+				{
+					"type": "string",
+					"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+				}
+			]
 		},
 		"LocalImagePath": {
-			"pattern": "^/public/(?:(?!\\.{1,2}(?:/|$))[^/%\\\\?#\\x00-\\x1f\\x7f]+/)*(?!\\.{1,2}(?:/|$))[^/%\\\\?#\\x00-\\x1f\\x7f]+\\.(?:[sS][vV][gG]|[pP][nN][gG]|[jJ][pP][eE]?[gG]|[gG][iI][fF]|[wW][eE][bB][pP])(?![\\s\\S])",
 			"description": "A decoded image path under /public/. Use SVG, PNG, JPEG, GIF or WebP; no dot segments, percent escapes, backslashes, queries or fragments.",
-			"type": "string"
+			"type": "string",
+			"anyOf": [
+				{
+					"type": "string",
+					"pattern": "^/public/(?:(?!\\.{1,2}(?:/|$))[^/%\\\\?#\\x00-\\x1f\\x7f]+/)*(?!\\.{1,2}(?:/|$))[^/%\\\\?#\\x00-\\x1f\\x7f]+\\.(?:[sS][vV][gG]|[pP][nN][gG]|[jJ][pP][eE]?[gG]|[gG][iI][fF]|[wW][eE][bB][pP])(?![\\s\\S])"
+				},
+				{
+					"type": "string",
+					"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+				}
+			]
 		},
 		"HexColor": {
-			"pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})(?![\\s\\S])",
 			"description": "A three- or six-digit hexadecimal color.",
-			"type": "string"
+			"type": "string",
+			"anyOf": [
+				{ "type": "string", "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})(?![\\s\\S])" },
+				{
+					"type": "string",
+					"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+				}
+			]
 		},
 		"Tags": {
-			"pattern": "^[^\\x00-\\x1f\\x7f]*(?![\\s\\S])",
 			"description": "Comma-separated labels, not a map or list. Empty means no tags.",
-			"type": "string"
+			"type": "string",
+			"anyOf": [
+				{ "type": "string", "pattern": "^[^\\x00-\\x1f\\x7f]*(?![\\s\\S])" },
+				{
+					"type": "string",
+					"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+				}
+			]
 		},
 		"Link": {
 			"additionalProperties": false,
@@ -49,10 +75,15 @@
 			"required": ["title", "url"],
 			"properties": {
 				"title": {
-					"minLength": 1,
-					"pattern": "\\S",
 					"description": "Visible name of this link.",
-					"type": "string"
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "pattern": "\\S", "minLength": 1 },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
 				},
 				"url": { "$ref": "#/$defs/HttpUrl" },
 				"description": { "description": "Plain text; multiline is supported.", "type": "string" },
@@ -60,10 +91,15 @@
 				"favicon_path": { "$ref": "#/$defs/LocalImagePath" },
 				"tags": { "default": "", "$ref": "#/$defs/Tags" },
 				"group": {
-					"minLength": 1,
-					"pattern": "\\S",
 					"description": "Optional display group label.",
-					"type": "string"
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "pattern": "\\S", "minLength": 1 },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
 				},
 				"requires_auth": {
 					"default": false,
@@ -86,7 +122,17 @@
 			"additionalProperties": false,
 			"type": "object",
 			"properties": {
-				"title": { "minLength": 1, "pattern": "\\S", "default": "Where", "type": "string" },
+				"title": {
+					"default": "Where",
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "pattern": "\\S", "minLength": 1 },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
+				},
 				"description": { "default": "", "type": "string" },
 				"logo_path": { "$ref": "#/$defs/LocalImagePath" },
 				"favicon_path": { "$ref": "#/$defs/LocalImagePath" },
@@ -95,8 +141,26 @@
 					"default": "configured",
 					"description": "Ordering of groups and links; the ungrouped Other bucket stays last.",
 					"anyOf": [
-						{ "const": "configured", "type": "string" },
-						{ "const": "alphabetical", "type": "string" }
+						{
+							"type": "string",
+							"anyOf": [
+								{ "type": "string", "const": "configured" },
+								{
+									"type": "string",
+									"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+								}
+							]
+						},
+						{
+							"type": "string",
+							"anyOf": [
+								{ "type": "string", "const": "alphabetical" },
+								{
+									"type": "string",
+									"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+								}
+							]
+						}
 					]
 				}
 			}
@@ -115,8 +179,26 @@
 			"required": ["issuer", "client_id", "client_secret"],
 			"properties": {
 				"issuer": { "$ref": "#/$defs/HttpUrl" },
-				"client_id": { "minLength": 1, "pattern": "\\S", "type": "string" },
-				"client_secret": { "minLength": 1, "type": "string" }
+				"client_id": {
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "pattern": "\\S", "minLength": 1 },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
+				},
+				"client_secret": {
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "minLength": 1 },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
+				}
 			}
 		},
 		"CredentialsAuth": {
@@ -124,8 +206,26 @@
 			"type": "object",
 			"required": ["username", "password"],
 			"properties": {
-				"username": { "minLength": 1, "pattern": "\\S", "type": "string" },
-				"password": { "minLength": 1, "type": "string" }
+				"username": {
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "pattern": "\\S", "minLength": 1 },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
+				},
+				"password": {
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "minLength": 1 },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
+				}
 			}
 		},
 		"Auth": {

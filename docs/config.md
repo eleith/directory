@@ -6,11 +6,10 @@ configuration and inferred TypeScript types. The generated
 optionality: fields with defaults can be omitted, but link titles/URLs and auth
 credentials remain required.
 
-**Current scope:** schema, types and editor generation only. The application does
-not read YAML or enforce this configuration yet. `where validate`, environment
-expansion, redacted loading errors, authentication and dashboard rendering are
-not implemented in this commit. CLI help still works; `validate` still fails.
-Do not treat a schema-valid auth block as an active access-control feature.
+The shared loader and `where validate` now read YAML, apply defaults, expand
+environment values and validate the result. The web page still uses no operator
+configuration. Authentication, file reloads and dashboard rendering are later
+work; a valid auth block does not enable access control yet.
 
 ## Start with the example
 
@@ -28,6 +27,84 @@ links:
 There is no hosted schema URL. If copying the file elsewhere, update the schema
 comment to the artifact's real location. The package also exports
 `@where/config/schema.json`; runtime consumers resolve compiled ESM, not TS source.
+
+## Loading and validation
+
+```sh
+pnpm cli -- validate apps/web/config/where.example.yml
+```
+
+The wrapper builds the shared package and standalone CLI first. The compiled
+command is `node apps/cli/dist/index.js validate [path]`; its executable is named
+`where`. Gunshi defines commands and generates help, as in When. It accepts one
+leading `--` for package-manager forwarding. Use `where --help` or
+`where validate --help` for usage; help after a path also leaves the file unread.
+
+Path selection is explicit argument, then `CONFIG_PATH`, then
+`config/where.yaml`, relative to the working directory. There is no production-
+specific path or search for nearby files. The deployment layout is:
+
+```text
+deployment/
+  config/where.yaml
+  public/
+```
+
+`WHERE_PUBLIC_DIR` can override that sibling public directory. Relative overrides
+resolve from the working directory. Validation checks image-path syntax only;
+it does not inspect this directory or contact any destination.
+
+Files use one YAML 1.2 core document. Mapping keys are read as strings; duplicate
+keys, collection keys, unknown tags and other YAML versions are rejected. Merge
+keys are disabled. Alias expansion is bounded and cycles are rejected. Arrays,
+non-plain objects and unsafe keys are rejected before defaults can alter them.
+Explicit nulls and wrongly typed values are errors, not requests for defaults.
+Unknown fields remain errors.
+
+A valid file prints `Configuration is valid.` and exits 0. Invalid or unreadable
+input exits 1. Errors contain fixed messages, codes and field paths such as
+`/auth/credentials/password` or `/links/*/url`. Link IDs and unknown field names
+are replaced with `*`; filenames, values, environment-variable names, parser
+snippets and original exceptions are not printed.
+
+## Environment values
+
+Interpolation happens in string values **after YAML parsing**, not in keys. Values
+from the environment are not parsed as YAML, expanded again, or converted to
+booleans/numbers. Injecting an environment map through the loader API avoids
+reading the process environment; the CLI normally uses its process environment.
+
+| Syntax             | Meaning                                                                         |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `${VAR}`           | Use a set environment value; otherwise fail validation.                         |
+| `${VAR:-fallback}` | Use the fallback only when the variable is unset. An empty value counts as set. |
+| `$$`               | A literal `$`; `$${VAR}` produces literal `${VAR}`.                             |
+
+Names use uppercase ASCII letters, digits and underscores, starting with a
+letter or underscore. Fallbacks are literal text ending at the first `}`. Other
+dollar text is unchanged. Quote templates in YAML when punctuation could affect
+YAML parsing.
+
+For example:
+
+```yaml
+site:
+  order: '${WHERE_ORDER:-configured}'
+links:
+  photos:
+    title: Photos
+    url: '${PHOTOS_URL:-https://photos.example.com}'
+```
+
+The editor schema accepts supported templates in constrained string fields;
+actual URLs, paths, colors and string choices are checked after expansion by the
+loader. Required fields remain required. Booleans and numbers must be authored
+with their actual YAML types.
+
+**Public text stays public.** Using an environment variable in a title,
+description, URL, tag or other display field does not make it secret. The future
+dashboard will expose those values. Authentication configuration and session
+secrets stay outside its display model. The validator prints neither kind.
 
 ## Fields and defaults
 
@@ -65,7 +142,7 @@ an empty string. Commas separate labels; surrounding spaces and empty segments
 are ignored for display/search. This is not a quoted CSV dialect, so a comma is
 always a separator. Control characters/newlines are invalid. The configuration
 retains the authored string; splitting labels belongs to prepared display/search
-work, not this schema-only step.
+work, not loading or validation.
 
 `group` is an optional nonblank display label, independent of tags. If every link
 omits it, the planned directory is flat. If any link has a group, ungrouped links
@@ -107,10 +184,9 @@ auth:
 Username/password and all three OIDC fields are required and nonempty. Empty,
 null, unknown or mixed auth blocks are invalid; disabling the other strategy with
 `null` is invalid too. Omit `auth` entirely for no auth. Environment references are
-only literal text at this stage; C3 will expand them before runtime validation.
-Editors do not expand environment values, so references in constrained URL,
-image-path or color fields may be flagged until interpolation-aware tooling is
-added with the loader. Never put real credentials into committed examples.
+expanded before validation, including in OIDC issuer URLs. Editors recognize
+template syntax but cannot check the environment's values. Never put real
+credentials into committed examples.
 
 ## URLs and images
 
@@ -146,6 +222,6 @@ not regenerate the artifact or mask drift. Regenerate intentionally after schema
 changes, review the JSON diff, and update examples/tests together.
 
 Browser-facing code may import **types only** from `@where/config/types`. Its JS
-entry is empty and does not import the schema, format registry or a future loader.
+entry is empty and does not import the schema, format registry or loader.
 The canonical schema's TypeBox format registry entry is namespaced
 `where-http-url`; the editor copy uses standard `uri` plus the HTTP(S) pattern.

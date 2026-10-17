@@ -29,7 +29,8 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"@sinclair/typebox": "0.34.49"
+		"@sinclair/typebox": "0.34.49",
+		"yaml": "2.9.1"
 	},
 	"devDependencies": {
 		"@types/node": "catalog:",

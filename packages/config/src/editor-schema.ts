@@ -85,7 +85,28 @@ function removeDefaultedPropertiesFromRequired(node: SchemaObject, context: Edit
 	else node.required = required;
 }
 
-function adaptSchemaForEditor(node: unknown, context: EditorContext): void {
+function allowStringInterpolation(node: SchemaObject): void {
+	if (node.type !== 'string' || node.$ref || node.anyOf || node.oneOf || node.allOf) return;
+	const literalConstraints: SchemaObject = {};
+	for (const key of ['format', 'pattern', 'const', 'enum', 'minLength', 'maxLength']) {
+		if (!Object.hasOwn(node, key)) continue;
+		literalConstraints[key] = node[key];
+		delete node[key];
+	}
+	if (Object.keys(literalConstraints).length === 0) return;
+	// Dollar pairs are escapes; only an unpaired dollar can start an environment token.
+	const environmentToken = '(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}';
+	node.anyOf = [
+		{ type: 'string', ...literalConstraints },
+		{ type: 'string', pattern: environmentToken }
+	];
+}
+
+function adaptSchemaForEditor(
+	node: unknown,
+	context: EditorContext,
+	allowInterpolation = true
+): void {
 	if (!isObject(node)) return;
 	delete node.$id;
 	if (typeof node.$ref === 'string') {
@@ -103,7 +124,9 @@ function adaptSchemaForEditor(node: unknown, context: EditorContext): void {
 	]) {
 		const children = node[key];
 		if (isObject(children)) {
-			for (const child of Object.values(children)) adaptSchemaForEditor(child, context);
+			for (const child of Object.values(children)) {
+				adaptSchemaForEditor(child, context, allowInterpolation);
+			}
 		}
 	}
 	for (const key of [
@@ -124,10 +147,12 @@ function adaptSchemaForEditor(node: unknown, context: EditorContext): void {
 		'prefixItems'
 	]) {
 		const child = node[key];
+		const interpolateChild = allowInterpolation && key !== 'propertyNames';
 		if (Array.isArray(child)) {
-			for (const item of child) adaptSchemaForEditor(item, context);
+			for (const item of child) adaptSchemaForEditor(item, context, interpolateChild);
 		} else {
-			adaptSchemaForEditor(child, context);
+			adaptSchemaForEditor(child, context, interpolateChild);
 		}
 	}
+	if (allowInterpolation) allowStringInterpolation(node);
 }

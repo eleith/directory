@@ -1,0 +1,36 @@
+# @where/config
+
+Shared configuration for Where. The [contract](../../docs/config.md) lists fields,
+defaults, paths and environment syntax.
+
+```ts
+import { loadConfigFile } from '@where/config';
+
+const config = await loadConfigFile('config/where.yaml', { env: process.env });
+```
+
+`loadConfigFile(path?, { env }?)` reads YAML and calls
+`validateConfig(raw, { env }?)`. Both apply defaults, interpolate string values,
+and check the canonical TypeBox schema. Omitting `env` uses `process.env`; an
+injected map is used on its own. Neither function watches files or publishes
+state. The loader returns a fresh private configuration without changing the
+input. Display projection and immutable snapshots belong to the web server.
+
+Input is checked before defaulting: arrays, nulls, non-plain or cyclic objects,
+accessors, hidden/symbol properties and unsafe keys are rejected. This prevents
+TypeBox object defaults from changing invalid input into valid objects. Fields
+are never silently removed.
+
+Failures throw `ConfigError` with a safe message and readonly `issues` containing
+`code`, `path` and `message`. Values, filenames, variable names and original
+exceptions are excluded. Known field names remain visible; link IDs and unknown
+names become `*`. Catch unexpected errors without printing their raw contents.
+
+The package also exports `resolveConfigPath`, `resolveDeploymentRoot` and
+`resolvePublicDir`. These resolve operational paths without reading assets.
+The default layout has sibling `config/` and `public/` directories.
+
+Browser code must use **type-only** imports from `@where/config/types`; the main
+entry imports filesystem and validation code. `@where/config/schema.json` is the
+generated text-editor schema. See [development](../../docs/development.md) for
+build, schema-drift and test commands.

@@ -9,6 +9,14 @@ import type {
 	WhereConfigurationSchema
 } from './schema.js';
 
+export type ConfigEnvironment = Readonly<Record<string, string | undefined>>;
+export interface ConfigLoadOptions {
+	env?: ConfigEnvironment;
+}
+export interface ConfigPathOptions extends ConfigLoadOptions {
+	cwd?: string;
+}
+
 export type WhereConfiguration = Static<typeof WhereConfigurationSchema>;
 export type WhereLink = Static<typeof LinkSchema>;
 export type WhereSite = Static<typeof SiteSchema>;
