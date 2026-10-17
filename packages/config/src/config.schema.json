@@ -1,0 +1,154 @@
+{
+	"additionalProperties": false,
+	"title": "Where configuration",
+	"type": "object",
+	"required": ["links"],
+	"properties": {
+		"version": { "default": 1, "const": 1, "type": "number" },
+		"site": { "default": {}, "$ref": "#/$defs/Site" },
+		"appearance": { "default": {}, "$ref": "#/$defs/Appearance" },
+		"auth": { "$ref": "#/$defs/Auth" },
+		"links": {
+			"additionalProperties": false,
+			"description": "Links keyed by stable, non-numeric lowercase slugs. An empty map is allowed.",
+			"type": "object",
+			"patternProperties": {
+				"^(?![0-9]+(?![\\s\\S]))(?!(?:prototype|constructor)(?![\\s\\S]))[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])": {
+					"default": {},
+					"$ref": "#/$defs/Link"
+				}
+			}
+		}
+	},
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$defs": {
+		"HttpUrl": {
+			"format": "uri",
+			"pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^\\s]+$",
+			"description": "An absolute HTTP or HTTPS URL. Relative and executable URLs are not accepted.",
+			"type": "string"
+		},
+		"LocalImagePath": {
+			"pattern": "^/public/(?:(?!\\.{1,2}(?:/|$))[^/%\\\\?#\\x00-\\x1f\\x7f]+/)*(?!\\.{1,2}(?:/|$))[^/%\\\\?#\\x00-\\x1f\\x7f]+\\.(?:[sS][vV][gG]|[pP][nN][gG]|[jJ][pP][eE]?[gG]|[gG][iI][fF]|[wW][eE][bB][pP])(?![\\s\\S])",
+			"description": "A decoded image path under /public/. Use SVG, PNG, JPEG, GIF or WebP; no dot segments, percent escapes, backslashes, queries or fragments.",
+			"type": "string"
+		},
+		"HexColor": {
+			"pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})(?![\\s\\S])",
+			"description": "A three- or six-digit hexadecimal color.",
+			"type": "string"
+		},
+		"Tags": {
+			"pattern": "^[^\\x00-\\x1f\\x7f]*(?![\\s\\S])",
+			"description": "Comma-separated labels, not a map or list. Empty means no tags.",
+			"type": "string"
+		},
+		"Link": {
+			"additionalProperties": false,
+			"type": "object",
+			"required": ["title", "url"],
+			"properties": {
+				"title": {
+					"minLength": 1,
+					"pattern": "\\S",
+					"description": "Visible name of this link.",
+					"type": "string"
+				},
+				"url": { "$ref": "#/$defs/HttpUrl" },
+				"description": { "description": "Plain text; multiline is supported.", "type": "string" },
+				"logo_path": { "$ref": "#/$defs/LocalImagePath" },
+				"favicon_path": { "$ref": "#/$defs/LocalImagePath" },
+				"tags": { "default": "", "$ref": "#/$defs/Tags" },
+				"group": {
+					"minLength": 1,
+					"pattern": "\\S",
+					"description": "Optional display group label.",
+					"type": "string"
+				},
+				"requires_auth": {
+					"default": false,
+					"description": "Service sign-in hint only; does not enable Where authentication.",
+					"type": "boolean"
+				},
+				"internal_only": {
+					"default": false,
+					"description": "LAN/VPN availability hint only; does not check or restrict network access.",
+					"type": "boolean"
+				},
+				"admin_only": {
+					"default": false,
+					"description": "Intended-for-administrators hint only; does not hide the link or enforce a role.",
+					"type": "boolean"
+				}
+			}
+		},
+		"Site": {
+			"additionalProperties": false,
+			"type": "object",
+			"properties": {
+				"title": { "minLength": 1, "pattern": "\\S", "default": "Where", "type": "string" },
+				"description": { "default": "", "type": "string" },
+				"logo_path": { "$ref": "#/$defs/LocalImagePath" },
+				"favicon_path": { "$ref": "#/$defs/LocalImagePath" },
+				"footer": { "default": "", "type": "string" },
+				"order": {
+					"default": "configured",
+					"description": "Ordering of groups and links; the ungrouped Other bucket stays last.",
+					"anyOf": [
+						{ "const": "configured", "type": "string" },
+						{ "const": "alphabetical", "type": "string" }
+					]
+				}
+			}
+		},
+		"Appearance": {
+			"additionalProperties": false,
+			"type": "object",
+			"properties": {
+				"primary_light_color": { "default": "#0f766e", "$ref": "#/$defs/HexColor" },
+				"primary_dark_color": { "default": "#5eead4", "$ref": "#/$defs/HexColor" }
+			}
+		},
+		"OidcAuth": {
+			"additionalProperties": false,
+			"type": "object",
+			"required": ["issuer", "client_id", "client_secret"],
+			"properties": {
+				"issuer": { "$ref": "#/$defs/HttpUrl" },
+				"client_id": { "minLength": 1, "pattern": "\\S", "type": "string" },
+				"client_secret": { "minLength": 1, "type": "string" }
+			}
+		},
+		"CredentialsAuth": {
+			"additionalProperties": false,
+			"type": "object",
+			"required": ["username", "password"],
+			"properties": {
+				"username": { "minLength": 1, "pattern": "\\S", "type": "string" },
+				"password": { "minLength": 1, "type": "string" }
+			}
+		},
+		"Auth": {
+			"description": "Declare exactly one strategy, or omit auth for an open dashboard.",
+			"anyOf": [
+				{
+					"additionalProperties": false,
+					"title": "OIDC",
+					"type": "object",
+					"required": ["oidc"],
+					"properties": { "oidc": { "$ref": "#/$defs/OidcAuth" }, "credentials": { "not": {} } }
+				},
+				{
+					"additionalProperties": false,
+					"title": "Shared username and password",
+					"type": "object",
+					"required": ["credentials"],
+					"properties": {
+						"credentials": { "$ref": "#/$defs/CredentialsAuth" },
+						"oidc": { "not": {} }
+					}
+				}
+			]
+		}
+	}
+}

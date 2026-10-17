@@ -4,10 +4,10 @@
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
 		"declaration": true,
-		"rootDir": "src",
+		"rootDir": ".",
 		"outDir": "dist",
 		"types": ["node"]
 	},
-	"include": ["src/**/*.ts"],
+	"include": ["src/**/*.ts", "scripts/**/*.ts"],
 	"exclude": ["dist"]
 }

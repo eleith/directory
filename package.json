@@ -8,6 +8,8 @@
 		"pnpm": "11.9.0"
 	},
 	"scripts": {
+		"schema:generate": "pnpm --filter @where/config schema:generate",
+		"schema:check": "pnpm --filter @where/config schema:check",
 		"build:packages": "pnpm --filter './packages/*' -r build",
 		"build": "pnpm -r build",
 		"check": "pnpm -r check",
@@ -16,7 +18,7 @@
 		"test": "pnpm -r test",
 		"test:coverage": "pnpm -r test:coverage",
 		"test:e2e": "pnpm --filter @where/web test:e2e",
-		"verify": "pnpm build && pnpm check && pnpm lint && pnpm test:coverage && pnpm test:e2e",
+		"verify": "pnpm schema:check && pnpm build && pnpm check && pnpm lint && pnpm test:coverage && pnpm test:e2e",
 		"dev": "pnpm build:packages && pnpm --filter @where/web dev",
 		"cli": "pnpm build:packages && pnpm --filter @where/cli build && node apps/cli/dist/index.js"
 	},

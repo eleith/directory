@@ -12,6 +12,7 @@ when:
         - .github/workflows/**
         - .woodpecker/**
         - packages/config/**
+        - apps/web/config/where.example.yml
   - event: pull_request
     path:
       include:
@@ -20,6 +21,7 @@ when:
         - .github/workflows/**
         - .woodpecker/**
         - packages/config/**
+        - apps/web/config/where.example.yml
 
 steps:
   prepare:
@@ -32,6 +34,7 @@ steps:
       - corepack install --global pnpm@11.9.0
       - pnpm config set store-dir .pnpm-store
       - pnpm install --frozen-lockfile
+      - pnpm schema:check
 
   build:
     image: node:26.5.0-bookworm

@@ -7,12 +7,20 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
-		}
+		},
+		"./types": {
+			"types": "./dist/types.d.ts",
+			"import": "./dist/types.js"
+		},
+		"./schema.json": "./src/config.schema.json"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"src/config.schema.json"
 	],
 	"scripts": {
+		"schema:generate": "node scripts/generate-schema.ts",
+		"schema:check": "node scripts/generate-schema.ts --check",
 		"build": "tsc -p tsconfig.build.json",
 		"check": "tsc --noEmit -p tsconfig.json",
 		"lint": "prettier --ignore-path ../../.prettierignore --check . && eslint .",
@@ -20,9 +28,13 @@
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage"
 	},
+	"dependencies": {
+		"@sinclair/typebox": "0.34.49"
+	},
 	"devDependencies": {
 		"@types/node": "catalog:",
 		"@vitest/coverage-v8": "catalog:",
+		"prettier": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}

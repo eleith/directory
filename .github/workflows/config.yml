@@ -9,6 +9,7 @@ on:
       - .github/workflows/**
       - .woodpecker/**
       - packages/config/**
+      - apps/web/config/where.example.yml
   pull_request:
     paths:
       - '*'
@@ -16,6 +17,7 @@ on:
       - .github/workflows/**
       - .woodpecker/**
       - packages/config/**
+      - apps/web/config/where.example.yml
 
 permissions:
   contents: read
@@ -37,6 +39,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Check editor schema
+        run: pnpm schema:check
       - name: Build config
         run: pnpm --filter '@where/config...' build
       - name: Check types

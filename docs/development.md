@@ -1,12 +1,13 @@
 # Development
 
-## Bootstrap scope
+## Current scope
 
 The bootstrap contains all three workspaces, local quality gates, and non-publishing
 Woodpecker/GitHub workflow definitions. CLI help and the SSR placeholder read the
-same supported configuration format version. YAML schema validation and loading,
-authentication, the dashboard, application images, and releases are not implemented
-yet.
+same supported configuration format version. The TypeBox schema, inferred types
+and deterministic editor-schema generation are implemented; see
+[configuration](config.md). YAML loading, CLI validation, authentication, the
+dashboard, application images and releases are not implemented yet.
 
 ## Toolchain
 
@@ -42,19 +43,23 @@ control system package installation, its `install --with-deps chromium` command
 installs them; do not use it to bypass sandbox restrictions. Install the Chromium
 revision matching the pinned Playwright version after changing that dependency.
 
-| Command                            | What it does                                                                |
-| ---------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm build`                       | Builds config, then CLI and the adapter-node production server.             |
-| `pnpm check`                       | Checks config/CLI TypeScript plus web Svelte/TypeScript diagnostics.        |
-| `pnpm lint` / `pnpm format`        | Checks or writes root/workspace Prettier formatting; lint also runs ESLint. |
-| `pnpm test` / `pnpm test:coverage` | Runs all workspace unit/artifact tests, with diagnostic coverage.           |
-| `pnpm test:e2e`                    | Runs Chromium against the existing production build.                        |
-| `pnpm verify`                      | Builds, checks types/lint, runs coverage tests, then E2E.                   |
-| `pnpm dev`                         | Builds config, then starts Vite on `127.0.0.1:5173`.                        |
+| Command                                      | What it does                                                                   |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pnpm build`                                 | Builds config, then CLI and the adapter-node production server.                |
+| `pnpm check`                                 | Checks config/CLI TypeScript plus web Svelte/TypeScript diagnostics.           |
+| `pnpm lint` / `pnpm format`                  | Checks or writes root/workspace Prettier formatting; lint also runs ESLint.    |
+| `pnpm test` / `pnpm test:coverage`           | Runs all workspace unit/artifact tests, with diagnostic coverage.              |
+| `pnpm test:e2e`                              | Runs Chromium against the existing production build.                           |
+| `pnpm schema:generate` / `pnpm schema:check` | Generates editor JSON / checks drift without writing, before any build.        |
+| `pnpm verify`                                | Checks schema drift, builds, checks types/lint, runs coverage tests, then E2E. |
+| `pnpm dev`                                   | Builds config, then starts Vite on `127.0.0.1:5173`.                           |
 
 `pnpm build:packages` rebuilds just shared output. Package exports deliberately
 resolve `dist/index.js` and `dist/index.d.ts`, with no source aliases or custom
-loader. Build before independent checks/tests; `pnpm verify` does this in order.
+loader. `@where/config/types` is a type-only entry; the schema JSON is exported
+separately. Schema generation compiles fresh source into disposable output and
+never relies on an existing `dist`. Build before independent workspace
+checks/tests; `pnpm verify` does this in order.
 After editing config source during development, rebuild shared output to make it
 visible to Vite; there is no automatic config-source compiler/watch process.
 
@@ -106,14 +111,17 @@ matching `when`: [.github/workflows](../.github/workflows/) and
 [.woodpecker](../.woodpecker/). `pnpm verify` remains the local all-workspace
 aggregate, not a pipeline. Every selected pipeline uses a frozen full-workspace
 install, then package-scoped build, type checks, lint, and coverage tests. Config
-exports and CLI executables are built before their artifact tests. Web alone has
+exports and CLI executables are built before their artifact tests. Both config
+pipelines run `pnpm schema:check` after frozen installation and before building;
+regeneration is never an automatic part of build. Web alone has
 production browser tests, with an explicit production build before Playwright.
 Each pipeline also runs root `pnpm lint` so global formatting/ESLint remains
 covered; this intentionally overlaps workspace lint.
 
 Path filters include dependencies and shared tooling, not just app directories:
 
-- `packages/config/**` runs config, CLI, and web checks.
+- `packages/config/**` and the shared `apps/web/config/where.example.yml` run
+  config, CLI, and web checks.
 - `apps/cli/**` or `apps/web/**` selects that application's pipeline.
 - Root files (`'*'`, including dotfiles), `docs/**`, and both workflow directories
   run all three. This covers the lockfile, catalog, package manager/Node pins,
@@ -141,8 +149,8 @@ libraries; CI does not download browsers or run APT for each application check.
 Keep both image references (and the GitHub digest) paired with the catalog's
 Playwright version. A `node26` image tag alone does not pin a Node patch: browser
 steps explicitly require Node 26.5.0 and pnpm 11.9.0. The public GHCR image's
-contents were inspected; the separately built Gitea image still needs its first
-runner-side pull/version check. A mismatched image fails rather than silently
+contents were inspected; inspect runner logs after image changes to confirm the
+separately built Gitea image too. A mismatched image fails rather than silently
 using another toolchain. Local development still needs its own matching browser
 installation as described above.
 
@@ -186,7 +194,8 @@ entire workflow is skipped. Do not blindly require every selectively triggered
 package check. Distinct job names avoid ambiguous statuses but do not solve that
 provider policy issue.
 
-There are no schema/validation/image/release commands yet. Axe and PageSpeed
+Schema generation/drift commands are available; YAML loading, CLI validation,
+image and release commands are not. Axe and PageSpeed
 remain owner-run manual checks, not automated gates.
 
 ## Manual checks for the bootstrap handoff

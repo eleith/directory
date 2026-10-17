@@ -10,6 +10,7 @@ on:
       - .woodpecker/**
       - apps/cli/**
       - packages/**
+      - apps/web/config/where.example.yml
   pull_request:
     paths:
       - '*'
@@ -18,6 +19,7 @@ on:
       - .woodpecker/**
       - apps/cli/**
       - packages/**
+      - apps/web/config/where.example.yml
 
 permissions:
   contents: read

@@ -7,8 +7,11 @@ right link. The dashboard will be driven by one mounted YAML file.
 
 The bootstrap includes a server-rendered placeholder, a compiled shared config
 package, CLI help/error handling, and non-publishing CI definitions. The page and
-CLI share the supported configuration format version. YAML schema validation and
-loading, authentication, and dashboard links are not implemented yet.
+CLI share the supported configuration format version. The TypeBox configuration
+contract and generated editor schema are now available. YAML loading, CLI
+validation, authentication, and dashboard links are not implemented yet.
+See the [configuration contract](docs/config.md) and
+[example](apps/web/config/where.example.yml).
 
 ## Development
 
@@ -48,5 +51,5 @@ Each Woodpecker pipeline has one status-aware email step for main pushes, using 
 notification secret names. Confirm those bindings and Gitea CI-image pull access
 on the actual provider; a Gitea PR does not itself trigger GitHub Actions. See
 [development](docs/development.md) for routing, safe secret setup, first-run
-checks, and scope limits. YAML
-schema/validation is the next PR, not part of this bootstrap.
+checks, and scope limits. Configuration loading and CLI validation are the next
+commit; this schema-only step does not enable them.

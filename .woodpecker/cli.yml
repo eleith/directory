@@ -13,6 +13,7 @@ when:
         - .woodpecker/**
         - apps/cli/**
         - packages/**
+        - apps/web/config/where.example.yml
   - event: pull_request
     path:
       include:
@@ -22,6 +23,7 @@ when:
         - .woodpecker/**
         - apps/cli/**
         - packages/**
+        - apps/web/config/where.example.yml
 
 steps:
   prepare:

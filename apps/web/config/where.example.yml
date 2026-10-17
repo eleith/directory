@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../../packages/config/src/config.schema.json
+# Schema example only: the bootstrap does not load this file or enable authentication yet.
+version: 1
+site:
+  title: Home Server
+  description: Useful things running at home.
+  logo_path: /public/home.svg
+  favicon_path: /public/favicon.svg
+  footer: Something not working? Ask your household maintainer.
+  order: configured # Or alphabetical.
+
+appearance:
+  primary_light_color: '#0f766e'
+  primary_dark_color: '#5eead4'
+
+# Omit auth for an open dashboard. Enable exactly one strategy when auth is implemented.
+# auth:
+#   oidc:
+#     issuer: https://identity.example.com
+#     client_id: where
+#     client_secret: '${WHERE_OIDC_CLIENT_SECRET}'
+# Or:
+# auth:
+#   credentials:
+#     username: family
+#     password: '${WHERE_PASSWORD}'
+
+links:
+  photos:
+    title: Photos
+    url: https://photos.example.com
+    description: |
+      Family photos and videos.
+      Install the service's mobile app for automatic backups.
+    logo_path: /public/photos.svg
+    favicon_path: /public/photos-icon.png
+    tags: photos, videos, backup
+    group: Photos & files
+    requires_auth: true
+    internal_only: false
+    admin_only: false
+  router:
+    title: Router
+    url: http://router.example.com
+    description: Manage the home network.
+    tags: network, router
+    group: Behind the scenes
+    requires_auth: true
+    internal_only: true
+    admin_only: true
