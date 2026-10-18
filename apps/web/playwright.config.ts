@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 const origin = 'http://127.0.0.1:4183';
@@ -13,6 +14,11 @@ export default defineConfig({
 		command: 'node build/index.js',
 		url: origin,
 		reuseExistingServer: false,
-		env: { HOST: '127.0.0.1', PORT: '4183', ORIGIN: origin }
+		env: {
+			HOST: '127.0.0.1',
+			PORT: '4183',
+			ORIGIN: origin,
+			CONFIG_PATH: fileURLToPath(new URL('./e2e/fixtures/where.yaml', import.meta.url))
+		}
 	}
 });

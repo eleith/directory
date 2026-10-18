@@ -14,7 +14,8 @@
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
-		"@where/config": "workspace:*"
+		"@where/config": "workspace:*",
+		"tslog": "5.2.0"
 	},
 	"devDependencies": {
 		"@playwright/test": "catalog:",

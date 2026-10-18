@@ -5,7 +5,12 @@ import type { ConfigLoadOptions } from '@where/config/types';
 import { prepareSnapshot, type PreparedSnapshot } from './snapshot.js';
 
 export interface DirectoryIssue {
-	readonly code: 'load_failed' | 'prepare_failed' | 'restart_required';
+	readonly code:
+		| 'load_failed'
+		| 'prepare_failed'
+		| 'restart_required'
+		| 'auth_unavailable'
+		| 'watch_failed';
 	readonly issues?: readonly ConfigIssue[];
 }
 

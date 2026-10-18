@@ -12,7 +12,7 @@
 <main>
 	<h1><span aria-hidden="true">📍</span> {data.title}</h1>
 	<p>{data.description}</p>
-	<p>The workspace is ready. Dashboard configuration and links are coming next.</p>
+	<p>The directory is loaded. Dashboard links are coming next.</p>
 	<p class="status">Configuration format {data.configurationVersion}</p>
 </main>
 

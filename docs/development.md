@@ -7,11 +7,12 @@ Woodpecker/GitHub workflow definitions. CLI help and the SSR placeholder read th
 same supported configuration format version. The TypeBox schema, inferred types
 and deterministic editor-schema generation are implemented, along with YAML
 loading, environment interpolation and standalone CLI validation; see
-[configuration](config.md). Server-side snapshot preparation, grouping and a
-web-owned directory loader with serialized reloads are available but not wired
-into web startup yet.
-Authentication, dashboard rendering, application images and releases are not
-implemented yet.
+[configuration](config.md). The web server now loads before serving, polls the
+configuration path, and captures one immutable snapshot per request. The shell
+shows configured site copy; dashboard links and image serving are still later
+work. Until authentication is implemented, auth-enabled startup is explicitly
+rejected rather than treated as open access. Application images and releases
+are not implemented yet.
 
 ## Toolchain
 
@@ -70,6 +71,18 @@ The config package pins YAML **2.9.1**. The CLI uses **Gunshi 0.35.1** for
 commands, arguments and generated help, matching When. It uses catalog-pinned esbuild
 **0.28.2** for its Node bundle; dependency install scripts are disabled for
 esbuild because the platform binary ships as an optional dependency.
+
+The web server now needs configuration at runtime, not at build time. To preview
+without creating operator configuration:
+
+```sh
+CONFIG_PATH="$PWD/apps/web/config/where.example.yml" pnpm dev
+```
+
+`pnpm dev` runs Vite from `apps/web`, so its default path is
+`apps/web/config/where.yaml`. Absolute `CONFIG_PATH` values work independently of
+the command's working directory. Never overwrite an existing operator file with
+the example. Keep auth omitted until the access gate is available.
 
 ### CLI validation
 
@@ -144,16 +157,57 @@ directory.stop();
 
 Startup failure rejects with a redacted `DirectoryError`; no directory object is
 returned. There is no separate `start()` or public publisher. The config package
-only loads and validates configuration. These modules start no file watcher;
-web startup, polling and per-request capture are the next integration step.
+only loads and validates configuration.
+
+### Web startup and file polling
+
+The Kit `init` hook skips build analysis, then chooses separate production or
+development startup functions. Both use the shared `bootApp` function; production
+startup finishes before adapter-node opens a socket. Compilation needs no mounted
+YAML or credentials. Startup errors stay fatal and are reported without raw error
+values. Auth-enabled startup reports `auth_unavailable` until C6 supplies
+functioning providers and gates.
+
+Only a valid startup installs `watchConfig`, a non-persistent one-second path
+poll. Inode, modification-time or size changes request a serialized reload;
+editor atomic rename saves and deletion/recreation keep working. Boot requests
+one additional reload after watcher installation to catch saves during setup.
+Invalid later edits keep the last good snapshot and generic health readiness.
+
+The request hook captures `directory.currentSnapshot()` once into
+`event.locals.snapshot`; nested loaders use that reference even if a reload
+publishes meanwhile. The shell returns only the captured public site title and
+description plus the format version, not private configuration or link metadata.
+`/healthz` returns only `{ "status": "ok" }` after initialization. Requests load
+neither YAML nor asset fallbacks. Shutdown stops the watcher and blocks pending
+publication. Polling/config preparation are not browser code.
+
+Production lifecycle handling uses adapter-node's `sveltekit:shutdown` event.
+Development lifecycle handling separately owns replacement of previous instances,
+pending-startup cleanup, and the small serve-only Vite close bridge. Kit's pinned
+SSR loader does not run `import.meta.hot.dispose`, so that bridge remains
+application-specific. Development cleanup happens at the next initialization or
+server close, not immediately when source is invalidated.
+
+Server diagnostics use **tslog 5.2.0**: JSON in production and pretty output in
+development, with call-site stack capture disabled. Reporting passes only fixed
+messages, issue codes and safe field paths to the logger, never raw errors or
+configuration values. Library formatting is not a substitute for that boundary.
 
 ### Browser checks
 
 Browser tests launch `node build/index.js` from the web workspace on
 `127.0.0.1:4183`. They refuse to reuse an existing server and stop their server
-afterwards. Build before invoking E2E independently. Tests use no personal
-configuration, credentials, or development server. Unit discovery is separate
-from browser specs. Coverage measures TypeScript modules, not Svelte markup;
+afterwards. Build before invoking E2E independently. Playwright explicitly sets
+`CONFIG_PATH` to the checked-in empty-directory fixture under `e2e/fixtures`, not
+the process's operator path. Tests use no personal configuration, credentials,
+or development server. Unit discovery is separate from browser specs.
+
+The co-located process tests launch the real adapter-node build with disposable
+YAML and OS-assigned ports. They check fatal invalid/auth-enabled startup,
+atomic replacement, invalid/deleted file recovery, safe logs/health and graceful
+shutdown. These tests require the production build, just like the CLI artifact
+tests; they are not browser tests. Coverage measures TypeScript modules, not Svelte markup;
 there is no arbitrary percentage gate or claim of full UI coverage. The config
 smoke test imports built output, so its pass does not imply source instrumentation
 coverage of `src/index.ts`.
@@ -278,16 +332,30 @@ checks, not automated gates.
    overrides. On an authorized main run, check package notifications actually
    arrive. Verify failure delivery in a controlled runner test, not by breaking
    main. Do not inject operator YAML or credentials into application checks.
-4. Run `pnpm dev`; check the placeholder at desktop/narrow widths, OS light/dark,
-   and with JavaScript disabled. The web page still shows no operator configuration.
+4. Make a disposable copy to try startup and file changes without editing the
+   checked-in example or operator configuration:
+
+   ```sh
+   preview=$(mktemp -d)
+   cp apps/web/config/where.example.yml "$preview/where.yaml"
+   CONFIG_PATH="$preview/where.yaml" pnpm dev
+   ```
+
+   Check desktop/narrow widths, OS light/dark and JavaScript disabled. Edit the
+   copied site's title/description and refresh after approximately one second.
+   Try an atomic rename save, invalid YAML, deletion and restoration: the last
+   good copy should remain until a valid file returns. `/healthz` exposes only
+   readiness, not configuration names or paths. Auth-enabled startup must fail;
+   links and mounted images are not rendered yet. Stop the server when finished.
    For production output, after `pnpm build`, run:
 
    ```sh
-   HOST=127.0.0.1 PORT=3000 ORIGIN=http://127.0.0.1:3000 node apps/web/build/index.js
+   CONFIG_PATH="$PWD/apps/web/config/where.example.yml" \
+     HOST=127.0.0.1 PORT=3000 ORIGIN=http://127.0.0.1:3000 node apps/web/build/index.js
    ```
 
-   Open `http://127.0.0.1:3000`, then stop the server when finished. No dashboard
-   controls are expected. Run manual axe/PageSpeed when the actual UI exists;
+   Open `http://127.0.0.1:3000`, then stop the server when finished. Only the site
+   copy is configured; no dashboard controls are expected. Run manual axe/PageSpeed when the actual UI exists;
    placeholder scores do not establish final-app accessibility/performance.
 
 Complete agent review before staged owner review. Stage only one coherent commit

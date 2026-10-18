@@ -132,6 +132,9 @@ importers:
       '@where/config':
         specifier: workspace:*
         version: link:../../packages/config
+      tslog:
+        specifier: 5.2.0
+        version: 5.2.0
     devDependencies:
       '@playwright/test':
         specifier: 'catalog:'
@@ -1591,6 +1594,11 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
+  tslog@5.2.0:
+    resolution: {integrity: sha512-bD0FpBIFZ1OInp7uzQmEn1SJe6feTkVTCudw/27ILuISbVZtTryXqauxyCWTa1I8ZgTm9OGQ6YrJPKM+6QTeJA==}
+    engines: {node: '>=22'}
+    hasBin: true
+
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
@@ -2967,6 +2975,8 @@ snapshots:
 
   tslib@2.8.1:
     optional: true
+
+  tslog@5.2.0: {}
 
   type-check@0.4.0:
     dependencies:

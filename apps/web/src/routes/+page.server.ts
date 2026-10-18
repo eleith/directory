@@ -1,8 +1,8 @@
 import { configurationVersion } from '@where/config';
 import type { PageServerLoad } from './$types.js';
 
-export const load = (() => ({
-	title: 'Where',
-	description: "A small directory for your family's homelab.",
+export const load = (({ locals }) => ({
+	title: locals.snapshot.display.site.title,
+	description: locals.snapshot.display.site.description,
 	configurationVersion
 })) satisfies PageServerLoad;

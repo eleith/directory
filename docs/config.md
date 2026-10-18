@@ -7,11 +7,12 @@ optionality: fields with defaults can be omitted, but link titles/URLs and auth
 credentials remain required.
 
 The shared loader and `where validate` now read YAML, apply defaults, expand
-environment values and validate the result. The web server's directory loader can
-prepare immutable snapshots and apply reloads, but it is not wired into the web
-page yet. Web startup integration/file polling, authentication and dashboard
-rendering are later work; a valid auth
-block does not enable access control yet.
+environment values and validate the result. The web server loads a complete
+immutable snapshot before serving, captures it once per request, and polls the
+configuration path for changes. The shell renders configured site copy; dashboard
+links and images are not served yet. Authentication is not implemented, so the
+web server rejects startup with any auth block even though the CLI can validate
+its shape. Omit auth to run this intermediate version.
 
 ## Start with the example
 
@@ -44,7 +45,10 @@ leading `--` for package-manager forwarding. Use `where --help` or
 
 Path selection is explicit argument, then `CONFIG_PATH`, then
 `config/where.yaml`, relative to the working directory. There is no production-
-specific path or search for nearby files. The deployment layout is:
+specific path or search for nearby files. The web server pins the selected path
+at startup. `pnpm dev` runs from `apps/web`, so its default is
+`apps/web/config/where.yaml`; an absolute `CONFIG_PATH` avoids working-directory
+ambiguity. The deployment layout is:
 
 ```text
 deployment/
@@ -68,6 +72,21 @@ input exits 1. Errors contain fixed messages, codes and field paths such as
 `/auth/credentials/password` or `/links/*/url`. Link IDs and unknown field names
 are replaced with `*`; filenames, values, environment-variable names, parser
 snippets and original exceptions are not printed.
+
+### File changes and last-good state
+
+The web server polls inode, modification time and size approximately once per
+second. Mount the config directory rather than a single file so editor atomic
+rename saves remain visible. Invalid edits and deletion keep the previous
+snapshot; a later valid replacement recovers automatically. Ordinary requests do
+not read YAML or prepare snapshots. `/healthz` stays generic and ready while a
+last-good snapshot is serving.
+
+An auth change rejects the entire replacement and reports `restart_required`,
+including changes that enable or disable auth. It never partially accepts the
+candidate's display changes or restarts the process automatically. Restore the
+original auth to resume display reloads. Auth-enabled startup remains unavailable
+until the actual gate is implemented. Environment files are not polled.
 
 ## Environment values
 

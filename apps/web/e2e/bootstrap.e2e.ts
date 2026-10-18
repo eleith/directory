@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('serves the scaffold from the production build', async ({ page }) => {
+test('serves the configured shell from the production build', async ({ page }) => {
 	await page.goto('/');
 	await expect(page).toHaveTitle('Where — Homelab dashboard');
 	await expect(page.getByRole('heading', { name: 'Where' })).toBeVisible();
