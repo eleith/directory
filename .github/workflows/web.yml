@@ -39,8 +39,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build shared packages
-        run: pnpm build:packages
+      - name: Build web and shared dependencies
+        run: pnpm --filter '@where/web...' build
       - name: Check types
         run: pnpm --filter @where/web check
       - name: Lint root and workspace
