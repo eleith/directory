@@ -7,8 +7,11 @@ Woodpecker/GitHub workflow definitions. CLI help and the SSR placeholder read th
 same supported configuration format version. The TypeBox schema, inferred types
 and deterministic editor-schema generation are implemented, along with YAML
 loading, environment interpolation and standalone CLI validation; see
-[configuration](config.md). Authentication, dashboard rendering, application
-images and releases are not implemented yet.
+[configuration](config.md). Server-side snapshot preparation, grouping and a
+web-owned directory loader with serialized reloads are available but not wired
+into web startup yet.
+Authentication, dashboard rendering, application images and releases are not
+implemented yet.
 
 ## Toolchain
 
@@ -102,6 +105,47 @@ cover configuration paths, auth/environment failures, secret sentinels, help,
 arguments and API import without executing main. Config compiled-module and CLI
 subprocess tests do not contribute to source coverage; passing them is not a
 claim of full source coverage.
+
+### Prepared configuration snapshots
+
+`prepareSnapshot` in `apps/web/src/lib/server/config/snapshot.ts` clones the
+validated private configuration, creates the display model and exact referenced
+asset lists, then freezes the complete snapshot. Only its `display` member may
+be sent to the browser. The client-facing interfaces in `src/lib/display/types.ts`
+contain no server imports. Snapshot IDs are fresh random UUIDs, not hashes of
+configuration or credentials.
+
+`prepareDirectory` builds the browser data through `getSite(config)` and
+`getGroups(config)`. These helpers select public fields, prepare comma-split tag
+labels, and group/order links. Alphabetical ordering uses an English,
+base-sensitive, numeric collator on the server, preserving declaration-order ties.
+Group identities keep a configured Other separate from the missing-group bucket.
+
+`loadDirectory(path?, { env, report }?)` in
+`apps/web/src/lib/server/config/load-directory.ts` loads and prepares the first
+snapshot before returning a directory object:
+
+```ts
+const directory = await loadDirectory(path, { report });
+const captured = directory.currentSnapshot();
+await directory.reload();
+directory.stop();
+```
+
+- `currentSnapshot()` returns a complete immutable snapshot. Replacements change
+  one private reference; earlier captures keep their complete version.
+- `reload()` runs one attempt at a time. Requests during loading or preparation
+  coalesce into one follow-up. Load/preparation failures retain the current
+  snapshot and report a safe issue. Auth differences from the initial snapshot
+  report `restart_required` and reject the entire candidate, including display
+  edits. Restoring the original auth permits later display reloads.
+- `stop()` is terminal. It clears pending work and prevents later publication or
+  reporting, without claiming to cancel I/O already in progress.
+
+Startup failure rejects with a redacted `DirectoryError`; no directory object is
+returned. There is no separate `start()` or public publisher. The config package
+only loads and validates configuration. These modules start no file watcher;
+web startup, polling and per-request capture are the next integration step.
 
 ### Browser checks
 

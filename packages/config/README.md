@@ -14,7 +14,8 @@ const config = await loadConfigFile('config/where.yaml', { env: process.env });
 and check the canonical TypeBox schema. Omitting `env` uses `process.env`; an
 injected map is used on its own. Neither function watches files or publishes
 state. The loader returns a fresh private configuration without changing the
-input. Display projection and immutable snapshots belong to the web server.
+input. Preparing the browser's directory data and immutable snapshots belongs
+to the web server.
 
 Input is checked before defaulting: arrays, nulls, non-plain or cyclic objects,
 accessors, hidden/symbol properties and unsafe keys are rejected. This prevents
@@ -29,6 +30,10 @@ names become `*`. Catch unexpected errors without printing their raw contents.
 The package also exports `resolveConfigPath`, `resolveDeploymentRoot` and
 `resolvePublicDir`. These resolve operational paths without reading assets.
 The default layout has sibling `config/` and `public/` directories.
+
+Directory state, snapshot preparation and reload policy belong to the web server.
+The shared loader keeps no cached configuration. See the web server's
+[directory API](../../docs/development.md#prepared-configuration-snapshots).
 
 Browser code must use **type-only** imports from `@where/config/types`; the main
 entry imports filesystem and validation code. `@where/config/schema.json` is the

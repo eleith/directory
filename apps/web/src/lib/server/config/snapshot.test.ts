@@ -1,0 +1,97 @@
+import { validateConfig } from '@where/config';
+import { describe, expect, it } from 'vitest';
+import { prepareSnapshot } from './snapshot.js';
+
+const service = { title: 'Photos', url: 'https://photos.example.com' };
+
+function configuration() {
+	return validateConfig(
+		{
+			site: { title: 'Home', logo_path: '/public/home.svg', favicon_path: '/public/site-icon.png' },
+			auth: { credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' } },
+			links: {
+				photos: {
+					...service,
+					tags: ' photos, backup ',
+					logo_path: '/public/photos.svg',
+					favicon_path: '/public/photos-icon.png'
+				},
+				files: {
+					...service,
+					title: 'Files',
+					logo_path: '/public/shared.png',
+					favicon_path: '/public/home.svg',
+					admin_only: true
+				}
+			}
+		},
+		{ env: {} }
+	);
+}
+
+describe('private prepared snapshots', () => {
+	it('owns its configuration and display rather than freezing or retaining caller data', () => {
+		const input = configuration();
+		const before = structuredClone(input);
+		const snapshot = prepareSnapshot(input);
+		expect(input).toEqual(before);
+		expect(Object.isFrozen(input)).toBe(false);
+		expect(Object.isFrozen(input.site)).toBe(false);
+		expect(snapshot.configuration).toEqual(input);
+		expect(snapshot.configuration).not.toBe(input);
+		expect(snapshot.configuration.site).not.toBe(input.site);
+		expect(Object.isFrozen(snapshot)).toBe(true);
+		expect(Object.isFrozen(snapshot.configuration)).toBe(true);
+		expect(Object.isFrozen(snapshot.configuration.site)).toBe(true);
+		expect(Object.isFrozen(snapshot.configuration.auth?.credentials)).toBe(true);
+		expect(Object.isFrozen(snapshot.display)).toBe(true);
+		expect(Object.isFrozen(snapshot.assets)).toBe(true);
+		expect(Object.isFrozen(snapshot.assets.referencedPaths)).toBe(true);
+		input.site.title = 'Changed';
+		input.links.photos!.tags = 'changed';
+		if (input.auth?.credentials) input.auth.credentials.password = 'Changed';
+		expect(snapshot.display.site.title).toBe('Home');
+		expect(snapshot.display.groups.flatMap((group) => group.links)[0]?.tags).toEqual([
+			'photos',
+			'backup'
+		]);
+		expect(snapshot.configuration.auth?.credentials?.password).toBe('PRIVATE_PASSWORD');
+		expect(Reflect.set(snapshot.configuration.site, 'title', 'Changed')).toBe(false);
+	});
+
+	it('collects exact referenced assets and branding exceptions without filesystem access', () => {
+		const snapshot = prepareSnapshot(configuration());
+		expect(snapshot.assets.brandingPaths).toEqual(['/public/home.svg', '/public/site-icon.png']);
+		expect(snapshot.assets.referencedPaths).toEqual([
+			'/public/home.svg',
+			'/public/site-icon.png',
+			'/public/photos.svg',
+			'/public/photos-icon.png',
+			'/public/shared.png'
+		]);
+		expect(snapshot.display.groups.flatMap((group) => group.links)).toHaveLength(2);
+	});
+
+	it('keeps authentication private while assigning a fresh non-secret display identity', () => {
+		const input = configuration();
+		const first = prepareSnapshot(input);
+		const second = prepareSnapshot(input);
+		expect(first.display.snapshotId).toMatch(
+			/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+		);
+		expect(second.display.snapshotId).not.toBe(first.display.snapshotId);
+		expect(JSON.stringify(first.configuration)).toContain('PRIVATE_PASSWORD');
+		expect(JSON.stringify(first.display)).not.toContain('PRIVATE_');
+		expect(first.display).not.toHaveProperty('configuration');
+		expect(first.display).not.toHaveProperty('auth');
+		expect(first.display).not.toHaveProperty('assets');
+	});
+
+	it('handles omitted branding, no images and an explicitly empty directory', () => {
+		const snapshot = prepareSnapshot(validateConfig({ links: {} }, { env: {} }));
+		expect(snapshot.assets).toEqual({ referencedPaths: [], brandingPaths: [] });
+		expect(snapshot.display.site).not.toHaveProperty('logo_path');
+		expect(snapshot.display.site).not.toHaveProperty('favicon_path');
+		expect(snapshot.display.groups.flatMap((group) => group.links)).toEqual([]);
+	});
+});

@@ -7,9 +7,11 @@ optionality: fields with defaults can be omitted, but link titles/URLs and auth
 credentials remain required.
 
 The shared loader and `where validate` now read YAML, apply defaults, expand
-environment values and validate the result. The web page still uses no operator
-configuration. Authentication, file reloads and dashboard rendering are later
-work; a valid auth block does not enable access control yet.
+environment values and validate the result. The web server's directory loader can
+prepare immutable snapshots and apply reloads, but it is not wired into the web
+page yet. Web startup integration/file polling, authentication and dashboard
+rendering are later work; a valid auth
+block does not enable access control yet.
 
 ## Start with the example
 
@@ -141,8 +143,9 @@ admin_only: false
 an empty string. Commas separate labels; surrounding spaces and empty segments
 are ignored for display/search. This is not a quoted CSV dialect, so a comma is
 always a separator. Control characters/newlines are invalid. The configuration
-retains the authored string; splitting labels belongs to prepared display/search
-work, not loading or validation.
+retains the authored string. Snapshot preparation now produces display labels
+by splitting commas, trimming spaces and dropping empty parts; loading and
+validation leave the original string alone.
 
 `group` is an optional nonblank display label, independent of tags. If every link
 omits it, the planned directory is flat. If any link has a group, ungrouped links
@@ -159,8 +162,9 @@ The three booleans are **informational service hints only** and default to false
 
 False means no advisory badge, not a verified claim about the service. All
 visitors authorized to open Where still see the same links. These flags neither
-hide links nor change the directory's actual `auth` strategy. Rendering/grouping,
-badges and search are later work, not implemented by the schema.
+hide links nor change the directory's actual `auth` strategy. Prepared grouping
+and ordering are implemented; rendering, badges and search remain later work.
+All advisory flag combinations preserve the same link inclusion.
 
 ## Authentication shapes
 

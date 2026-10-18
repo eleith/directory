@@ -8,8 +8,10 @@ right link. The dashboard will be driven by one mounted YAML file.
 The bootstrap includes a server-rendered placeholder, a compiled shared config
 package, and non-publishing CI definitions. The shared loader reads YAML, applies
 defaults, expands environment values, and validates the TypeBox contract. The
-standalone CLI uses that same loader. The web page still shows a placeholder;
-authentication and dashboard links are not implemented yet.
+standalone CLI uses that same loader. Immutable display snapshots and a web-owned
+directory loader with serialized reloads are available for server integration.
+The web page still shows a placeholder; web startup integration, authentication
+and dashboard links are not implemented yet.
 See the [configuration contract](docs/config.md) and
 [example](apps/web/config/where.example.yml).
 
