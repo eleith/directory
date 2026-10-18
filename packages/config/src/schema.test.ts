@@ -9,28 +9,32 @@ import {
 	HttpUrlSchema,
 	LocalImagePathSchema,
 	LinkSchema,
-	WhereConfigurationSchema
+	DirectoryConfigurationSchema
 } from './schema.js';
-import type { WhereConfiguration, WhereLink } from './types.js';
+import type { DirectoryConfiguration, DirectoryLink } from './types.js';
 
 const link = { title: 'Photos', url: 'https://photos.example.com' };
 const raw = { links: { photos: link } };
 const linkDefaults = { tags: '', requires_auth: false, internal_only: false, admin_only: false };
 
 function defaultFixture(value: unknown) {
-	return Value.Default(WhereConfigurationSchema, configurationReferences, structuredClone(value));
+	return Value.Default(
+		DirectoryConfigurationSchema,
+		configurationReferences,
+		structuredClone(value)
+	);
 }
 function accepts(value: unknown): boolean {
-	return Value.Check(WhereConfigurationSchema, configurationReferences, defaultFixture(value));
+	return Value.Check(DirectoryConfigurationSchema, configurationReferences, defaultFixture(value));
 }
 
 describe('configuration defaults and inferred types', () => {
 	it('fills nested objects, the ordering union, and each link map value', () => {
 		const value = defaultFixture({ links: { photos: link, router: { ...link, title: 'Router' } } });
-		expect(Value.Check(WhereConfigurationSchema, configurationReferences, value)).toBe(true);
+		expect(Value.Check(DirectoryConfigurationSchema, configurationReferences, value)).toBe(true);
 		expect(value).toEqual({
 			version: 1,
-			site: { title: 'Where', description: '', footer: '', order: 'configured' },
+			site: { title: 'Directory', description: '', footer: '', order: 'configured' },
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 			links: {
 				photos: { ...link, ...linkDefaults },
@@ -66,43 +70,43 @@ describe('configuration defaults and inferred types', () => {
 				router: { ...link, requires_auth: true, internal_only: true, admin_only: true }
 			}
 		});
-		expect(Value.Check(WhereConfigurationSchema, configurationReferences, value)).toBe(true);
+		expect(Value.Check(DirectoryConfigurationSchema, configurationReferences, value)).toBe(true);
 		expect(value).not.toHaveProperty('auth');
 		expect(value).not.toHaveProperty('links.router.group');
 	});
 
 	it('does not mutate authored input or share mutable defaults between calls', () => {
 		const first = defaultFixture(raw);
-		if (!Value.Check(WhereConfigurationSchema, configurationReferences, first))
+		if (!Value.Check(DirectoryConfigurationSchema, configurationReferences, first))
 			throw new Error('Invalid fixture');
 		first.site.title = 'Changed';
 		first.links['photos']!.requires_auth = true;
-		expect(defaultFixture(raw)).toHaveProperty('site.title', 'Where');
+		expect(defaultFixture(raw)).toHaveProperty('site.title', 'Directory');
 		expect(defaultFixture(raw)).toHaveProperty('links.photos.requires_auth', false);
 		expect(raw).toEqual({ links: { photos: link } });
 	});
 
 	it('keeps loaded defaults required and genuinely optional metadata optional in TypeScript', () => {
-		expectTypeOf<WhereConfiguration['version']>().toEqualTypeOf<1>();
-		expectTypeOf<WhereConfiguration['site']['title']>().toEqualTypeOf<string>();
-		expectTypeOf<WhereConfiguration['site']['order']>().toEqualTypeOf<
+		expectTypeOf<DirectoryConfiguration['version']>().toEqualTypeOf<1>();
+		expectTypeOf<DirectoryConfiguration['site']['title']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectoryConfiguration['site']['order']>().toEqualTypeOf<
 			'configured' | 'alphabetical'
 		>();
-		expectTypeOf<WhereConfiguration['auth']>().toBeNullable();
-		expectTypeOf<WhereLink['tags']>().toEqualTypeOf<string>();
-		expectTypeOf<WhereLink['group']>().toEqualTypeOf<string | undefined>();
-		expectTypeOf<WhereLink['requires_auth']>().toEqualTypeOf<boolean>();
-		expectTypeOf<WhereLink['internal_only']>().toEqualTypeOf<boolean>();
-		expectTypeOf<WhereLink['admin_only']>().toEqualTypeOf<boolean>();
-		expectTypeOf<WhereLink['description']>().toEqualTypeOf<string | undefined>();
+		expectTypeOf<DirectoryConfiguration['auth']>().toBeNullable();
+		expectTypeOf<DirectoryLink['tags']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectoryLink['group']>().toEqualTypeOf<string | undefined>();
+		expectTypeOf<DirectoryLink['requires_auth']>().toEqualTypeOf<boolean>();
+		expectTypeOf<DirectoryLink['internal_only']>().toEqualTypeOf<boolean>();
+		expectTypeOf<DirectoryLink['admin_only']>().toEqualTypeOf<boolean>();
+		expectTypeOf<DirectoryLink['description']>().toEqualTypeOf<string | undefined>();
 		// @ts-expect-error loaded values must contain defaulted fields
-		const incomplete: WhereConfiguration = { links: {} };
+		const incomplete: DirectoryConfiguration = { links: {} };
 		// @ts-expect-error link titles remain required
-		const missingTitle: WhereLink = { url: link.url, ...linkDefaults };
+		const missingTitle: DirectoryLink = { url: link.url, ...linkDefaults };
 		// @ts-expect-error both auth strategies are forbidden statically too
-		const both: NonNullable<WhereConfiguration['auth']> = {
+		const both: NonNullable<DirectoryConfiguration['auth']> = {
 			credentials: { username: 'family', password: 'fixture' },
-			oidc: { issuer: 'https://id.example.com', client_id: 'where', client_secret: 'fixture' }
+			oidc: { issuer: 'https://id.example.com', client_id: 'directory', client_secret: 'fixture' }
 		};
 		void [incomplete, missingTitle, both];
 	});
@@ -118,12 +122,12 @@ describe('strict configuration boundary', () => {
 			{ credentials: {} },
 			{ credentials: { username: 'family' } },
 			{ credentials: { username: 'family', password: '' } },
-			{ oidc: { issuer: 'https://id.example.com', client_id: 'where' } },
-			{ oidc: { issuer: 'javascript:alert(1)', client_id: 'where', client_secret: 'fixture' } },
+			{ oidc: { issuer: 'https://id.example.com', client_id: 'directory' } },
+			{ oidc: { issuer: 'javascript:alert(1)', client_id: 'directory', client_secret: 'fixture' } },
 			{ credentials: { username: 'family', password: 'fixture' }, oidc: null },
 			{
 				credentials: { username: 'family', password: 'fixture' },
-				oidc: { issuer: 'https://id.example.com', client_id: 'where', client_secret: 'fixture' }
+				oidc: { issuer: 'https://id.example.com', client_id: 'directory', client_secret: 'fixture' }
 			},
 			{ unknown: {} }
 		].map((auth) => ({ auth }))
@@ -133,7 +137,7 @@ describe('strict configuration boundary', () => {
 
 	it.each([
 		{ credentials: { username: 'family', password: 'fixture' } },
-		{ oidc: { issuer: 'https://id.example.com', client_id: 'where', client_secret: 'fixture' } }
+		{ oidc: { issuer: 'https://id.example.com', client_id: 'directory', client_secret: 'fixture' } }
 	])('accepts exactly one complete auth strategy', (auth) => {
 		expect(accepts({ ...raw, auth })).toBe(true);
 	});
@@ -215,10 +219,12 @@ describe('strict configuration boundary', () => {
 			for (const value of [
 				JSON.parse(`{"links":{},"${key}":{}}`) as unknown,
 				JSON.parse(
-					`{"links":{"${key}":{"title":"Bad","url":"https://example.com","tags":"","requires_auth":false,"internal_only":false,"admin_only":false}},"version":1,"site":{"title":"Where","description":"","footer":"","order":"configured"},"appearance":{"primary_light_color":"#fff","primary_dark_color":"#000"}}`
+					`{"links":{"${key}":{"title":"Bad","url":"https://example.com","tags":"","requires_auth":false,"internal_only":false,"admin_only":false}},"version":1,"site":{"title":"Directory","description":"","footer":"","order":"configured"},"appearance":{"primary_light_color":"#fff","primary_dark_color":"#000"}}`
 				) as unknown
 			]) {
-				expect(Value.Check(WhereConfigurationSchema, configurationReferences, value)).toBe(false);
+				expect(Value.Check(DirectoryConfigurationSchema, configurationReferences, value)).toBe(
+					false
+				);
 			}
 		}
 	});

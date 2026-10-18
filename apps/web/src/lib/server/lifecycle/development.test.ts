@@ -1,4 +1,4 @@
-import { validateConfig } from '@where/config';
+import { validateConfig } from '@directory/config';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Directory } from '../config/load-directory.js';
 import { prepareSnapshot } from '../config/snapshot.js';
@@ -30,13 +30,13 @@ beforeEach(() => {
 
 afterEach(() => {
 	for (const [name, listener] of listeners.mock.calls) {
-		if (name === 'where:dev-stop') process.off(name, listener);
+		if (name === 'directory:dev-stop') process.off(name, listener);
 	}
 	vi.restoreAllMocks();
 });
 
 function devStopListener(attempt = 0) {
-	return listeners.mock.calls.filter(([name]) => name === 'where:dev-stop')[attempt]![1];
+	return listeners.mock.calls.filter(([name]) => name === 'directory:dev-stop')[attempt]![1];
 }
 
 describe('development lifecycle', () => {
@@ -51,16 +51,16 @@ describe('development lifecycle', () => {
 		expect(server.directory).toBe(ready);
 		expect(listeners.mock.calls.filter(([name]) => name === 'sveltekit:shutdown')).toEqual([]);
 		const shutdown = devStopListener();
-		expect(process.listenerCount('where:dev-stop', shutdown)).toBe(1);
-		process.emit('where:dev-stop');
-		process.emit('where:dev-stop');
+		expect(process.listenerCount('directory:dev-stop', shutdown)).toBe(1);
+		process.emit('directory:dev-stop');
+		process.emit('directory:dev-stop');
 		shutdown();
 		expect(ready.stop).toHaveBeenCalledOnce();
 		expect(server.directory).toBeUndefined();
-		expect(process.listenerCount('where:dev-stop', shutdown)).toBe(0);
+		expect(process.listenerCount('directory:dev-stop', shutdown)).toBe(0);
 		expect(
 			off.mock.calls.filter(
-				([name, listener]) => name === 'where:dev-stop' && listener === shutdown
+				([name, listener]) => name === 'directory:dev-stop' && listener === shutdown
 			)
 		).toHaveLength(1);
 	});
@@ -76,14 +76,14 @@ describe('development lifecycle', () => {
 		mocks.boot.mockImplementationOnce(async () => {
 			expect(first.stop).toHaveBeenCalledOnce();
 			expect(server.directory).toBeUndefined();
-			expect(process.listenerCount('where:dev-stop', oldCleanup)).toBe(0);
+			expect(process.listenerCount('directory:dev-stop', oldCleanup)).toBe(0);
 			return second;
 		});
 		await startDevelopment(server);
 		oldCleanup();
 		expect(server.directory).toBe(second);
 		expect(second.stop).not.toHaveBeenCalled();
-		process.emit('where:dev-stop');
+		process.emit('directory:dev-stop');
 		expect(first.stop).toHaveBeenCalledOnce();
 		expect(second.stop).toHaveBeenCalledOnce();
 	});
@@ -103,13 +103,13 @@ describe('development lifecycle', () => {
 		mocks.boot.mockImplementationOnce(async () => {
 			expect(first.stop).toHaveBeenCalledOnce();
 			expect(oldServer.directory).toBeUndefined();
-			expect(process.listenerCount('where:dev-stop', oldCleanup)).toBe(0);
+			expect(process.listenerCount('directory:dev-stop', oldCleanup)).toBe(0);
 			return second;
 		});
 		await current.startDevelopment(server);
 		oldCleanup();
 		expect(server.directory).toBe(second);
-		process.emit('where:dev-stop');
+		process.emit('directory:dev-stop');
 		expect(second.stop).toHaveBeenCalledOnce();
 		expect(server.directory).toBeUndefined();
 	});
@@ -123,8 +123,8 @@ describe('development lifecycle', () => {
 		const startup = startDevelopment(server);
 		expect(server.directory).toBeUndefined();
 		const shutdown = devStopListener();
-		process.emit('where:dev-stop');
-		expect(process.listenerCount('where:dev-stop', shutdown)).toBe(0);
+		process.emit('directory:dev-stop');
+		expect(process.listenerCount('directory:dev-stop', shutdown)).toBe(0);
 		pending.resolve(stopped);
 		await startup;
 		shutdown();
@@ -150,7 +150,7 @@ describe('development lifecycle', () => {
 		expect(second.stop).not.toHaveBeenCalled();
 		expect(server.directory).toBe(second);
 		expect(server.directory?.currentSnapshot().display.site.title).toBe('Current');
-		process.emit('where:dev-stop');
+		process.emit('directory:dev-stop');
 		expect(second.stop).toHaveBeenCalledOnce();
 	});
 
@@ -161,7 +161,7 @@ describe('development lifecycle', () => {
 		mocks.boot.mockRejectedValueOnce(error);
 		await expect(startDevelopment(server)).rejects.toBe(error);
 		expect(server.directory).toBeUndefined();
-		expect(process.listenerCount('where:dev-stop', devStopListener())).toBe(0);
+		expect(process.listenerCount('directory:dev-stop', devStopListener())).toBe(0);
 	});
 
 	it('leaves no leaked listener or cleared new state when a superseded boot fails', async () => {
@@ -178,11 +178,11 @@ describe('development lifecycle', () => {
 		pending.reject(failure);
 		await rejection;
 		failedCleanup();
-		expect(process.listenerCount('where:dev-stop', failedCleanup)).toBe(0);
-		expect(process.listenerCount('where:dev-stop', devStopListener(1))).toBe(1);
+		expect(process.listenerCount('directory:dev-stop', failedCleanup)).toBe(0);
+		expect(process.listenerCount('directory:dev-stop', devStopListener(1))).toBe(1);
 		expect(server.directory).toBe(current);
 		expect(current.stop).not.toHaveBeenCalled();
-		process.emit('where:dev-stop');
+		process.emit('directory:dev-stop');
 		expect(current.stop).toHaveBeenCalledOnce();
 	});
 
@@ -198,7 +198,7 @@ describe('development lifecycle', () => {
 		oldCleanup();
 		expect(server.directory).toBe(reused);
 		expect(reused.stop).toHaveBeenCalledOnce();
-		process.emit('where:dev-stop');
+		process.emit('directory:dev-stop');
 		expect(server.directory).toBeUndefined();
 		expect(reused.stop).toHaveBeenCalledTimes(2);
 	});

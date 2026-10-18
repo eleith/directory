@@ -34,11 +34,11 @@ function run(...args: string[]) {
 
 async function expectCleanCache(): Promise<void> {
 	const entries = await readdir(join(fixturePackage, 'node_modules/.cache'));
-	expect(entries.filter((name) => name.startsWith('where-schema-'))).toEqual([]);
+	expect(entries.filter((name) => name.startsWith('directory-schema-'))).toEqual([]);
 }
 
 beforeEach(async () => {
-	fixtureRoot = await mkdtemp(join(tmpdir(), 'where-schema-test-'));
+	fixtureRoot = await mkdtemp(join(tmpdir(), 'directory-schema-test-'));
 	fixturePackage = join(fixtureRoot, 'packages/config');
 	artifact = join(fixturePackage, 'src/config.schema.json');
 	await mkdir(join(fixturePackage, 'scripts'), { recursive: true });
@@ -125,7 +125,7 @@ describe('schema generator CLI from clean source', () => {
 		const schemaSource = join(fixturePackage, 'src/schema.ts');
 		await writeFile(
 			schemaSource,
-			`${await readFile(schemaSource, 'utf8')}\nWhereConfigurationSchema.description = 'Fresh canonical source fixture';\n`
+			`${await readFile(schemaSource, 'utf8')}\nDirectoryConfigurationSchema.description = 'Fresh canonical source fixture';\n`
 		);
 		const checked = run('--check');
 		expect(checked.status, checked.stderr).toBe(1);

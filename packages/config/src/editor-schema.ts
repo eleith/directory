@@ -1,5 +1,5 @@
 import type { TSchema } from '@sinclair/typebox';
-import { configurationReferences, WhereConfigurationSchema } from './schema.js';
+import { configurationReferences, DirectoryConfigurationSchema } from './schema.js';
 
 type SchemaObject = Record<string, unknown>;
 type EditorContext = {
@@ -8,7 +8,7 @@ type EditorContext = {
 };
 
 export function createEditorSchema(
-	schema: TSchema = WhereConfigurationSchema,
+	schema: TSchema = DirectoryConfigurationSchema,
 	references: readonly TSchema[] = configurationReferences
 ): SchemaObject {
 	const editorSchema = cloneSchema(schema);
@@ -113,7 +113,7 @@ function adaptSchemaForEditor(
 		resolveReference(node.$ref, context);
 		node.$ref = context.referenceTargets.get(node.$ref) ?? node.$ref;
 	}
-	if (node.format === 'where-http-url') node.format = 'uri';
+	if (node.format === 'directory-http-url') node.format = 'uri';
 	removeDefaultedPropertiesFromRequired(node, context);
 	for (const key of [
 		'properties',

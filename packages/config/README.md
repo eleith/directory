@@ -1,12 +1,12 @@
-# @where/config
+# @directory/config
 
-Shared configuration for Where. The [contract](../../docs/config.md) lists fields,
+Shared configuration for Directory. The [contract](../../docs/config.md) lists fields,
 defaults, paths and environment syntax.
 
 ```ts
-import { loadConfigFile } from '@where/config';
+import { loadConfigFile } from '@directory/config';
 
-const config = await loadConfigFile('config/where.yaml', { env: process.env });
+const config = await loadConfigFile('config/directory.yaml', { env: process.env });
 ```
 
 `loadConfigFile(path?, { env }?)` reads YAML and calls
@@ -35,7 +35,7 @@ Directory state, snapshot preparation and reload policy belong to the web server
 The shared loader keeps no cached configuration. See the web server's
 [directory API](../../docs/development.md#prepared-configuration-snapshots).
 
-Browser code must use **type-only** imports from `@where/config/types`; the main
-entry imports filesystem and validation code. `@where/config/schema.json` is the
+Browser code must use **type-only** imports from `@directory/config/types`; the main
+entry imports filesystem and validation code. `@directory/config/schema.json` is the
 generated text-editor schema. See [development](../../docs/development.md) for
 build, schema-drift and test commands.

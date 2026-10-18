@@ -1,4 +1,4 @@
-# Working on Where
+# Working on Directory
 
 Start with [README.md](README.md) and [docs/development.md](docs/development.md).
 Local planning notes, when present, live in `.plans/foundation/architecture.md`

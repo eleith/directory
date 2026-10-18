@@ -18,7 +18,7 @@ export default defineConfig({
 			HOST: '127.0.0.1',
 			PORT: '4183',
 			ORIGIN: origin,
-			CONFIG_PATH: fileURLToPath(new URL('./e2e/fixtures/where.yaml', import.meta.url))
+			CONFIG_PATH: fileURLToPath(new URL('./e2e/fixtures/directory.yaml', import.meta.url))
 		}
 	}
 });

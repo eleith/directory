@@ -1,5 +1,5 @@
 {
-	"name": "@where/web",
+	"name": "@directory/web",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -14,7 +14,7 @@
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
-		"@where/config": "workspace:*",
+		"@directory/config": "workspace:*",
 		"tslog": "5.2.0"
 	},
 	"devDependencies": {

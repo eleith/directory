@@ -1,4 +1,4 @@
-import { configurationVersion } from '@where/config';
+import { configurationVersion } from '@directory/config';
 import type { PageServerLoad } from './$types.js';
 
 export const load = (({ locals }) => ({

@@ -2,19 +2,19 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { inspect } from 'node:util';
-import { ConfigError, validateConfig } from '@where/config';
-import type { WhereConfiguration } from '@where/config/types';
+import { ConfigError, validateConfig } from '@directory/config';
+import type { DirectoryConfiguration } from '@directory/config/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DirectoryError, loadDirectory, type DirectoryIssue } from './load-directory.js';
 import type { PreparedSnapshot } from './snapshot.js';
 
 const mocks = vi.hoisted(() => ({
-	load: vi.fn<typeof import('@where/config').loadConfigFile>(),
-	prepare: vi.fn<(config: WhereConfiguration) => PreparedSnapshot | Promise<PreparedSnapshot>>()
+	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
+	prepare: vi.fn<(config: DirectoryConfiguration) => PreparedSnapshot | Promise<PreparedSnapshot>>()
 }));
 
-vi.mock('@where/config', async (importOriginal) => ({
-	...(await importOriginal<typeof import('@where/config')>()),
+vi.mock('@directory/config', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@directory/config')>()),
 	loadConfigFile: mocks.load
 }));
 vi.mock('./snapshot.js', async (importOriginal) => ({
@@ -28,12 +28,15 @@ const credentials = { credentials: { username: 'family', password: sentinel } };
 const oidc = {
 	oidc: {
 		issuer: 'https://identity.example.com',
-		client_id: 'where',
+		client_id: 'directory',
 		client_secret: sentinel
 	}
 };
 
-function configuration(title = 'boot', auth?: WhereConfiguration['auth']): WhereConfiguration {
+function configuration(
+	title = 'boot',
+	auth?: DirectoryConfiguration['auth']
+): DirectoryConfiguration {
 	return validateConfig(
 		{
 			site: { title, logo_path: `/public/${title}.svg` },
@@ -68,7 +71,7 @@ beforeEach(() => {
 
 describe('directory startup', () => {
 	it('returns a directory only after loading and preparation have completed', async () => {
-		const loaded = Promise.withResolvers<WhereConfiguration>();
+		const loaded = Promise.withResolvers<DirectoryConfiguration>();
 		const prepared = Promise.withResolvers<PreparedSnapshot>();
 		const preparing = Promise.withResolvers<void>();
 		mocks.load.mockReturnValueOnce(loaded.promise);
@@ -158,9 +161,9 @@ describe('directory startup', () => {
 		await directory.reload();
 		expect(mocks.load).toHaveBeenLastCalledWith(pinned, { env });
 		expect(mocks.load.mock.calls[1]?.[1]?.env).toBe(env);
-		const explicit = await loadDirectory('custom/where.yaml', { env, report });
+		const explicit = await loadDirectory('custom/directory.yaml', { env, report });
 		await explicit.reload();
-		expect(mocks.load).toHaveBeenLastCalledWith(resolve('custom/where.yaml'), { env });
+		expect(mocks.load).toHaveBeenLastCalledWith(resolve('custom/directory.yaml'), { env });
 		expect(report).not.toHaveBeenCalled();
 	});
 });
@@ -169,7 +172,7 @@ describe('filesystem integration', () => {
 	it('loads disposable YAML with env and defaults, retains last good after an invalid edit, and recovers', async ({
 		onTestFinished
 	}) => {
-		const temporary = await mkdtemp(join(tmpdir(), 'where-directory-'));
+		const temporary = await mkdtemp(join(tmpdir(), 'directory-directory-'));
 		onTestFinished(() => rm(temporary, { recursive: true, force: true }));
 		const configPath = join(temporary, sentinel);
 		const source = `
@@ -187,7 +190,8 @@ links:
     tags: photos, backup
 `;
 		await writeFile(configPath, source);
-		const realConfig = await vi.importActual<typeof import('@where/config')>('@where/config');
+		const realConfig =
+			await vi.importActual<typeof import('@directory/config')>('@directory/config');
 		mocks.load.mockImplementation(realConfig.loadConfigFile);
 		const report = vi.fn<(issue: DirectoryIssue) => void>();
 		const env = {
@@ -244,10 +248,10 @@ describe('owned snapshot reloads', () => {
 	it('serializes load and preparation, coalescing bursts into one pending follow-up', async () => {
 		const directory = await loadDirectory();
 		const boot = directory.currentSnapshot();
-		const firstLoad = Promise.withResolvers<WhereConfiguration>();
+		const firstLoad = Promise.withResolvers<DirectoryConfiguration>();
 		const firstPrepare = Promise.withResolvers<void>();
 		const preparing = Promise.withResolvers<void>();
-		const secondLoad = Promise.withResolvers<WhereConfiguration>();
+		const secondLoad = Promise.withResolvers<DirectoryConfiguration>();
 		const loadingAgain = Promise.withResolvers<void>();
 		mocks.load.mockReturnValueOnce(firstLoad.promise).mockImplementationOnce(() => {
 			loadingAgain.resolve();
@@ -335,7 +339,7 @@ describe('owned snapshot reloads', () => {
 			throw new Error(sentinel);
 		});
 		const directory = await loadDirectory(undefined, { report });
-		const pending = Promise.withResolvers<WhereConfiguration>();
+		const pending = Promise.withResolvers<DirectoryConfiguration>();
 		mocks.load.mockReturnValueOnce(pending.promise).mockResolvedValue(configuration('recovered'));
 		const run = directory.reload();
 		await Promise.resolve();
@@ -387,7 +391,7 @@ describe('boot authentication', () => {
 		restored.auth = {
 			oidc: {
 				client_secret: sentinel,
-				client_id: 'where',
+				client_id: 'directory',
 				issuer: 'https://identity.example.com'
 			}
 		};
@@ -427,7 +431,7 @@ describe('terminal stop', () => {
 		const report = vi.fn();
 		const directory = await loadDirectory(undefined, { report });
 		const boot = directory.currentSnapshot();
-		const pending = Promise.withResolvers<WhereConfiguration>();
+		const pending = Promise.withResolvers<DirectoryConfiguration>();
 		mocks.load.mockReturnValueOnce(pending.promise);
 		const run = directory.reload();
 		await Promise.resolve();

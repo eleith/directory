@@ -1,4 +1,4 @@
-# 📍 Where
+# 📍 Directory
 
 A minimal homelab directory for the family: learn what is available and open the
 right link. The dashboard will be driven by one mounted YAML file.
@@ -14,7 +14,7 @@ invalid edits. The shell shows configured site copy, not dashboard links.
 Authentication and image serving are not implemented yet; auth-enabled startup is
 intentionally rejected until the access gate is ready.
 See the [configuration contract](docs/config.md) and
-[example](apps/web/config/where.example.yml).
+[example](apps/web/config/directory.example.yml).
 
 ## Development
 
@@ -22,9 +22,9 @@ Use Node **26.5.0** and pnpm **11.9.0**, pinned in `mise.toml`:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter @where/web exec playwright install chromium
+pnpm --filter @directory/web exec playwright install chromium
 pnpm verify
-CONFIG_PATH="$PWD/apps/web/config/where.example.yml" pnpm dev
+CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" pnpm dev
 ```
 
 Open `http://localhost:5173`. The configured site title and description render
@@ -37,7 +37,7 @@ Validate the example or your own configuration:
 
 ```sh
 pnpm cli -- --help
-pnpm cli -- validate apps/web/config/where.example.yml
+pnpm cli -- validate apps/web/config/directory.example.yml
 ```
 
 Validation returns 0 for a valid file and nonzero for unreadable or invalid input.

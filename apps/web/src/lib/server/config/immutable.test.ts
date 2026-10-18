@@ -3,11 +3,11 @@ import { freezeData } from './immutable.js';
 
 describe('immutable owned snapshot data', () => {
 	it('freezes every object and array while preserving values and optional absence', () => {
-		const data = { title: 'Where', links: [{ title: 'Photos', tags: ['photos', 'backup'] }] };
+		const data = { title: 'Directory', links: [{ title: 'Photos', tags: ['photos', 'backup'] }] };
 		const immutable = freezeData(data);
 		expect(immutable).toBe(data);
 		expect(immutable).toEqual({
-			title: 'Where',
+			title: 'Directory',
 			links: [{ title: 'Photos', tags: ['photos', 'backup'] }]
 		});
 		expect(Object.isFrozen(immutable)).toBe(true);

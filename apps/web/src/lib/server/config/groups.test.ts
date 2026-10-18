@@ -1,11 +1,11 @@
-import { validateConfig } from '@where/config';
-import type { WhereLink, WhereSite } from '@where/config/types';
+import { validateConfig } from '@directory/config';
+import type { DirectoryLink, DirectorySite } from '@directory/config/types';
 import { describe, expect, it } from 'vitest';
 import { getGroups } from './groups.js';
 
 function directory(
-	links: Record<string, Pick<WhereLink, 'title'> & Partial<WhereLink>>,
-	order: WhereSite['order'] = 'configured'
+	links: Record<string, Pick<DirectoryLink, 'title'> & Partial<DirectoryLink>>,
+	order: DirectorySite['order'] = 'configured'
 ) {
 	const config = validateConfig(
 		{

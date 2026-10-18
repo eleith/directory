@@ -6,7 +6,7 @@ import type {
 	LinkSchema,
 	OidcAuthSchema,
 	SiteSchema,
-	WhereConfigurationSchema
+	DirectoryConfigurationSchema
 } from './schema.js';
 
 export type ConfigEnvironment = Readonly<Record<string, string | undefined>>;
@@ -17,10 +17,10 @@ export interface ConfigPathOptions extends ConfigLoadOptions {
 	cwd?: string;
 }
 
-export type WhereConfiguration = Static<typeof WhereConfigurationSchema>;
-export type WhereLink = Static<typeof LinkSchema>;
-export type WhereSite = Static<typeof SiteSchema>;
-export type WhereAppearance = Static<typeof AppearanceSchema>;
-export type WhereAuth = Static<typeof AuthSchema>;
-export type WhereCredentialsAuth = Static<typeof CredentialsAuthSchema>;
-export type WhereOidcAuth = Static<typeof OidcAuthSchema>;
+export type DirectoryConfiguration = Static<typeof DirectoryConfigurationSchema>;
+export type DirectoryLink = Static<typeof LinkSchema>;
+export type DirectorySite = Static<typeof SiteSchema>;
+export type DirectoryAppearance = Static<typeof AppearanceSchema>;
+export type DirectoryAuth = Static<typeof AuthSchema>;
+export type DirectoryCredentialsAuth = Static<typeof CredentialsAuthSchema>;
+export type DirectoryOidcAuth = Static<typeof OidcAuthSchema>;

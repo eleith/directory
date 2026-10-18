@@ -1,10 +1,10 @@
-import type { WhereConfiguration, WhereLink, WhereSite } from '@where/config/types';
+import type { DirectoryConfiguration, DirectoryLink, DirectorySite } from '@directory/config/types';
 import type { DirectoryDisplay, DisplayGroup, DisplayLink } from '../../display/types.js';
 
 const alphabeticalOrder = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
 
 export function getGroups(
-	config: WhereConfiguration
+	config: DirectoryConfiguration
 ): Pick<DirectoryDisplay, 'grouped' | 'groups'> {
 	const order = config.site.order;
 	const namedGroups = new Map<string, { id: string; label: string; links: DisplayLink[] }>();
@@ -47,8 +47,8 @@ export function getGroups(
 	return { grouped, groups };
 }
 
-function prepareLink(id: string, link: WhereLink): DisplayLink {
-	const optionalFields: Pick<WhereLink, 'description' | 'logo_path' | 'favicon_path'> = {};
+function prepareLink(id: string, link: DirectoryLink): DisplayLink {
+	const optionalFields: Pick<DirectoryLink, 'description' | 'logo_path' | 'favicon_path'> = {};
 	if (link.description !== undefined) optionalFields.description = link.description;
 	if (link.logo_path !== undefined) optionalFields.logo_path = link.logo_path;
 	if (link.favicon_path !== undefined) optionalFields.favicon_path = link.favicon_path;
@@ -64,7 +64,7 @@ function prepareLink(id: string, link: WhereLink): DisplayLink {
 	};
 }
 
-function getTagLabels(link: WhereLink): string[] {
+function getTagLabels(link: DirectoryLink): string[] {
 	return link.tags
 		.split(',')
 		.map((tag) => tag.trim())
@@ -73,7 +73,7 @@ function getTagLabels(link: WhereLink): string[] {
 
 function orderDisplayLinks(
 	links: readonly DisplayLink[],
-	order: WhereSite['order']
+	order: DirectorySite['order']
 ): DisplayLink[] {
 	const orderedLinks = [...links];
 	if (order === 'alphabetical') {

@@ -1,6 +1,6 @@
 import { inspect } from 'node:util';
-import { ConfigError, validateConfig } from '@where/config';
-import type { WhereConfiguration } from '@where/config/types';
+import { ConfigError, validateConfig } from '@directory/config';
+import type { DirectoryConfiguration } from '@directory/config/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bootApp } from './boot.js';
 import { DirectoryError, type Directory } from './config/load-directory.js';
@@ -8,15 +8,15 @@ import { prepareSnapshot } from './config/snapshot.js';
 import { reportDirectoryIssue } from './logger.js';
 
 const mocks = vi.hoisted(() => ({
-	path: vi.fn<typeof import('@where/config').resolveConfigPath>(),
-	load: vi.fn<typeof import('@where/config').loadConfigFile>(),
+	path: vi.fn<typeof import('@directory/config').resolveConfigPath>(),
+	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
 	directory: vi.fn<typeof import('./config/load-directory.js').loadDirectory>(),
 	watch: vi.fn<typeof import('./config/watch.js').watchConfig>(),
 	stopWatching: vi.fn<() => void>()
 }));
 
-vi.mock('@where/config', async (importOriginal) => ({
-	...(await importOriginal<typeof import('@where/config')>()),
+vi.mock('@directory/config', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@directory/config')>()),
 	resolveConfigPath: mocks.path,
 	loadConfigFile: mocks.load
 }));
@@ -31,7 +31,7 @@ const realDirectory = await vi.importActual<typeof import('./config/load-directo
 );
 const sentinel = 'PRIVATE-environment-password-filename.yaml';
 
-function configuration(auth?: WhereConfiguration['auth']): WhereConfiguration {
+function configuration(auth?: DirectoryConfiguration['auth']): DirectoryConfiguration {
 	const input: Record<string, unknown> = {
 		site: { title: 'Family', description: 'Welcome' },
 		links: { photos: { title: 'Photos', url: 'https://photos.example.com' } }
@@ -193,7 +193,7 @@ describe('bootApp', () => {
 		mocks.directory.mockImplementationOnce(realDirectory.loadDirectory);
 		const app = await bootApp({});
 		const original = app.currentSnapshot();
-		const pending = Promise.withResolvers<WhereConfiguration>();
+		const pending = Promise.withResolvers<DirectoryConfiguration>();
 		const loading = Promise.withResolvers<void>();
 		mocks.load.mockImplementationOnce(() => {
 			loading.resolve();

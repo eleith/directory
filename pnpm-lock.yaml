@@ -104,7 +104,7 @@ importers:
 
   apps/cli:
     dependencies:
-      '@where/config':
+      '@directory/config':
         specifier: workspace:*
         version: link:../../packages/config
       gunshi:
@@ -129,7 +129,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@where/config':
+      '@directory/config':
         specifier: workspace:*
         version: link:../../packages/config
       tslog:

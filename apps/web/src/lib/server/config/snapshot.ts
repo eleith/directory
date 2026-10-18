@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { WhereConfiguration } from '@where/config/types';
+import type { DirectoryConfiguration } from '@directory/config/types';
 import type { DirectoryDisplay } from '../../display/types.js';
 import { freezeData, type Immutable } from './immutable.js';
 import { prepareDirectory } from './directory.js';
 
 export interface PreparedSnapshot {
-	readonly configuration: Immutable<WhereConfiguration>;
+	readonly configuration: Immutable<DirectoryConfiguration>;
 	readonly display: DirectoryDisplay;
 	readonly assets: {
 		readonly referencedPaths: readonly string[];
@@ -13,14 +13,14 @@ export interface PreparedSnapshot {
 	};
 }
 
-export function prepareSnapshot(config: WhereConfiguration): PreparedSnapshot {
+export function prepareSnapshot(config: DirectoryConfiguration): PreparedSnapshot {
 	const configuration = structuredClone(config);
 	const display = prepareDirectory(configuration, randomUUID());
 	const assets = collectAssetPaths(configuration);
 	return freezeData({ configuration, display, assets });
 }
 
-function collectAssetPaths(config: WhereConfiguration): PreparedSnapshot['assets'] {
+function collectAssetPaths(config: DirectoryConfiguration): PreparedSnapshot['assets'] {
 	const brandingPaths = new Set<string>();
 	for (const path of [config.site.logo_path, config.site.favicon_path]) {
 		if (path !== undefined) brandingPaths.add(path);

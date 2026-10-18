@@ -9,7 +9,7 @@ import {
 	HttpUrlSchema,
 	LocalImagePathSchema,
 	SiteSchema,
-	WhereConfigurationSchema
+	DirectoryConfigurationSchema
 } from './schema.js';
 
 type ObjectSchema = Record<string, unknown>;
@@ -85,9 +85,9 @@ describe('default-aware editor schema', () => {
 	});
 
 	it('does not mutate canonical schemas and produces repeatable output', () => {
-		const before = JSON.stringify([WhereConfigurationSchema, configurationReferences]);
+		const before = JSON.stringify([DirectoryConfigurationSchema, configurationReferences]);
 		const editor = createEditorSchema();
-		expect(JSON.stringify([WhereConfigurationSchema, configurationReferences])).toBe(before);
+		expect(JSON.stringify([DirectoryConfigurationSchema, configurationReferences])).toBe(before);
 		expect(createEditorSchema()).toEqual(editor);
 	});
 
@@ -274,7 +274,7 @@ describe('default-aware editor schema', () => {
 			interpolationPattern(object(object(editor.patternProperties)['^[a-z]+$'])).test('${VALUE}')
 		).toBe(true);
 		const links = property(createEditorSchema(), 'links');
-		const canonicalLinks = WhereConfigurationSchema.properties.links;
+		const canonicalLinks = DirectoryConfigurationSchema.properties.links;
 		expect(Object.keys(object(links.patternProperties))).toEqual(
 			Object.keys(canonicalLinks.patternProperties)
 		);

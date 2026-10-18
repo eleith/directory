@@ -20,7 +20,7 @@ links:
 }
 
 async function launchServer(contents: string | undefined) {
-	const temporary = await mkdtemp(join(tmpdir(), 'where-boot-'));
+	const temporary = await mkdtemp(join(tmpdir(), 'directory-boot-'));
 	onTestFinished(() => rm(temporary, { recursive: true, force: true }));
 	const path = join(temporary, `${sentinel}.yaml`);
 	if (contents !== undefined) await writeFile(path, contents);

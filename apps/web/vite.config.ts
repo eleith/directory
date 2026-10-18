@@ -6,10 +6,10 @@ export default defineConfig({
 		sveltekit(),
 		// Kit's SSR loader does not run import.meta.hot.dispose.
 		{
-			name: 'where-dev-cleanup',
+			name: 'directory-dev-cleanup',
 			apply: 'serve',
 			closeBundle() {
-				process.emit('where:dev-stop');
+				process.emit('directory:dev-stop');
 			}
 		}
 	]

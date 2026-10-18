@@ -1,4 +1,4 @@
-import { validateConfig } from '@where/config';
+import { validateConfig } from '@directory/config';
 import { describe, expect, it } from 'vitest';
 import { prepareSnapshot } from './snapshot.js';
 

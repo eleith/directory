@@ -39,7 +39,7 @@ Do not use SvelteKit 3 configuration APIs with this pinned Kit 2 stack.
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter @where/web exec playwright install chromium
+pnpm --filter @directory/web exec playwright install chromium
 pnpm verify
 ```
 
@@ -61,7 +61,7 @@ revision matching the pinned Playwright version after changing that dependency.
 
 `pnpm build:packages` rebuilds just shared output. Package exports deliberately
 resolve `dist/index.js` and `dist/index.d.ts`, with no source aliases or custom
-loader. `@where/config/types` is a type-only entry; the schema JSON is exported
+loader. `@directory/config/types` is a type-only entry; the schema JSON is exported
 separately. Schema generation compiles fresh source into disposable output and
 never relies on an existing `dist`. Build before independent workspace
 checks/tests; `pnpm verify` does this in order.
@@ -76,11 +76,11 @@ The web server now needs configuration at runtime, not at build time. To preview
 without creating operator configuration:
 
 ```sh
-CONFIG_PATH="$PWD/apps/web/config/where.example.yml" pnpm dev
+CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" pnpm dev
 ```
 
 `pnpm dev` runs Vite from `apps/web`, so its default path is
-`apps/web/config/where.yaml`. Absolute `CONFIG_PATH` values work independently of
+`apps/web/config/directory.yaml`. Absolute `CONFIG_PATH` values work independently of
 the command's working directory. Never overwrite an existing operator file with
 the example. Keep auth omitted until the access gate is available.
 
@@ -88,7 +88,7 @@ the example. Keep auth omitted until the access gate is available.
 
 ```sh
 pnpm cli -- --help
-pnpm cli -- validate apps/web/config/where.example.yml
+pnpm cli -- validate apps/web/config/directory.example.yml
 ```
 
 The root command builds shared config and the CLI, then runs its compiled Node
@@ -96,7 +96,7 @@ entrypoint. The wrapper also emits build logs; the following stream guarantees
 refer to the compiled CLI itself:
 
 - Help returns 0 on stdout without loading configuration.
-- `where validate [path]` returns 0 on stdout for a valid file, otherwise 1 on
+- `directory validate [path]` returns 0 on stdout for a valid file, otherwise 1 on
   stderr. It checks the actual environment, with no weaker structure-only mode.
 - Missing commands, unknown options and extra paths return 1 on stderr. Exactly
   one leading `--` is accepted for package-manager forwarding; repeated or
@@ -234,7 +234,7 @@ covered; this intentionally overlaps workspace lint.
 
 Path filters include dependencies and shared tooling, not just app directories:
 
-- `packages/config/**` and the shared `apps/web/config/where.example.yml` run
+- `packages/config/**` and the shared `apps/web/config/directory.example.yml` run
   config, CLI, and web checks.
 - `apps/cli/**` or `apps/web/**` selects that application's pipeline.
 - Root files (`'*'`, including dotfiles), `docs/**`, and both workflow directories
@@ -337,8 +337,8 @@ checks, not automated gates.
 
    ```sh
    preview=$(mktemp -d)
-   cp apps/web/config/where.example.yml "$preview/where.yaml"
-   CONFIG_PATH="$preview/where.yaml" pnpm dev
+   cp apps/web/config/directory.example.yml "$preview/directory.yaml"
+   CONFIG_PATH="$preview/directory.yaml" pnpm dev
    ```
 
    Check desktop/narrow widths, OS light/dark and JavaScript disabled. Edit the
@@ -350,7 +350,7 @@ checks, not automated gates.
    For production output, after `pnpm build`, run:
 
    ```sh
-   CONFIG_PATH="$PWD/apps/web/config/where.example.yml" \
+   CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" \
      HOST=127.0.0.1 PORT=3000 ORIGIN=http://127.0.0.1:3000 node apps/web/build/index.js
    ```
 

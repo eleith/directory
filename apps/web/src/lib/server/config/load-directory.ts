@@ -1,7 +1,12 @@
 import { resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { ConfigError, loadConfigFile, resolveConfigPath, type ConfigIssue } from '@where/config';
-import type { ConfigLoadOptions } from '@where/config/types';
+import {
+	ConfigError,
+	loadConfigFile,
+	resolveConfigPath,
+	type ConfigIssue
+} from '@directory/config';
+import type { ConfigLoadOptions } from '@directory/config/types';
 import { prepareSnapshot, type PreparedSnapshot } from './snapshot.js';
 
 export interface DirectoryIssue {

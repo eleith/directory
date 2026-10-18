@@ -1,5 +1,5 @@
-import { ConfigError, configurationVersion, loadConfigFile } from '@where/config';
-import type { ConfigLoadOptions } from '@where/config';
+import { ConfigError, configurationVersion, loadConfigFile } from '@directory/config';
+import type { ConfigLoadOptions } from '@directory/config';
 import { cli, define, type CommandContext } from 'gunshi';
 
 export interface CliOutput {
@@ -7,13 +7,13 @@ export interface CliOutput {
 	stderr: (text: string) => void;
 }
 
-const header = `Where — configuration validation.
+const header = `Directory — configuration validation.
 Supported configuration format version: ${configurationVersion}.
-Path selection: explicit path, then CONFIG_PATH, then config/where.yaml.`;
+Path selection: explicit path, then CONFIG_PATH, then config/directory.yaml.`;
 
 const rootCommand = define({
-	name: 'where',
-	description: 'Where configuration tools.',
+	name: 'directory',
+	description: 'Directory configuration tools.',
 	run() {
 		throw new Error('A command is required.');
 	}
@@ -27,7 +27,7 @@ export async function runCli(
 	const forwarded = args[0] === '--' ? args.slice(1) : [...args];
 	try {
 		const result = await cli(forwarded, rootCommand, {
-			name: 'where',
+			name: 'directory',
 			usageSilent: true,
 			renderHeader: async () => header,
 			renderValidationErrors: null,
@@ -37,7 +37,7 @@ export async function runCli(
 		if (result) output.stdout(`${result}\n`);
 		return 0;
 	} catch (error) {
-		let message = 'Command failed. Run where --help for usage.\n';
+		let message = 'Command failed. Run directory --help for usage.\n';
 		if (error instanceof ConfigError) {
 			message = `Configuration validation failed.\n${error.message}\n`;
 		}

@@ -40,15 +40,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build web and shared dependencies
-        run: pnpm --filter '@where/web...' build
+        run: pnpm --filter '@directory/web...' build
       - name: Check types
-        run: pnpm --filter @where/web check
+        run: pnpm --filter @directory/web check
       - name: Lint root and workspace
         run: |
           pnpm lint
-          pnpm --filter @where/web lint
+          pnpm --filter @directory/web lint
       - name: Unit tests
-        run: pnpm --filter @where/web test:coverage
+        run: pnpm --filter @directory/web test:coverage
 
   e2e:
     name: Web E2E
@@ -68,6 +68,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build web and shared dependencies
-        run: pnpm --filter '@where/web...' build
+        run: pnpm --filter '@directory/web...' build
       - name: Browser tests
-        run: pnpm --filter @where/web test:e2e
+        run: pnpm --filter @directory/web test:e2e

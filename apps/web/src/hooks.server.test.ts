@@ -1,4 +1,4 @@
-import { validateConfig } from '@where/config';
+import { validateConfig } from '@directory/config';
 import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Directory } from './lib/server/config/load-directory.js';
@@ -10,8 +10,8 @@ const mocks = vi.hoisted(() => ({
 	dev: false,
 	boot: vi.fn<typeof import('./lib/server/boot.js').bootApp>(),
 	report: vi.fn<typeof import('./lib/server/logger.js').reportStartupFailure>(),
-	load: vi.fn<typeof import('@where/config').loadConfigFile>(),
-	path: vi.fn<typeof import('@where/config').resolveConfigPath>(),
+	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
+	path: vi.fn<typeof import('@directory/config').resolveConfigPath>(),
 	prepare: vi.fn<typeof import('./lib/server/config/snapshot.js').prepareSnapshot>()
 }));
 
@@ -25,8 +25,8 @@ vi.mock('$app/environment', () => ({
 }));
 vi.mock('./lib/server/boot.js', () => ({ bootApp: mocks.boot }));
 vi.mock('./lib/server/logger.js', () => ({ reportStartupFailure: mocks.report }));
-vi.mock('@where/config', async (importOriginal) => ({
-	...(await importOriginal<typeof import('@where/config')>()),
+vi.mock('@directory/config', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@directory/config')>()),
 	loadConfigFile: mocks.load,
 	resolveConfigPath: mocks.path
 }));
@@ -81,7 +81,7 @@ beforeEach(async () => {
 
 afterEach(() => {
 	for (const [name, listener] of listeners.mock.calls) {
-		if (name === 'sveltekit:shutdown' || name === 'where:dev-stop') process.off(name, listener);
+		if (name === 'sveltekit:shutdown' || name === 'directory:dev-stop') process.off(name, listener);
 	}
 	vi.restoreAllMocks();
 });
@@ -101,10 +101,10 @@ describe('server hooks', () => {
 		expect(mocks.prepare).not.toHaveBeenCalled();
 		expect(
 			listeners.mock.calls.filter(
-				([name]) => name === 'sveltekit:shutdown' || name === 'where:dev-stop'
+				([name]) => name === 'sveltekit:shutdown' || name === 'directory:dev-stop'
 			)
 		).toEqual([]);
-		expect(emit).not.toHaveBeenCalledWith('where:dev-stop');
+		expect(emit).not.toHaveBeenCalledWith('directory:dev-stop');
 	});
 
 	it('dispatches production startup and serves only after boot, until shutdown', async () => {
@@ -137,7 +137,7 @@ describe('server hooks', () => {
 		expect(development).toHaveBeenCalledOnce();
 		expect(production).not.toHaveBeenCalled();
 		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
-		process.emit('where:dev-stop');
+		process.emit('directory:dev-stop');
 	});
 
 	it.each([false, true])('redacts startup failure at the common boundary (dev=%s)', async (dev) => {

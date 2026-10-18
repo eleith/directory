@@ -6,7 +6,7 @@ configuration and inferred TypeScript types. The generated
 optionality: fields with defaults can be omitted, but link titles/URLs and auth
 credentials remain required.
 
-The shared loader and `where validate` now read YAML, apply defaults, expand
+The shared loader and `directory validate` now read YAML, apply defaults, expand
 environment values and validate the result. The web server loads a complete
 immutable snapshot before serving, captures it once per request, and polls the
 configuration path for changes. The shell renders configured site copy; dashboard
@@ -14,9 +14,18 @@ links and images are not served yet. Authentication is not implemented, so the
 web server rejects startup with any auth block even though the CLI can validate
 its shape. Omit auth to run this intermediate version.
 
+## Migrating from Where
+
+Directory was previously named Where. The package namespace is now `@directory/*`,
+the CLI executable is `directory`, the default filename is `config/directory.yaml`,
+and the public-directory override is `DIRECTORY_PUBLIC_DIR`. An explicit
+`CONFIG_PATH` can still point to an existing `config/where.yaml` file. Update
+operator environments manually; there is no automatic fallback or migration.
+The configuration format version and fields are unchanged.
+
 ## Start with the example
 
-See [where.example.yml](../apps/web/config/where.example.yml). Its schema comment
+See [directory.example.yml](../apps/web/config/directory.example.yml). Its schema comment
 points to the actual checked-in artifact relative to `apps/web/config`:
 
 ```yaml
@@ -29,34 +38,34 @@ links:
 
 There is no hosted schema URL. If copying the file elsewhere, update the schema
 comment to the artifact's real location. The package also exports
-`@where/config/schema.json`; runtime consumers resolve compiled ESM, not TS source.
+`@directory/config/schema.json`; runtime consumers resolve compiled ESM, not TS source.
 
 ## Loading and validation
 
 ```sh
-pnpm cli -- validate apps/web/config/where.example.yml
+pnpm cli -- validate apps/web/config/directory.example.yml
 ```
 
 The wrapper builds the shared package and standalone CLI first. The compiled
 command is `node apps/cli/dist/index.js validate [path]`; its executable is named
-`where`. Gunshi defines commands and generates help, as in When. It accepts one
-leading `--` for package-manager forwarding. Use `where --help` or
-`where validate --help` for usage; help after a path also leaves the file unread.
+`directory`. Gunshi defines commands and generates help, as in When. It accepts one
+leading `--` for package-manager forwarding. Use `directory --help` or
+`directory validate --help` for usage; help after a path also leaves the file unread.
 
 Path selection is explicit argument, then `CONFIG_PATH`, then
-`config/where.yaml`, relative to the working directory. There is no production-
+`config/directory.yaml`, relative to the working directory. There is no production-
 specific path or search for nearby files. The web server pins the selected path
 at startup. `pnpm dev` runs from `apps/web`, so its default is
-`apps/web/config/where.yaml`; an absolute `CONFIG_PATH` avoids working-directory
+`apps/web/config/directory.yaml`; an absolute `CONFIG_PATH` avoids working-directory
 ambiguity. The deployment layout is:
 
 ```text
 deployment/
-  config/where.yaml
+  config/directory.yaml
   public/
 ```
 
-`WHERE_PUBLIC_DIR` can override that sibling public directory. Relative overrides
+`DIRECTORY_PUBLIC_DIR` can override that sibling public directory. Relative overrides
 resolve from the working directory. Validation checks image-path syntax only;
 it does not inspect this directory or contact any destination.
 
@@ -110,7 +119,7 @@ For example:
 
 ```yaml
 site:
-  order: '${WHERE_ORDER:-configured}'
+  order: '${DIRECTORY_ORDER:-configured}'
 links:
   photos:
     title: Photos
@@ -132,7 +141,7 @@ secrets stay outside its display model. The validator prints neither kind.
 | Field                                 | Contract                                                                                                                                                                      |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version`                             | Only `1`; defaults to `1`. This is the file format, not the app release.                                                                                                      |
-| `site`                                | Optional object. Defaults: title `Where`, description/footer empty, order `configured`.                                                                                       |
+| `site`                                | Optional object. Defaults: title `Directory`, description/footer empty, order `configured`.                                                                                   |
 | `site.logo_path`, `site.favicon_path` | Optional independent local images; omission leaves bundled branding to the future UI.                                                                                         |
 | `site.order`                          | `configured` or `alphabetical`; defaults to `configured`.                                                                                                                     |
 | `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                          |
@@ -175,12 +184,12 @@ group named Other remains distinct from that missing-group bucket.
 
 The three booleans are **informational service hints only** and default to false:
 
-- `requires_auth`: opening this service needs sign-in; not Where's auth setting.
+- `requires_auth`: opening this service needs sign-in; not Directory's auth setting.
 - `internal_only`: intended for LAN/VPN access; no network detection or enforcement.
 - `admin_only`: intended for administrators; no role or visibility restriction.
 
 False means no advisory badge, not a verified claim about the service. All
-visitors authorized to open Where still see the same links. These flags neither
+visitors authorized to open Directory still see the same links. These flags neither
 hide links nor change the directory's actual `auth` strategy. Prepared grouping
 and ordering are implemented; rendering, badges and search remain later work.
 All advisory flag combinations preserve the same link inclusion.
@@ -193,15 +202,15 @@ Declare one, never both:
 auth:
   credentials:
     username: family
-    password: '${WHERE_PASSWORD}'
+    password: '${DIRECTORY_PASSWORD}'
 ```
 
 ```yaml
 auth:
   oidc:
     issuer: https://identity.example.com
-    client_id: where
-    client_secret: '${WHERE_OIDC_CLIENT_SECRET}'
+    client_id: directory
+    client_secret: '${DIRECTORY_OIDC_CLIENT_SECRET}'
 ```
 
 Username/password and all three OIDC fields are required and nonempty. Empty,
@@ -244,7 +253,7 @@ the first gate in local `verify` and both providers' config pipeline. Build does
 not regenerate the artifact or mask drift. Regenerate intentionally after schema
 changes, review the JSON diff, and update examples/tests together.
 
-Browser-facing code may import **types only** from `@where/config/types`. Its JS
+Browser-facing code may import **types only** from `@directory/config/types`. Its JS
 entry is empty and does not import the schema, format registry or loader.
 The canonical schema's TypeBox format registry entry is namespaced
-`where-http-url`; the editor copy uses standard `uri` plus the HTTP(S) pattern.
+`directory-http-url`; the editor copy uses standard `uri` plus the HTTP(S) pattern.

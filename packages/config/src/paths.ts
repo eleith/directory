@@ -4,7 +4,7 @@ import type { ConfigPathOptions } from './types.js';
 export function resolveConfigPath(options: ConfigPathOptions = {}): string {
 	const env = options.env ?? process.env;
 	const cwd = options.cwd ?? process.cwd();
-	return resolve(cwd, env.CONFIG_PATH ?? 'config/where.yaml');
+	return resolve(cwd, env.CONFIG_PATH ?? 'config/directory.yaml');
 }
 
 export function resolveDeploymentRoot(configPath: string): string {
@@ -14,6 +14,6 @@ export function resolveDeploymentRoot(configPath: string): string {
 export function resolvePublicDir(configPath: string, options: ConfigPathOptions = {}): string {
 	const env = options.env ?? process.env;
 	const cwd = options.cwd ?? process.cwd();
-	if (env.WHERE_PUBLIC_DIR !== undefined) return resolve(cwd, env.WHERE_PUBLIC_DIR);
+	if (env.DIRECTORY_PUBLIC_DIR !== undefined) return resolve(cwd, env.DIRECTORY_PUBLIC_DIR);
 	return resolve(resolveDeploymentRoot(resolve(cwd, configPath)), 'public');
 }

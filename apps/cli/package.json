@@ -1,5 +1,5 @@
 {
-	"name": "@where/cli",
+	"name": "@directory/cli",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -10,7 +10,7 @@
 		}
 	},
 	"bin": {
-		"where": "./dist/index.js"
+		"directory": "./dist/index.js"
 	},
 	"files": [
 		"dist"
@@ -24,7 +24,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"@where/config": "workspace:*",
+		"@directory/config": "workspace:*",
 		"gunshi": "0.35.1"
 	},
 	"devDependencies": {

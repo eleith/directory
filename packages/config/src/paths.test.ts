@@ -7,7 +7,9 @@ describe('operational paths', () => {
 
 	it('uses one default independent of NODE_ENV or nearby files', () => {
 		for (const NODE_ENV of ['development', 'production', 'test']) {
-			expect(resolveConfigPath({ cwd, env: { NODE_ENV } })).toBe(resolve(cwd, 'config/where.yaml'));
+			expect(resolveConfigPath({ cwd, env: { NODE_ENV } })).toBe(
+				resolve(cwd, 'config/directory.yaml')
+			);
 		}
 	});
 
@@ -21,19 +23,21 @@ describe('operational paths', () => {
 	});
 
 	it('finds the sibling deployment public directory', () => {
-		const configPath = resolve(cwd, 'config/where.yaml');
+		const configPath = resolve(cwd, 'config/directory.yaml');
 		expect(resolveDeploymentRoot(configPath)).toBe(cwd);
 		expect(resolvePublicDir(configPath, { cwd, env: {} })).toBe(resolve(cwd, 'public'));
-		expect(resolvePublicDir('config/where.yaml', { cwd, env: {} })).toBe(resolve(cwd, 'public'));
+		expect(resolvePublicDir('config/directory.yaml', { cwd, env: {} })).toBe(
+			resolve(cwd, 'public')
+		);
 	});
 
 	it('resolves public overrides from the working directory', () => {
-		const configPath = resolve(cwd, 'config/where.yaml');
-		expect(resolvePublicDir(configPath, { cwd, env: { WHERE_PUBLIC_DIR: 'assets' } })).toBe(
+		const configPath = resolve(cwd, 'config/directory.yaml');
+		expect(resolvePublicDir(configPath, { cwd, env: { DIRECTORY_PUBLIC_DIR: 'assets' } })).toBe(
 			resolve(cwd, 'assets')
 		);
 		expect(
-			resolvePublicDir(configPath, { cwd, env: { WHERE_PUBLIC_DIR: '/mounted/assets' } })
+			resolvePublicDir(configPath, { cwd, env: { DIRECTORY_PUBLIC_DIR: '/mounted/assets' } })
 		).toBe(resolve('/mounted/assets'));
 	});
 });

@@ -10,7 +10,7 @@ on:
       - .woodpecker/**
       - apps/cli/**
       - packages/**
-      - apps/web/config/where.example.yml
+      - apps/web/config/directory.example.yml
   pull_request:
     paths:
       - '*'
@@ -19,7 +19,7 @@ on:
       - .woodpecker/**
       - apps/cli/**
       - packages/**
-      - apps/web/config/where.example.yml
+      - apps/web/config/directory.example.yml
 
 permissions:
   contents: read
@@ -42,12 +42,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build CLI and shared dependencies
-        run: pnpm --filter '@where/cli...' build
+        run: pnpm --filter '@directory/cli...' build
       - name: Check types
-        run: pnpm --filter @where/cli check
+        run: pnpm --filter @directory/cli check
       - name: Lint root and workspace
         run: |
           pnpm lint
-          pnpm --filter @where/cli lint
+          pnpm --filter @directory/cli lint
       - name: Unit and artifact tests
-        run: pnpm --filter @where/cli test:coverage
+        run: pnpm --filter @directory/cli test:coverage

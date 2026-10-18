@@ -1,4 +1,4 @@
-import { validateConfig } from '@where/config';
+import { validateConfig } from '@directory/config';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Directory } from '../config/load-directory.js';
 import { prepareSnapshot } from '../config/snapshot.js';
@@ -45,7 +45,7 @@ describe('production lifecycle', () => {
 		await startProduction(server);
 		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
 		expect(server.directory).toBe(ready);
-		expect(listeners.mock.calls.filter(([name]) => name === 'where:dev-stop')).toEqual([]);
+		expect(listeners.mock.calls.filter(([name]) => name === 'directory:dev-stop')).toEqual([]);
 		const shutdown = listeners.mock.calls.find(([name]) => name === 'sveltekit:shutdown')![1];
 		expect(process.listenerCount('sveltekit:shutdown', shutdown)).toBe(1);
 		adapterEvents.emit('sveltekit:shutdown');

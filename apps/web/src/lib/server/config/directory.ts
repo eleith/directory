@@ -1,9 +1,12 @@
-import type { WhereConfiguration, WhereSite } from '@where/config/types';
+import type { DirectoryConfiguration, DirectorySite } from '@directory/config/types';
 import type { DirectoryDisplay, DisplaySite } from '../../display/types.js';
 import { getGroups } from './groups.js';
 import { freezeData } from './immutable.js';
 
-export function prepareDirectory(config: WhereConfiguration, snapshotId: string): DirectoryDisplay {
+export function prepareDirectory(
+	config: DirectoryConfiguration,
+	snapshotId: string
+): DirectoryDisplay {
 	const site = getSite(config);
 	const { grouped, groups } = getGroups(config);
 	return freezeData({
@@ -18,9 +21,9 @@ export function prepareDirectory(config: WhereConfiguration, snapshotId: string)
 	});
 }
 
-export function getSite(config: WhereConfiguration): DisplaySite {
+export function getSite(config: DirectoryConfiguration): DisplaySite {
 	const site = config.site;
-	const optionalFields: Pick<WhereSite, 'logo_path' | 'favicon_path'> = {};
+	const optionalFields: Pick<DirectorySite, 'logo_path' | 'favicon_path'> = {};
 	if (site.logo_path !== undefined) optionalFields.logo_path = site.logo_path;
 	if (site.favicon_path !== undefined) optionalFields.favicon_path = site.favicon_path;
 	return {

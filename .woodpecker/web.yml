@@ -43,7 +43,7 @@ steps:
     commands:
       - npm install --global corepack@0.36.0
       - corepack enable
-      - pnpm --filter @where/web build
+      - pnpm --filter @directory/web build
 
   lint:
     image: node:26.5.0-bookworm
@@ -52,9 +52,9 @@ steps:
     commands:
       - npm install --global corepack@0.36.0
       - corepack enable
-      - pnpm --filter @where/web check
+      - pnpm --filter @directory/web check
       - pnpm lint
-      - pnpm --filter @where/web lint
+      - pnpm --filter @directory/web lint
 
   test:
     image: node:26.5.0-bookworm
@@ -63,7 +63,7 @@ steps:
     commands:
       - npm install --global corepack@0.36.0
       - corepack enable
-      - pnpm --filter @where/web test:coverage
+      - pnpm --filter @directory/web test:coverage
 
   e2e:
     image: git.eleith.com/eleith.private/playwright:1.61.1-node26
@@ -72,7 +72,7 @@ steps:
       - pnpm --version
       - node --eval "if (process.versions.node !== '26.5.0') throw new Error('Expected Node 26.5.0')"
       - test "$(pnpm --version)" = "11.9.0"
-      - pnpm --filter @where/web test:e2e
+      - pnpm --filter @directory/web test:e2e
 
   notify:
     image: deblan/woodpecker-email:3.3.0

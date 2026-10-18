@@ -6,7 +6,7 @@ import { inspect } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createEditorSchema } from './editor-schema.js';
 import { ConfigError } from './errors.js';
-import { configurationReferences, WhereConfigurationSchema } from './schema.js';
+import { configurationReferences, DirectoryConfigurationSchema } from './schema.js';
 import { loadConfigFile, validateConfig } from './load.js';
 import type { ConfigEnvironment } from './types.js';
 
@@ -15,14 +15,14 @@ const sentinel = 'SENTINEL-never-log-this';
 let directory: string;
 
 beforeAll(() => {
-	directory = mkdtempSync(join(tmpdir(), 'where-loader-'));
+	directory = mkdtempSync(join(tmpdir(), 'directory-loader-'));
 });
 afterAll(() => {
 	rmSync(directory, { recursive: true, force: true });
 });
 
 async function loadYaml(source: string, env: ConfigEnvironment = {}) {
-	const path = join(directory, 'where.yaml');
+	const path = join(directory, 'directory.yaml');
 	writeFileSync(path, source);
 	return loadConfigFile(path, { env });
 }
@@ -62,7 +62,7 @@ describe('default, interpolate, then validate', () => {
 		const config = validateConfig(raw, { env: {} });
 		expect(config.version).toBe(1);
 		expect(config.site).toEqual({
-			title: 'Where',
+			title: 'Directory',
 			description: '',
 			footer: '',
 			order: 'configured'
@@ -94,7 +94,7 @@ describe('default, interpolate, then validate', () => {
 
 	it('leaves canonical references intact for later validation and editor generation', () => {
 		const references = [...configurationReferences];
-		const canonical = JSON.stringify([WhereConfigurationSchema, configurationReferences]);
+		const canonical = JSON.stringify([DirectoryConfigurationSchema, configurationReferences]);
 		const editor = createEditorSchema();
 		validateConfig({ links: {} }, { env: {} });
 		expect(() =>
@@ -102,7 +102,7 @@ describe('default, interpolate, then validate', () => {
 		).toThrow(ConfigError);
 		validateConfig({ links: { photos: link } }, { env: {} });
 		expect(configurationReferences).toEqual(references);
-		expect(JSON.stringify([WhereConfigurationSchema, configurationReferences])).toBe(canonical);
+		expect(JSON.stringify([DirectoryConfigurationSchema, configurationReferences])).toBe(canonical);
 		expect(createEditorSchema()).toEqual(editor);
 	});
 
@@ -157,12 +157,16 @@ describe('default, interpolate, then validate', () => {
 		const oidc = validateConfig(
 			{
 				links: {},
-				auth: { oidc: { issuer: '${ISSUER}', client_id: 'where', client_secret: '${SECRET}' } }
+				auth: { oidc: { issuer: '${ISSUER}', client_id: 'directory', client_secret: '${SECRET}' } }
 			},
 			{ env: { ISSUER: 'https://identity.example.com', SECRET: sentinel } }
 		);
 		expect(oidc.auth).toEqual({
-			oidc: { issuer: 'https://identity.example.com', client_id: 'where', client_secret: sentinel }
+			oidc: {
+				issuer: 'https://identity.example.com',
+				client_id: 'directory',
+				client_secret: sentinel
+			}
 		});
 	});
 
@@ -179,13 +183,20 @@ describe('default, interpolate, then validate', () => {
 		{ links: {}, auth: {} },
 		{ links: {}, auth: null },
 		{ links: {}, auth: { credentials: {} } },
-		{ links: {}, auth: { oidc: { issuer: 'https://identity.example.com', client_id: 'where' } } },
+		{
+			links: {},
+			auth: { oidc: { issuer: 'https://identity.example.com', client_id: 'directory' } }
+		},
 		{ links: {}, auth: { credentials: { username: 'family', password: 'test' }, oidc: null } },
 		{
 			links: {},
 			auth: {
 				credentials: { username: 'family', password: 'test' },
-				oidc: { issuer: 'https://identity.example.com', client_id: 'where', client_secret: 'test' }
+				oidc: {
+					issuer: 'https://identity.example.com',
+					client_id: 'directory',
+					client_secret: 'test'
+				}
 			}
 		},
 		{ links: {}, unknown: true },
@@ -234,7 +245,7 @@ describe('default, interpolate, then validate', () => {
 describe('YAML file loader', () => {
 	it('validates the documented example with the production parser', async () => {
 		const path = fileURLToPath(
-			new URL('../../../apps/web/config/where.example.yml', import.meta.url)
+			new URL('../../../apps/web/config/directory.example.yml', import.meta.url)
 		);
 		const config = await loadConfigFile(path, { env: {} });
 		expect(Object.keys(config.links).length).toBeGreaterThan(0);

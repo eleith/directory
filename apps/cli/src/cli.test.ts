@@ -1,15 +1,15 @@
-import { ConfigError, configurationVersion, loadConfigFile } from '@where/config';
-import type { WhereConfiguration } from '@where/config';
+import { ConfigError, configurationVersion, loadConfigFile } from '@directory/config';
+import type { DirectoryConfiguration } from '@directory/config';
 import { setImmediate } from 'node:timers/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { runCli } from './cli.js';
 
-vi.mock('@where/config', async (importOriginal) => ({
-	...(await importOriginal<typeof import('@where/config')>()),
+vi.mock('@directory/config', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@directory/config')>()),
 	loadConfigFile: vi.fn()
 }));
 
-const configuration: WhereConfiguration = {
+const configuration: DirectoryConfiguration = {
 	version: 1,
 	site: { title: 'DO_NOT_PRINT_SITE', description: '', footer: '', order: 'configured' },
 	appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
@@ -53,20 +53,20 @@ describe('runCli', () => {
 		expect(output.stderr).not.toHaveBeenCalled();
 		expect(output.stdout).toHaveBeenCalledExactlyOnceWith(expect.any(String));
 		const help = output.stdout.mock.calls[0]?.[0] as string;
-		expect(help).toContain('Where — configuration validation.');
+		expect(help).toContain('Directory — configuration validation.');
 		expect(help).toContain(`Supported configuration format version: ${configurationVersion}.`);
 		expect(help).toContain('CONFIG_PATH');
-		expect(help).toContain('config/where.yaml');
+		expect(help).toContain('config/directory.yaml');
 		expect(help).toContain('USAGE:');
 		expect(help).toContain('OPTIONS:');
 		expect(help).toMatch(/-h, --help\s+Display this help message/);
 		if (args.includes('validate')) {
-			expect(help).toContain('where validate <OPTIONS> [<path>]');
+			expect(help).toContain('directory validate <OPTIONS> [<path>]');
 			expect(help).toContain('ARGUMENTS:');
 			expect(help).toMatch(/path\s+Path to the YAML configuration\./);
 			expect(help).not.toContain('COMMANDS:');
 		} else {
-			expect(help).toContain('where [COMMANDS] <OPTIONS>');
+			expect(help).toContain('directory [COMMANDS] <OPTIONS>');
 			expect(help).toContain('COMMANDS:');
 			expect(help).toMatch(/validate <OPTIONS>\s+Validate a YAML configuration/);
 			expect(help).not.toContain('ARGUMENTS:');
@@ -116,7 +116,7 @@ describe('runCli', () => {
 		expect(loadConfigFile).not.toHaveBeenCalled();
 		expect(output.stdout).not.toHaveBeenCalled();
 		expect(output.stderr).toHaveBeenCalledExactlyOnceWith(
-			'Command failed. Run where --help for usage.\n'
+			'Command failed. Run directory --help for usage.\n'
 		);
 		expect(args).toEqual(original);
 	});
@@ -157,7 +157,7 @@ describe('runCli', () => {
 	it('does not report success before asynchronous validation finishes', async () => {
 		const output = createOutput();
 		const started = Promise.withResolvers<void>();
-		const pending = Promise.withResolvers<WhereConfiguration>();
+		const pending = Promise.withResolvers<DirectoryConfiguration>();
 		vi.mocked(loadConfigFile).mockImplementation(() => {
 			started.resolve();
 			return pending.promise;
@@ -185,8 +185,8 @@ describe('runCli', () => {
 		const helpOutput = createOutput();
 		const firstEnv = Object.freeze({ SECRET: 'DO_NOT_PRINT_FIRST_SECRET' });
 		const secondEnv = Object.freeze({ SECRET: 'DO_NOT_PRINT_SECOND_SECRET' });
-		const first = Promise.withResolvers<WhereConfiguration>();
-		const second = Promise.withResolvers<WhereConfiguration>();
+		const first = Promise.withResolvers<DirectoryConfiguration>();
+		const second = Promise.withResolvers<DirectoryConfiguration>();
 		const started = Promise.withResolvers<void>();
 		vi.mocked(loadConfigFile).mockImplementation((path) => {
 			if (vi.mocked(loadConfigFile).mock.calls.length === 2) started.resolve();
@@ -255,7 +255,7 @@ describe('runCli', () => {
 		expect(await runCli(['validate', 'DO_NOT_PRINT_PATH'], output)).toBe(1);
 		expect(output.stdout).not.toHaveBeenCalled();
 		expect(output.stderr).toHaveBeenCalledExactlyOnceWith(
-			'Command failed. Run where --help for usage.\n'
+			'Command failed. Run directory --help for usage.\n'
 		);
 	});
 });

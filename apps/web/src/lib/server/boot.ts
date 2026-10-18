@@ -1,5 +1,5 @@
-import { resolveConfigPath } from '@where/config';
-import type { ConfigEnvironment } from '@where/config/types';
+import { resolveConfigPath } from '@directory/config';
+import type { ConfigEnvironment } from '@directory/config/types';
 import { DirectoryError, loadDirectory, type Directory } from './config/load-directory.js';
 import { watchConfig } from './config/watch.js';
 import { reportDirectoryIssue } from './logger.js';

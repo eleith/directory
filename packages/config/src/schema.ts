@@ -12,7 +12,7 @@ const ref = <T extends TSchema>(schema: T, options?: SchemaOptions) => {
 	return Type.Unsafe<Static<T>>(Type.Ref(schema.$id, options));
 };
 
-FormatRegistry.Set('where-http-url', (value) => {
+FormatRegistry.Set('directory-http-url', (value) => {
 	try {
 		if (/\s/.test(value)) return false;
 		const url = new URL(value);
@@ -30,7 +30,7 @@ const imageSegment = '(?!\\.{1,2}(?:/|$))[^/%\\\\?#\\x00-\\x1f\\x7f]+';
 
 export const HttpUrlSchema = Type.String({
 	$id: 'HttpUrl',
-	format: 'where-http-url',
+	format: 'directory-http-url',
 	pattern: '^[Hh][Tt][Tt][Pp][Ss]?://[^\\s]+$',
 	description: 'An absolute HTTP or HTTPS URL. Relative and executable URLs are not accepted.'
 });
@@ -67,7 +67,7 @@ export const LinkSchema = Type.Object(
 		),
 		requires_auth: Type.Boolean({
 			default: false,
-			description: 'Service sign-in hint only; does not enable Where authentication.'
+			description: 'Service sign-in hint only; does not enable Directory authentication.'
 		}),
 		internal_only: Type.Boolean({
 			default: false,
@@ -84,7 +84,7 @@ export const LinkSchema = Type.Object(
 
 export const SiteSchema = Type.Object(
 	{
-		title: Type.String({ ...nonEmptyText, default: 'Where' }),
+		title: Type.String({ ...nonEmptyText, default: 'Directory' }),
 		description: Type.String({ default: '' }),
 		logo_path: Type.Optional(ref(LocalImagePathSchema)),
 		favicon_path: Type.Optional(ref(LocalImagePathSchema)),
@@ -136,7 +136,7 @@ export const AuthSchema = Type.Union(
 	{ $id: 'Auth', description: 'Declare exactly one strategy, or omit auth for an open dashboard.' }
 );
 
-export const WhereConfigurationSchema = Type.Object(
+export const DirectoryConfigurationSchema = Type.Object(
 	{
 		version: Type.Literal(configurationVersion, { default: configurationVersion }),
 		site: ref(SiteSchema, { default: {} }),
@@ -147,7 +147,7 @@ export const WhereConfigurationSchema = Type.Object(
 			description: 'Links keyed by stable, non-numeric lowercase slugs. An empty map is allowed.'
 		})
 	},
-	{ $id: 'WhereConfiguration', additionalProperties: false, title: 'Where configuration' }
+	{ $id: 'DirectoryConfiguration', additionalProperties: false, title: 'Directory configuration' }
 );
 
 export const configurationReferences: TSchema[] = [

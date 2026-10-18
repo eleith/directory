@@ -5,13 +5,13 @@ import { ConfigError, type ConfigIssue } from './errors.js';
 import { assertSafeInput } from './input.js';
 import { interpolate } from './interpolate.js';
 import { resolveConfigPath } from './paths.js';
-import { configurationReferences, WhereConfigurationSchema } from './schema.js';
-import type { ConfigLoadOptions, WhereConfiguration } from './types.js';
+import { configurationReferences, DirectoryConfigurationSchema } from './schema.js';
+import type { ConfigLoadOptions, DirectoryConfiguration } from './types.js';
 
 export async function loadConfigFile(
 	path?: string,
 	options: ConfigLoadOptions = {}
-): Promise<WhereConfiguration> {
+): Promise<DirectoryConfiguration> {
 	let source: string;
 	try {
 		const configPath = path ?? resolveConfigPath(options);
@@ -23,12 +23,15 @@ export async function loadConfigFile(
 	return validateConfig(raw, options);
 }
 
-export function validateConfig(raw: unknown, options: ConfigLoadOptions = {}): WhereConfiguration {
+export function validateConfig(
+	raw: unknown,
+	options: ConfigLoadOptions = {}
+): DirectoryConfiguration {
 	assertSafeInput(raw);
 	try {
 		const copy: unknown = structuredClone(raw);
 		const defaulted: unknown = Value.Default(
-			WhereConfigurationSchema,
+			DirectoryConfigurationSchema,
 			[...configurationReferences],
 			copy
 		);
@@ -68,11 +71,15 @@ function parseConfigurationYaml(source: string): unknown {
 	}
 }
 
-function checkSchema(value: unknown): WhereConfiguration {
+function checkSchema(value: unknown): DirectoryConfiguration {
 	const locations: Pick<ConfigIssue, 'code' | 'path'>[] = [];
-	for (const error of Value.Errors(WhereConfigurationSchema, [...configurationReferences], value)) {
+	for (const error of Value.Errors(
+		DirectoryConfigurationSchema,
+		[...configurationReferences],
+		value
+	)) {
 		locations.push({ code: 'invalid_value', path: error.path });
 	}
 	if (locations.length > 0) throw new ConfigError(locations);
-	return value as WhereConfiguration;
+	return value as DirectoryConfiguration;
 }

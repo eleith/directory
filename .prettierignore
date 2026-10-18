@@ -14,4 +14,6 @@ pnpm-lock.yaml
 .env.*
 /config/where.yaml
 /apps/web/config/where.yaml
+/config/directory.yaml
+/apps/web/config/directory.yaml
 /public/

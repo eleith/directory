@@ -1,4 +1,4 @@
-import { ConfigError } from '@where/config';
+import { ConfigError } from '@directory/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DirectoryError } from './config/load-directory.js';
 import { logger, reportDirectoryIssue, reportStartupFailure } from './logger.js';

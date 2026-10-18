@@ -10,7 +10,7 @@ const artifact = join(packageDirectory, 'src/config.schema.json');
 async function generateSchema(): Promise<string> {
 	const dependencyCacheDirectory = join(packageDirectory, 'node_modules/.cache');
 	await mkdir(dependencyCacheDirectory, { recursive: true });
-	const temporaryDirectory = await mkdtemp(join(dependencyCacheDirectory, 'where-schema-'));
+	const temporaryDirectory = await mkdtemp(join(dependencyCacheDirectory, 'directory-schema-'));
 	try {
 		await writeFile(join(temporaryDirectory, 'package.json'), '{"type":"module"}\n');
 		const configPath = join(packageDirectory, 'tsconfig.json');

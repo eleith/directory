@@ -5,7 +5,7 @@ let logType: 'pretty' | 'json' = 'pretty';
 if (process.env.NODE_ENV === 'production') logType = 'json';
 
 export const logger = new Logger({
-	name: 'where',
+	name: 'directory',
 	type: logType,
 	stack: { capture: 'off' }
 });

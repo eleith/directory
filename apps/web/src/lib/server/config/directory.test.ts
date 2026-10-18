@@ -1,5 +1,5 @@
-import { validateConfig } from '@where/config';
-import type { WhereConfiguration } from '@where/config/types';
+import { validateConfig } from '@directory/config';
+import type { DirectoryConfiguration } from '@directory/config/types';
 import { describe, expect, it } from 'vitest';
 import { prepareDirectory } from './directory.js';
 
@@ -79,7 +79,7 @@ describe('prepareDirectory', () => {
 		const display = prepareDirectory(config, 'minimal');
 		expect(display).toEqual({
 			snapshotId: 'minimal',
-			site: { title: 'Where', description: '', footer: '' },
+			site: { title: 'Directory', description: '', footer: '' },
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 			grouped: false,
 			groups: [
@@ -140,7 +140,7 @@ describe('prepareDirectory', () => {
 	});
 
 	it('retains every link exactly once for all eight advisory flag combinations', () => {
-		const links: WhereConfiguration['links'] = {};
+		const links: DirectoryConfiguration['links'] = {};
 		let index = 0;
 		for (const requires_auth of [false, true]) {
 			for (const internal_only of [false, true]) {
@@ -227,7 +227,7 @@ describe('prepareDirectory', () => {
 		expect(Reflect.set(display.site, 'title', 'Changed')).toBe(false);
 		config.site.title = 'Input changed';
 		config.links.photos!.title = 'Input link changed';
-		expect(display.site.title).toBe('Where');
+		expect(display.site.title).toBe('Directory');
 		expect(display.groups[0]!.links[0]!.title).toBe('Photos');
 	});
 });

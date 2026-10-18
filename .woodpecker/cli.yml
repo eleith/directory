@@ -13,7 +13,7 @@ when:
         - .woodpecker/**
         - apps/cli/**
         - packages/**
-        - apps/web/config/where.example.yml
+        - apps/web/config/directory.example.yml
   - event: pull_request
     path:
       include:
@@ -23,7 +23,7 @@ when:
         - .woodpecker/**
         - apps/cli/**
         - packages/**
-        - apps/web/config/where.example.yml
+        - apps/web/config/directory.example.yml
 
 steps:
   prepare:
@@ -45,7 +45,7 @@ steps:
     commands:
       - npm install --global corepack@0.36.0
       - corepack enable
-      - pnpm --filter @where/cli build
+      - pnpm --filter @directory/cli build
 
   lint:
     image: node:26.5.0-bookworm
@@ -54,9 +54,9 @@ steps:
     commands:
       - npm install --global corepack@0.36.0
       - corepack enable
-      - pnpm --filter @where/cli check
+      - pnpm --filter @directory/cli check
       - pnpm lint
-      - pnpm --filter @where/cli lint
+      - pnpm --filter @directory/cli lint
 
   test:
     image: node:26.5.0-bookworm
@@ -65,7 +65,7 @@ steps:
     commands:
       - npm install --global corepack@0.36.0
       - corepack enable
-      - pnpm --filter @where/cli test:coverage
+      - pnpm --filter @directory/cli test:coverage
 
   notify:
     image: deblan/woodpecker-email:3.3.0

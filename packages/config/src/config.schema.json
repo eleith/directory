@@ -1,6 +1,6 @@
 {
 	"additionalProperties": false,
-	"title": "Where configuration",
+	"title": "Directory configuration",
 	"type": "object",
 	"required": ["links"],
 	"properties": {
@@ -103,7 +103,7 @@
 				},
 				"requires_auth": {
 					"default": false,
-					"description": "Service sign-in hint only; does not enable Where authentication.",
+					"description": "Service sign-in hint only; does not enable Directory authentication.",
 					"type": "boolean"
 				},
 				"internal_only": {
@@ -123,7 +123,7 @@
 			"type": "object",
 			"properties": {
 				"title": {
-					"default": "Where",
+					"default": "Directory",
 					"type": "string",
 					"anyOf": [
 						{ "type": "string", "pattern": "\\S", "minLength": 1 },

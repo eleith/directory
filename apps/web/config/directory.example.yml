@@ -17,13 +17,13 @@ appearance:
 # auth:
 #   oidc:
 #     issuer: https://identity.example.com
-#     client_id: where
-#     client_secret: '${WHERE_OIDC_CLIENT_SECRET}'
+#     client_id: directory
+#     client_secret: '${DIRECTORY_OIDC_CLIENT_SECRET}'
 # Or:
 # auth:
 #   credentials:
 #     username: family
-#     password: '${WHERE_PASSWORD}'
+#     password: '${DIRECTORY_PASSWORD}'
 
 links:
   photos:

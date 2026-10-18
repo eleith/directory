@@ -1,4 +1,4 @@
-import { ConfigError, configurationVersion, loadConfigFile } from '@where/config';
+import { ConfigError, configurationVersion, loadConfigFile } from '@directory/config';
 import { spawnSync } from 'node:child_process';
 import {
 	copyFileSync,
@@ -46,9 +46,9 @@ links:
 auth:
   credentials:
     username: DO_NOT_PRINT_USERNAME
-    password: '\${WHERE_CLI_PASSWORD}'
+    password: '\${DIRECTORY_CLI_PASSWORD}'
 `,
-		env: { WHERE_CLI_PASSWORD: 'DO_NOT_PRINT_PASSWORD: [\n# YAML-shaped secret' },
+		env: { DIRECTORY_CLI_PASSWORD: 'DO_NOT_PRINT_PASSWORD: [\n# YAML-shaped secret' },
 		valid: true
 	},
 	{
@@ -56,13 +56,13 @@ auth:
 		yaml: `links: {}
 auth:
   oidc:
-    issuer: '\${WHERE_CLI_ISSUER}'
+    issuer: '\${DIRECTORY_CLI_ISSUER}'
     client_id: DO_NOT_PRINT_CLIENT
-    client_secret: '\${WHERE_CLI_SECRET}'
+    client_secret: '\${DIRECTORY_CLI_SECRET}'
 `,
 		env: {
-			WHERE_CLI_ISSUER: 'https://identity.example.com/DO_NOT_PRINT_ISSUER',
-			WHERE_CLI_SECRET: 'DO_NOT_PRINT_CLIENT_SECRET'
+			DIRECTORY_CLI_ISSUER: 'https://identity.example.com/DO_NOT_PRINT_ISSUER',
+			DIRECTORY_CLI_SECRET: 'DO_NOT_PRINT_CLIENT_SECRET'
 		},
 		valid: true
 	},
@@ -96,9 +96,9 @@ site:
 		yaml: `links:
   photos:
     title: DO_NOT_PRINT_TITLE
-    url: '\${WHERE_CLI_URL}'
+    url: '\${DIRECTORY_CLI_URL}'
 `,
-		env: { WHERE_CLI_URL: 'DO_NOT_PRINT_INVALID_URL' },
+		env: { DIRECTORY_CLI_URL: 'DO_NOT_PRINT_INVALID_URL' },
 		valid: false
 	},
 	{
@@ -116,9 +116,9 @@ site:
 auth:
   credentials:
     username: DO_NOT_PRINT_USER
-    password: '\${WHERE_CLI_PASSWORD}'
+    password: '\${DIRECTORY_CLI_PASSWORD}'
 `,
-		env: { WHERE_CLI_PASSWORD: '' },
+		env: { DIRECTORY_CLI_PASSWORD: '' },
 		valid: false
 	},
 	{
@@ -147,7 +147,7 @@ auth:
 ];
 
 beforeAll(() => {
-	isolatedDirectory = mkdtempSync(join(tmpdir(), 'where-cli-standalone-'));
+	isolatedDirectory = mkdtempSync(join(tmpdir(), 'directory-cli-standalone-'));
 	executablePath = join(isolatedDirectory, 'index.js');
 	apiPath = join(isolatedDirectory, 'cli.js');
 	copyFileSync(new URL('index.js', buildDirectory), executablePath);
@@ -245,21 +245,21 @@ describe('standalone compiled CLI with only copied index.js and cli.js', () => {
 
 		expect(result.exitCode).toBe(0);
 		expect(result.stderr).toBe('');
-		expect(result.stdout).toContain('Where — configuration validation.');
+		expect(result.stdout).toContain('Directory — configuration validation.');
 		expect(result.stdout).toContain(
 			`Supported configuration format version: ${configurationVersion}.`
 		);
 		expect(result.stdout).toContain('CONFIG_PATH');
-		expect(result.stdout).toContain('config/where.yaml');
+		expect(result.stdout).toContain('config/directory.yaml');
 		expect(result.stdout).toContain('USAGE:');
 		expect(result.stdout).toMatch(/-h, --help\s+Display this help message/);
 		if (args.includes('validate')) {
-			expect(result.stdout).toContain('where validate <OPTIONS> [<path>]');
+			expect(result.stdout).toContain('directory validate <OPTIONS> [<path>]');
 			expect(result.stdout).toContain('ARGUMENTS:');
 			expect(result.stdout).toMatch(/path\s+Path to the YAML configuration\./);
 			expect(result.stdout).not.toContain('COMMANDS:');
 		} else {
-			expect(result.stdout).toContain('where [COMMANDS] <OPTIONS>');
+			expect(result.stdout).toContain('directory [COMMANDS] <OPTIONS>');
 			expect(result.stdout).toContain('COMMANDS:');
 			expect(result.stdout).toMatch(/validate <OPTIONS>\s+Validate a YAML configuration/);
 			expect(result.stdout).not.toContain('ARGUMENTS:');
@@ -304,7 +304,7 @@ describe('standalone compiled CLI with only copied index.js and cli.js', () => {
 		const expected = {
 			exitCode: 1,
 			stdout: '',
-			stderr: 'Command failed. Run where --help for usage.\n'
+			stderr: 'Command failed. Run directory --help for usage.\n'
 		};
 		const env = { CONFIG_PATH: 'DO_NOT_PRINT_ENV_PATH', SECRET: 'DO_NOT_PRINT_SECRET' };
 
@@ -346,7 +346,7 @@ describe('standalone compiled CLI with only copied index.js and cli.js', () => {
 	});
 
 	it('uses explicit path, CONFIG_PATH, then the default relative to the subprocess working directory', () => {
-		const defaultPath = join(isolatedDirectory, 'config', 'where.yaml');
+		const defaultPath = join(isolatedDirectory, 'config', 'directory.yaml');
 		mkdirSync(dirname(defaultPath), { recursive: true });
 		writeFileSync(defaultPath, 'links: {}\n');
 		const envPath = join(isolatedDirectory, 'DO_NOT_PRINT_ENV_PATH.yaml');
