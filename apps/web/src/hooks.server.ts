@@ -5,7 +5,7 @@ import { startDevelopment } from './lib/server/lifecycle/development.js';
 import { startProduction } from './lib/server/lifecycle/production.js';
 import { reportStartupFailure } from './lib/server/logger.js';
 
-const server: ServerState = { directory: undefined };
+const server: ServerState = { application: undefined };
 
 export const init: ServerInit = async () => {
 	if (building) return;
@@ -20,9 +20,19 @@ export const init: ServerInit = async () => {
 };
 
 export const handle: Handle = ({ event, resolve }) => {
-	if (server.directory === undefined) {
-		return new Response('Service unavailable', { status: 503 });
+	const application = server.application;
+	if (application === undefined) {
+		return new Response('Service unavailable', {
+			status: 503,
+			headers: { 'cache-control': 'no-store' }
+		});
 	}
-	event.locals.snapshot = server.directory.currentSnapshot();
-	return resolve(event);
+	event.locals.snapshot = application.directory.currentSnapshot();
+	event.locals.authentication = application.authentication;
+	event.locals.session = null;
+	if (application.authentication === undefined) {
+		event.locals.auth = async () => null;
+		return resolve(event);
+	}
+	return application.authentication.handle({ event, resolve });
 };

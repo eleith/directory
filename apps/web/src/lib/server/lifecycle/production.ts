@@ -1,15 +1,14 @@
 import { bootApp } from '../boot.js';
-import type { Directory } from '../config/load-directory.js';
-import type { ServerState } from './application.js';
+import type { Application, ServerState } from './application.js';
 
 export async function startProduction(server: ServerState): Promise<void> {
-	const directory = await bootApp();
+	const application = await bootApp();
 	// adapter-node emits shutdown after listening, which waits for Kit init.
-	process.once('sveltekit:shutdown', () => stopProduction(server, directory));
-	server.directory = directory;
+	process.once('sveltekit:shutdown', () => stopProduction(server, application));
+	server.application = application;
 }
 
-function stopProduction(server: ServerState, directory: Directory): void {
-	directory.stop();
-	if (server.directory === directory) server.directory = undefined;
+function stopProduction(server: ServerState, application: Application): void {
+	application.stop();
+	if (server.application === application) server.application = undefined;
 }

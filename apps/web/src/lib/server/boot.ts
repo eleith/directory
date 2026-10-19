@@ -1,10 +1,12 @@
 import { resolveConfigPath } from '@directory/config';
 import type { ConfigEnvironment } from '@directory/config/types';
+import { createAuthentication, type Authentication } from './auth/index.js';
 import { DirectoryError, loadDirectory, type Directory } from './config/load-directory.js';
+import type { Application } from './lifecycle/application.js';
 import { watchConfig } from './config/watch.js';
 import { reportDirectoryIssue } from './logger.js';
 
-export async function bootApp(env?: ConfigEnvironment): Promise<Directory> {
+export async function bootApp(env?: ConfigEnvironment): Promise<Application> {
 	const options = env === undefined ? {} : { env };
 	let path: string;
 	let directory: Directory;
@@ -16,10 +18,13 @@ export async function bootApp(env?: ConfigEnvironment): Promise<Directory> {
 		throw new DirectoryError({ code: 'load_failed' });
 	}
 
-	// C5 must not expose an authenticated configuration before providers exist.
-	if (directory.currentSnapshot().configuration.auth !== undefined) {
+	let authentication: Authentication | undefined;
+	try {
+		const auth = directory.currentSnapshot().configuration.auth;
+		if (auth !== undefined) authentication = createAuthentication(auth, env);
+	} catch {
 		directory.stop();
-		throw new DirectoryError({ code: 'auth_unavailable' });
+		throw new DirectoryError({ code: 'auth_failed' });
 	}
 
 	let stopWatching: () => void;
@@ -33,8 +38,8 @@ export async function bootApp(env?: ConfigEnvironment): Promise<Directory> {
 	// Catch a save between the initial read and installation of the path watcher.
 	await directory.reload();
 	return {
-		currentSnapshot: () => directory.currentSnapshot(),
-		reload: () => directory.reload(),
+		directory,
+		authentication,
 		stop() {
 			stopWatching();
 			directory.stop();

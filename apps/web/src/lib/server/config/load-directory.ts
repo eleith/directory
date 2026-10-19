@@ -14,7 +14,7 @@ export interface DirectoryIssue {
 		| 'load_failed'
 		| 'prepare_failed'
 		| 'restart_required'
-		| 'auth_unavailable'
+		| 'auth_failed'
 		| 'watch_failed';
 	readonly issues?: readonly ConfigIssue[];
 }

@@ -1,6 +1,8 @@
 import { validateConfig } from '@directory/config';
 import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import type { Authentication } from './lib/server/auth/index.js';
+import type { Application } from './lib/server/lifecycle/application.js';
 import type { Directory } from './lib/server/config/load-directory.js';
 
 const adapterEvents: NodeJS.EventEmitter = process;
@@ -55,11 +57,15 @@ function event(): RequestEvent {
 	return { locals: {} } as RequestEvent;
 }
 
-function directory(title: string) {
+function application(title: string, authentication?: Authentication) {
 	return {
-		currentSnapshot: vi.fn().mockReturnValue(snapshot(title)),
-		reload: vi.fn<Directory['reload']>(),
-		stop: vi.fn()
+		directory: {
+			currentSnapshot: vi.fn().mockReturnValue(snapshot(title)),
+			reload: vi.fn<Directory['reload']>(),
+			stop: vi.fn<Directory['stop']>()
+		},
+		authentication,
+		stop: vi.fn<Application['stop']>()
 	};
 }
 
@@ -108,8 +114,8 @@ describe('server hooks', () => {
 	});
 
 	it('dispatches production startup and serves only after boot, until shutdown', async () => {
-		const pending = Promise.withResolvers<Directory>();
-		const ready = directory('Ready');
+		const pending = Promise.withResolvers<Application>();
+		const ready = application('Ready');
 		mocks.boot.mockReturnValueOnce(pending.promise);
 		const hooks = await import('./hooks.server.js');
 		const resolve = vi.fn<Resolve>().mockResolvedValue(new Response('Ready'));
@@ -118,9 +124,10 @@ describe('server hooks', () => {
 		expect(development).not.toHaveBeenCalled();
 		const unavailable = await hooks.handle({ event: event(), resolve });
 		expect(unavailable.status).toBe(503);
+		expect(unavailable.headers.get('cache-control')).toBe('no-store');
 		expect(await unavailable.text()).toBe('Service unavailable');
 		expect(resolve).not.toHaveBeenCalled();
-		expect(ready.currentSnapshot).not.toHaveBeenCalled();
+		expect(ready.directory.currentSnapshot).not.toHaveBeenCalled();
 		pending.resolve(ready);
 		await startup;
 		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
@@ -131,7 +138,7 @@ describe('server hooks', () => {
 
 	it('dispatches development startup', async () => {
 		mocks.dev = true;
-		mocks.boot.mockResolvedValueOnce(directory('Development'));
+		mocks.boot.mockResolvedValueOnce(application('Development'));
 		const hooks = await import('./hooks.server.js');
 		await hooks.init();
 		expect(development).toHaveBeenCalledOnce();
@@ -158,6 +165,39 @@ describe('server hooks', () => {
 		expect(resolve).not.toHaveBeenCalled();
 	});
 
+	it.each(['credentials', 'oidc'] as const)(
+		'forwards enabled %s auth to its boot-owned native pipeline after setting locals',
+		async (strategy) => {
+			const response = new Response('Native pipeline', { status: 401 });
+			const authentication: Authentication = {
+				strategy,
+				handle: vi.fn<Handle>().mockImplementation(async ({ event }) => {
+					expect(event.locals.snapshot).toBe(
+						ready.directory.currentSnapshot.mock.results[0]?.value
+					);
+					expect(event.locals.authentication).toBe(authentication);
+					expect(event.locals.session).toBeNull();
+					return response;
+				}),
+				signIn: vi.fn<Authentication['signIn']>().mockResolvedValue(undefined),
+				signOut: vi.fn<Authentication['signOut']>().mockResolvedValue(undefined)
+			};
+			const ready = application('Enabled', authentication);
+			mocks.boot.mockResolvedValueOnce(ready);
+			const hooks = await import('./hooks.server.js');
+			await hooks.init();
+			const request = event();
+			const resolve = vi.fn<Resolve>();
+			expect(await hooks.handle({ event: request, resolve })).toBe(response);
+			expect(authentication.handle).toHaveBeenCalledExactlyOnceWith({ event: request, resolve });
+			expect(ready.directory.currentSnapshot).toHaveBeenCalledOnce();
+			expect(resolve).not.toHaveBeenCalled();
+			expect(authentication.signIn).not.toHaveBeenCalled();
+			expect(authentication.signOut).not.toHaveBeenCalled();
+			expect(mocks.boot).toHaveBeenCalledOnce();
+		}
+	);
+
 	it('captures exactly once per request so nested loaders keep the original snapshot after publication', async () => {
 		const initial = snapshot('Initial');
 		const replacement = snapshot('Replacement');
@@ -167,7 +207,8 @@ describe('server hooks', () => {
 			reload: vi.fn<Directory['reload']>(),
 			stop: vi.fn()
 		};
-		mocks.boot.mockResolvedValueOnce(directory);
+		const app = { directory, authentication: undefined, stop: vi.fn<Application['stop']>() };
+		mocks.boot.mockResolvedValueOnce(app);
 		const hooks = await import('./hooks.server.js');
 		await hooks.init();
 		const resolve = vi.fn<Resolve>().mockImplementation(async (event) => {
@@ -184,6 +225,10 @@ describe('server hooks', () => {
 		const first = await hooks.handle({ event: firstEvent, resolve });
 		expect(directory.currentSnapshot).toHaveBeenCalledOnce();
 		expect(firstEvent.locals.snapshot).toBe(initial);
+		expect(firstEvent.locals.authentication).toBeUndefined();
+		expect(firstEvent.locals.session).toBeNull();
+		expect(await firstEvent.locals.auth()).toBeNull();
+		expect(resolve.mock.calls[0]?.[0]).toBe(firstEvent);
 		const body = await first.text();
 		expect(JSON.parse(body)).toEqual({ first: 'Initial', second: 'Initial' });
 		expect(body).not.toContain(sentinel);

@@ -1,3 +1,5 @@
+import type { Session } from '@auth/sveltekit';
+import type { Authentication } from './lib/server/auth/index.js';
 import type { PreparedSnapshot } from './lib/server/config/snapshot.js';
 
 declare global {
@@ -10,6 +12,8 @@ declare global {
 	namespace App {
 		interface Locals {
 			snapshot: PreparedSnapshot;
+			authentication: Authentication | undefined;
+			session: Session | null;
 		}
 	}
 }

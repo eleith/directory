@@ -10,9 +10,9 @@ loading, environment interpolation and standalone CLI validation; see
 [configuration](config.md). The web server now loads before serving, polls the
 configuration path, and captures one immutable snapshot per request. The shell
 shows configured site copy; dashboard links and image serving are still later
-work. Until authentication is implemented, auth-enabled startup is explicitly
-rejected rather than treated as open access. Application images and releases
-are not implemented yet.
+work. Optional credentials or OIDC authentication gates the entire directory;
+no-auth mode stays open and requires no session secret. Application images and
+releases are not implemented yet.
 
 ## Toolchain
 
@@ -82,7 +82,10 @@ CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" pnpm dev
 `pnpm dev` runs Vite from `apps/web`, so its default path is
 `apps/web/config/directory.yaml`. Absolute `CONFIG_PATH` values work independently of
 the command's working directory. Never overwrite an existing operator file with
-the example. Keep auth omitted until the access gate is available.
+the example. With auth enabled, also supply a random `AUTH_SECRET` and matching
+`ORIGIN`/`AUTH_URL`; see [authentication setup](config.md#authentication-shapes).
+Use HTTPS or `http://localhost:5173` for local development, updating both URL
+settings if the development port changes.
 
 ### CLI validation
 
@@ -165,8 +168,10 @@ The Kit `init` hook skips build analysis, then chooses separate production or
 development startup functions. Both use the shared `bootApp` function; production
 startup finishes before adapter-node opens a socket. Compilation needs no mounted
 YAML or credentials. Startup errors stay fatal and are reported without raw error
-values. Auth-enabled startup reports `auth_unavailable` until C6 supplies
-functioning providers and gates.
+values. Enabled auth requires a random 32+ character `AUTH_SECRET` and matching
+root `ORIGIN`/`AUTH_URL` with no trailing slash. Authenticated deployments use
+HTTPS; HTTP is supported only on `localhost` for local development. Missing or inconsistent auth settings
+report `auth_failed`; no mode falls back to open access after an auth failure.
 
 Only a valid startup installs `watchConfig`, a non-persistent one-second path
 poll. Inode, modification-time or size changes request a serialized reload;
@@ -189,6 +194,31 @@ SSR loader does not run `import.meta.hot.dispose`, so that bridge remains
 application-specific. Development cleanup happens at the next initialization or
 server close, not immediately when source is invalidated.
 
+### Authentication boundary
+
+The running application owns its directory and one boot-created Auth.js instance
+when auth is configured. Providers and seven-day JWT session policy do not change
+on display reloads. The request hook captures the application and one snapshot,
+then runs Auth.js and the whole-directory access checks. Only a signed-in boolean is
+added to the directory page data; sessions, provider configuration and Auth.js handles
+remain server-side.
+
+Sign-in uses native SvelteKit form actions, as in When, with a server-selected
+provider and an allowlist of submitted fields. Return URLs are reduced to safe
+local paths. Sign-out is the root page's named POST action. Login forms work
+without JavaScript. Auth.js owns session encryption/cookies and OIDC callbacks;
+Directory owns default-deny routing, safe diagnostics and fixed-origin policy.
+
+SvelteKit's CSRF protection stays enabled, with an additional exact-origin check
+on state-changing requests independent of content type. Auth.js uses its standard
+`AUTH_URL` setting for callback/action URLs. Session handling uses the native
+SvelteKit event and cookie context; only submitted form fields are allowlisted. Native CSP protects scripts and framing;
+it does not restrict form redirects to self, because Chromium would block the
+OIDC redirect to the identity provider. Referrer policy follows When's
+`strict-origin-when-cross-origin`, preserving form Origin headers without leaking
+directory paths to another origin. Cookie security uses the native Auth.js and
+SvelteKit defaults for HTTPS and HTTP localhost.
+
 Server diagnostics use **tslog 5.2.0**: JSON in production and pretty output in
 development, with call-site stack capture disabled. Reporting passes only fixed
 messages, issue codes and safe field paths to the logger, never raw errors or
@@ -204,13 +234,19 @@ the process's operator path. Tests use no personal configuration, credentials,
 or development server. Unit discovery is separate from browser specs.
 
 The co-located process tests launch the real adapter-node build with disposable
-YAML and OS-assigned ports. They check fatal invalid/auth-enabled startup,
-atomic replacement, invalid/deleted file recovery, safe logs/health and graceful
+YAML and OS-assigned ports. They check fatal invalid configuration or auth
+prerequisites, atomic replacement, invalid/deleted file recovery, safe logs/health and graceful
 shutdown. These tests require the production build, just like the CLI artifact
 tests; they are not browser tests. Coverage measures TypeScript modules, not Svelte markup;
 there is no arbitrary percentage gate or claim of full UI coverage. The config
 smoke test imports built output, so its pass does not imply source instrumentation
 coverage of `src/index.ts`.
+
+Authentication browser/HTTP tests use separate disposable production servers and
+a test-only local OIDC issuer built from Node HTTP/crypto. They exercise real
+Auth.js flows, discovery, PKCE/state/nonce, invalid claims/outages, cookie expiry/rotation,
+private data routes and cross-origin/redirect attacks. No live IdP or operator
+config is used; real HTTPS/proxy and provider registration remain manual checks.
 
 Root commands cover all three workspaces, ordered by their declared package
 dependencies. Each workspace's lint/format commands explicitly share the root
@@ -345,8 +381,10 @@ checks, not automated gates.
    copied site's title/description and refresh after approximately one second.
    Try an atomic rename save, invalid YAML, deletion and restoration: the last
    good copy should remain until a valid file returns. `/healthz` exposes only
-   readiness, not configuration names or paths. Auth-enabled startup must fail;
-   links and mounted images are not rendered yet. Stop the server when finished.
+   readiness, not configuration names or paths. Configured authentication must
+   require sign-in before site copy/data are returned; missing secret/origin must
+   fail startup. Try a wrong password, sign-out and a direct `__data.json` request.
+   Links and mounted images are not rendered yet. Stop the server when finished.
    For production output, after `pnpm build`, run:
 
    ```sh

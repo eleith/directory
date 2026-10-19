@@ -2,22 +2,26 @@ import { validateConfig } from '@directory/config';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Directory } from '../config/load-directory.js';
 import { prepareSnapshot } from '../config/snapshot.js';
-import type { ServerState } from './application.js';
+import type { Application, ServerState } from './application.js';
 
 const mocks = vi.hoisted(() => ({
 	boot: vi.fn<typeof import('../boot.js').bootApp>()
 }));
 vi.mock('../boot.js', () => ({ bootApp: mocks.boot }));
 
-function directory(title: string) {
+function application(title: string) {
 	return {
-		currentSnapshot: vi
-			.fn()
-			.mockReturnValue(
-				prepareSnapshot(validateConfig({ site: { title }, links: {} }, { env: {} }))
-			),
-		reload: vi.fn<Directory['reload']>(),
-		stop: vi.fn<Directory['stop']>()
+		directory: {
+			currentSnapshot: vi
+				.fn()
+				.mockReturnValue(
+					prepareSnapshot(validateConfig({ site: { title }, links: {} }, { env: {} }))
+				),
+			reload: vi.fn<Directory['reload']>(),
+			stop: vi.fn<Directory['stop']>()
+		},
+		authentication: undefined,
+		stop: vi.fn<Application['stop']>()
 	};
 }
 
@@ -42,13 +46,13 @@ function devStopListener(attempt = 0) {
 describe('development lifecycle', () => {
 	it('stops exactly once on the dev close event and unregisters its callback', async () => {
 		const { startDevelopment } = await import('./development.js');
-		const server: ServerState = { directory: undefined };
-		const ready = directory('Development');
+		const server: ServerState = { application: undefined };
+		const ready = application('Development');
 		mocks.boot.mockResolvedValueOnce(ready);
 		const off = vi.spyOn(process, 'off');
 		await startDevelopment(server);
 		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
-		expect(server.directory).toBe(ready);
+		expect(server.application).toBe(ready);
 		expect(listeners.mock.calls.filter(([name]) => name === 'sveltekit:shutdown')).toEqual([]);
 		const shutdown = devStopListener();
 		expect(process.listenerCount('directory:dev-stop', shutdown)).toBe(1);
@@ -56,7 +60,7 @@ describe('development lifecycle', () => {
 		process.emit('directory:dev-stop');
 		shutdown();
 		expect(ready.stop).toHaveBeenCalledOnce();
-		expect(server.directory).toBeUndefined();
+		expect(server.application).toBeUndefined();
 		expect(process.listenerCount('directory:dev-stop', shutdown)).toBe(0);
 		expect(
 			off.mock.calls.filter(
@@ -67,21 +71,21 @@ describe('development lifecycle', () => {
 
 	it('cleans up a cached initialization before booting its replacement', async () => {
 		const { startDevelopment } = await import('./development.js');
-		const server: ServerState = { directory: undefined };
-		const first = directory('First');
-		const second = directory('Second');
+		const server: ServerState = { application: undefined };
+		const first = application('First');
+		const second = application('Second');
 		mocks.boot.mockResolvedValueOnce(first);
 		await startDevelopment(server);
 		const oldCleanup = devStopListener();
 		mocks.boot.mockImplementationOnce(async () => {
 			expect(first.stop).toHaveBeenCalledOnce();
-			expect(server.directory).toBeUndefined();
+			expect(server.application).toBeUndefined();
 			expect(process.listenerCount('directory:dev-stop', oldCleanup)).toBe(0);
 			return second;
 		});
 		await startDevelopment(server);
 		oldCleanup();
-		expect(server.directory).toBe(second);
+		expect(server.application).toBe(second);
 		expect(second.stop).not.toHaveBeenCalled();
 		process.emit('directory:dev-stop');
 		expect(first.stop).toHaveBeenCalledOnce();
@@ -90,38 +94,38 @@ describe('development lifecycle', () => {
 
 	it('reaches an older module instance during reimport before booting a new hooks state', async () => {
 		const previous = await import('./development.js');
-		const oldServer: ServerState = { directory: undefined };
-		const first = directory('Old module');
-		const second = directory('New module');
+		const oldServer: ServerState = { application: undefined };
+		const first = application('Old module');
+		const second = application('New module');
 		mocks.boot.mockResolvedValueOnce(first);
 		await previous.startDevelopment(oldServer);
 		const oldCleanup = devStopListener();
 		vi.resetModules();
 		const current = await import('./development.js');
 		expect(current.startDevelopment).not.toBe(previous.startDevelopment);
-		const server: ServerState = { directory: undefined };
+		const server: ServerState = { application: undefined };
 		mocks.boot.mockImplementationOnce(async () => {
 			expect(first.stop).toHaveBeenCalledOnce();
-			expect(oldServer.directory).toBeUndefined();
+			expect(oldServer.application).toBeUndefined();
 			expect(process.listenerCount('directory:dev-stop', oldCleanup)).toBe(0);
 			return second;
 		});
 		await current.startDevelopment(server);
 		oldCleanup();
-		expect(server.directory).toBe(second);
+		expect(server.application).toBe(second);
 		process.emit('directory:dev-stop');
 		expect(second.stop).toHaveBeenCalledOnce();
-		expect(server.directory).toBeUndefined();
+		expect(server.application).toBeUndefined();
 	});
 
-	it('stops a directory that finishes boot after dev server close without publishing it', async () => {
+	it('stops an application that finishes boot after dev server close without publishing it', async () => {
 		const { startDevelopment } = await import('./development.js');
-		const server: ServerState = { directory: undefined };
-		const pending = Promise.withResolvers<Directory>();
-		const stopped = directory('Never published');
+		const server: ServerState = { application: undefined };
+		const pending = Promise.withResolvers<Application>();
+		const stopped = application('Never published');
 		mocks.boot.mockReturnValueOnce(pending.promise);
 		const startup = startDevelopment(server);
-		expect(server.directory).toBeUndefined();
+		expect(server.application).toBeUndefined();
 		const shutdown = devStopListener();
 		process.emit('directory:dev-stop');
 		expect(process.listenerCount('directory:dev-stop', shutdown)).toBe(0);
@@ -129,16 +133,16 @@ describe('development lifecycle', () => {
 		await startup;
 		shutdown();
 		expect(stopped.stop).toHaveBeenCalledOnce();
-		expect(stopped.currentSnapshot).not.toHaveBeenCalled();
-		expect(server.directory).toBeUndefined();
+		expect(stopped.directory.currentSnapshot).not.toHaveBeenCalled();
+		expect(server.application).toBeUndefined();
 	});
 
 	it('cannot publish a superseded pending boot over a newer cached initialization', async () => {
 		const { startDevelopment } = await import('./development.js');
-		const server: ServerState = { directory: undefined };
-		const pending = Promise.withResolvers<Directory>();
-		const first = directory('Superseded');
-		const second = directory('Current');
+		const server: ServerState = { application: undefined };
+		const pending = Promise.withResolvers<Application>();
+		const first = application('Superseded');
+		const second = application('Current');
 		mocks.boot.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(second);
 		const startup = startDevelopment(server);
 		const oldCleanup = devStopListener();
@@ -148,27 +152,27 @@ describe('development lifecycle', () => {
 		oldCleanup();
 		expect(first.stop).toHaveBeenCalledOnce();
 		expect(second.stop).not.toHaveBeenCalled();
-		expect(server.directory).toBe(second);
-		expect(server.directory?.currentSnapshot().display.site.title).toBe('Current');
+		expect(server.application).toBe(second);
+		expect(server.application?.directory.currentSnapshot().display.site.title).toBe('Current');
 		process.emit('directory:dev-stop');
 		expect(second.stop).toHaveBeenCalledOnce();
 	});
 
 	it('removes its listener on boot failure and passes the error to the hook boundary', async () => {
 		const { startDevelopment } = await import('./development.js');
-		const server: ServerState = { directory: undefined };
+		const server: ServerState = { application: undefined };
 		const error = new Error('private startup failure');
 		mocks.boot.mockRejectedValueOnce(error);
 		await expect(startDevelopment(server)).rejects.toBe(error);
-		expect(server.directory).toBeUndefined();
+		expect(server.application).toBeUndefined();
 		expect(process.listenerCount('directory:dev-stop', devStopListener())).toBe(0);
 	});
 
 	it('leaves no leaked listener or cleared new state when a superseded boot fails', async () => {
 		const { startDevelopment } = await import('./development.js');
-		const server: ServerState = { directory: undefined };
-		const pending = Promise.withResolvers<Directory>();
-		const current = directory('Current');
+		const server: ServerState = { application: undefined };
+		const pending = Promise.withResolvers<Application>();
+		const current = application('Current');
 		mocks.boot.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(current);
 		const startup = startDevelopment(server);
 		const failedCleanup = devStopListener();
@@ -180,26 +184,26 @@ describe('development lifecycle', () => {
 		failedCleanup();
 		expect(process.listenerCount('directory:dev-stop', failedCleanup)).toBe(0);
 		expect(process.listenerCount('directory:dev-stop', devStopListener(1))).toBe(1);
-		expect(server.directory).toBe(current);
+		expect(server.application).toBe(current);
 		expect(current.stop).not.toHaveBeenCalled();
 		process.emit('directory:dev-stop');
 		expect(current.stop).toHaveBeenCalledOnce();
 	});
 
-	it('ignores an old callback even when the new attempt has the same directory identity', async () => {
+	it('ignores an old callback even when the new attempt has the same application identity', async () => {
 		const { startDevelopment } = await import('./development.js');
-		const server: ServerState = { directory: undefined };
-		const reused = directory('Same identity');
+		const server: ServerState = { application: undefined };
+		const reused = application('Same identity');
 		mocks.boot.mockResolvedValue(reused);
 		await startDevelopment(server);
 		const oldCleanup = devStopListener();
 		await startDevelopment(server);
 		expect(reused.stop).toHaveBeenCalledOnce();
 		oldCleanup();
-		expect(server.directory).toBe(reused);
+		expect(server.application).toBe(reused);
 		expect(reused.stop).toHaveBeenCalledOnce();
 		process.emit('directory:dev-stop');
-		expect(server.directory).toBeUndefined();
+		expect(server.application).toBeUndefined();
 		expect(reused.stop).toHaveBeenCalledTimes(2);
 	});
 });

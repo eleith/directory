@@ -6,6 +6,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const serverModule = new URL('../../../build/index.js', import.meta.url).href;
 const sentinel = 'PRIVATE_CONFIG_CREDENTIAL_LINK';
+const credentialsConfiguration = `links: {}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`;
 
 function source(title: string): string {
 	return `
@@ -19,7 +20,7 @@ links:
 `;
 }
 
-async function launchServer(contents: string | undefined) {
+async function launchServer(contents: string | undefined, environment: NodeJS.ProcessEnv = {}) {
 	const temporary = await mkdtemp(join(tmpdir(), 'directory-boot-'));
 	onTestFinished(() => rm(temporary, { recursive: true, force: true }));
 	const path = join(temporary, `${sentinel}.yaml`);
@@ -36,9 +37,11 @@ process.send(server.server.address().port);
 			HOST: '127.0.0.1',
 			PORT: '0',
 			ORIGIN: 'http://localhost',
+			AUTH_URL: 'http://localhost',
 			CONFIG_PATH: path,
 			NODE_ENV: 'production',
-			SHUTDOWN_TIMEOUT: '1'
+			SHUTDOWN_TIMEOUT: '1',
+			...environment
 		},
 		stdio: ['ignore', 'pipe', 'pipe', 'ipc']
 	});
@@ -111,17 +114,60 @@ describe('production configuration startup', () => {
 			contents: `links:\n  photos:\n    title: Photos\n    url: '\${${sentinel}}'`
 		},
 		{
-			name: 'credentials auth before C6',
-			code: 'auth_unavailable',
-			contents: `links: {}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`
+			name: 'credentials auth missing AUTH_SECRET',
+			code: 'auth_failed',
+			contents: credentialsConfiguration
 		},
 		{
-			name: 'OIDC auth before C6',
-			code: 'auth_unavailable',
+			name: 'enabled auth without ORIGIN',
+			code: 'auth_failed',
+			contents: credentialsConfiguration,
+			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: undefined }
+		},
+		{
+			name: 'enabled auth without AUTH_URL',
+			code: 'auth_failed',
+			contents: credentialsConfiguration,
+			environment: { AUTH_SECRET: sentinel.repeat(2), AUTH_URL: undefined }
+		},
+		{
+			name: 'enabled auth over an HTTP IP address',
+			code: 'auth_failed',
+			contents: credentialsConfiguration,
+			environment: {
+				AUTH_SECRET: sentinel.repeat(2),
+				ORIGIN: 'http://127.0.0.1',
+				AUTH_URL: 'http://127.0.0.1'
+			}
+		},
+		{
+			name: 'enabled auth with a non-root ORIGIN',
+			code: 'auth_failed',
+			contents: credentialsConfiguration,
+			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: `http://localhost/${sentinel}` }
+		},
+		{
+			name: 'enabled auth with a trailing-slash ORIGIN',
+			code: 'auth_failed',
+			contents: credentialsConfiguration,
+			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: 'http://localhost/' }
+		},
+		{
+			name: 'enabled auth with a mismatched AUTH_URL',
+			code: 'auth_failed',
+			contents: credentialsConfiguration,
+			environment: {
+				AUTH_SECRET: sentinel.repeat(2),
+				AUTH_URL: `https://foreign.example.com/${sentinel}`
+			}
+		},
+		{
+			name: 'OIDC auth missing AUTH_SECRET',
+			code: 'auth_failed',
 			contents: `links: {}\nauth:\n  oidc:\n    issuer: https://identity.example.com\n    client_id: ${sentinel}\n    client_secret: ${sentinel}`
 		}
-	])('rejects $name before opening a socket', async ({ contents, code }) => {
-		const server = await launchServer(contents);
+	])('rejects $name before opening a socket', async ({ contents, code, environment }) => {
+		const server = await launchServer(contents, environment);
 		const result = await server.closed;
 		expect(result.signal).toBeNull();
 		expect(result.code).not.toBe(0);

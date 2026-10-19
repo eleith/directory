@@ -14,6 +14,7 @@
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
+		"@auth/sveltekit": "1.11.3",
 		"@directory/config": "workspace:*",
 		"tslog": "5.2.0"
 	},

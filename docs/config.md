@@ -10,9 +10,9 @@ The shared loader and `directory validate` now read YAML, apply defaults, expand
 environment values and validate the result. The web server loads a complete
 immutable snapshot before serving, captures it once per request, and polls the
 configuration path for changes. The shell renders configured site copy; dashboard
-links and images are not served yet. Authentication is not implemented, so the
-web server rejects startup with any auth block even though the CLI can validate
-its shape. Omit auth to run this intermediate version.
+links and images are not served yet. Omit auth for open access, or configure shared
+credentials or OIDC to protect the whole directory. Enabled authentication requires
+`AUTH_SECRET` and matching `ORIGIN`/`AUTH_URL` before the web server can start.
 
 ## Migrating from Where
 
@@ -94,8 +94,8 @@ last-good snapshot is serving.
 An auth change rejects the entire replacement and reports `restart_required`,
 including changes that enable or disable auth. It never partially accepts the
 candidate's display changes or restarts the process automatically. Restore the
-original auth to resume display reloads. Auth-enabled startup remains unavailable
-until the actual gate is implemented. Environment files are not polled.
+original auth to resume display reloads. Providers and session policy are captured
+at startup; environment files are not polled.
 
 ## Environment values
 
@@ -219,6 +219,45 @@ null, unknown or mixed auth blocks are invalid; disabling the other strategy wit
 expanded before validation, including in OIDC issuer URLs. Editors recognize
 template syntax but cannot check the environment's values. Never put real
 credentials into committed examples.
+
+### Sessions and deployment
+
+Auth is all-or-nothing: a valid session opens the same directory for everyone.
+The service hints never become roles or per-link access rules. Sign-in and the
+required OIDC callback, generic health status and bundled resources are public;
+directory HTML, Kit data responses and future service assets require a session.
+The sign-in page exposes only the site title and sign-in strategy, not links or
+private configuration. Mounted branding/images remain later work.
+
+When auth is enabled, set these server environment variables:
+
+- `AUTH_SECRET`: a random string of at least 32 characters, generated with
+  `openssl rand -base64 32`. It protects encrypted, seven-day JWT session cookies.
+- `ORIGIN`: the fixed public root origin, for example
+  `https://directory.example.com`, with no path, query, credentials or trailing slash.
+  Enabled auth uses HTTPS, with HTTP allowed only on `localhost` for local
+  development, such as `http://localhost:5173`.
+- `AUTH_URL`: the same value as `ORIGIN`. This is Auth.js's standard URL setting;
+  callbacks do not depend on client-supplied Host or forwarded headers. The proxy
+  must still use the configured public origin. Legacy Auth.js URL settings, if
+  present, must not conflict.
+
+No-auth mode requires none of these variables. Production Node does not automatically
+read `.env`; inject the environment through the process/container or Node's
+`--env-file`. Cookies are HTTP-only and SameSite=Lax, and are Secure for HTTPS
+origins. Protected/auth responses use private, no-store caching.
+
+Register `${ORIGIN}/auth/callback/oidc` with your OIDC provider. Admission belongs
+to that provider's application assignments, not local accounts or role mappings.
+The app uses state, PKCE and nonce checks; do not turn them off for a provider.
+Shared credentials have no built-in rate limiting or lockout: use reverse-proxy
+throttling on sign-in or prefer OIDC for an internet-facing deployment.
+
+Sign-out clears the browser's cookie. Restarting with the same `AUTH_SECRET` does
+not revoke existing sessions; rotate it when changing access policy must end
+existing access. No session database or revocation list is maintained. Loader/CLI
+validation checks configuration shape and interpolated values, not provider
+availability or these runtime environment prerequisites.
 
 ## URLs and images
 

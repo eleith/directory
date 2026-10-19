@@ -11,8 +11,9 @@ defaults, expands environment values, and validates the TypeBox contract. The
 standalone CLI uses that same loader. The web server loads an immutable directory
 before serving, polls for file changes, and keeps the last good snapshot after
 invalid edits. The shell shows configured site copy, not dashboard links.
-Authentication and image serving are not implemented yet; auth-enabled startup is
-intentionally rejected until the access gate is ready.
+Authentication is optional: shared credentials or OIDC protect the whole directory,
+including data responses. Mounted image serving and the full dashboard remain
+later work. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [example](apps/web/config/directory.example.yml).
 

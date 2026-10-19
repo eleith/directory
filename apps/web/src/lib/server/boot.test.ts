@@ -2,12 +2,14 @@ import { inspect } from 'node:util';
 import { ConfigError, validateConfig } from '@directory/config';
 import type { DirectoryConfiguration } from '@directory/config/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Authentication } from './auth/index.js';
 import { bootApp } from './boot.js';
 import { DirectoryError, type Directory } from './config/load-directory.js';
 import { prepareSnapshot } from './config/snapshot.js';
 import { reportDirectoryIssue } from './logger.js';
 
 const mocks = vi.hoisted(() => ({
+	auth: vi.fn<typeof import('./auth/index.js').createAuthentication>(),
 	path: vi.fn<typeof import('@directory/config').resolveConfigPath>(),
 	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
 	directory: vi.fn<typeof import('./config/load-directory.js').loadDirectory>(),
@@ -25,11 +27,34 @@ vi.mock('./config/load-directory.js', async (importOriginal) => ({
 	loadDirectory: mocks.directory
 }));
 vi.mock('./config/watch.js', () => ({ watchConfig: mocks.watch }));
+vi.mock('./auth/index.js', () => ({ createAuthentication: mocks.auth }));
 
 const realDirectory = await vi.importActual<typeof import('./config/load-directory.js')>(
 	'./config/load-directory.js'
 );
 const sentinel = 'PRIVATE-environment-password-filename.yaml';
+const authCases = [
+	{ strategy: 'credentials', auth: { credentials: { username: sentinel, password: sentinel } } },
+	{
+		strategy: 'oidc',
+		auth: {
+			oidc: {
+				issuer: 'https://identity.example.com',
+				client_id: sentinel,
+				client_secret: sentinel
+			}
+		}
+	}
+] satisfies { strategy: Authentication['strategy']; auth: DirectoryConfiguration['auth'] }[];
+
+function authentication(strategy: Authentication['strategy']): Authentication {
+	return {
+		strategy,
+		handle: vi.fn<Authentication['handle']>().mockResolvedValue(new Response()),
+		signIn: vi.fn<Authentication['signIn']>().mockResolvedValue(undefined),
+		signOut: vi.fn<Authentication['signOut']>().mockResolvedValue(undefined)
+	};
+}
 
 function configuration(auth?: DirectoryConfiguration['auth']): DirectoryConfiguration {
 	const input: Record<string, unknown> = {
@@ -58,6 +83,7 @@ function expectRedacted(error: unknown): void {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	mocks.auth.mockReset();
 	mocks.path.mockReset().mockReturnValue(`/config/${sentinel}`);
 	mocks.load.mockReset().mockResolvedValue(configuration());
 	mocks.directory.mockReset().mockResolvedValue(loadedDirectory());
@@ -90,9 +116,12 @@ describe('bootApp', () => {
 			directory.reload.mock.invocationCallOrder[0]!
 		);
 		expect(directory.reload).toHaveBeenCalledTimes(1);
-		expect(app.currentSnapshot()).toBe(directory.currentSnapshot.mock.results[0]?.value);
+		expect(app.directory).toBe(directory);
+		expect(app.authentication).toBeUndefined();
+		expect(mocks.auth).not.toHaveBeenCalled();
+		expect(app.directory.currentSnapshot()).toBe(directory.currentSnapshot.mock.results[0]?.value);
 		await mocks.watch.mock.calls[0]![1]();
-		await app.reload();
+		await app.directory.reload();
 		expect(directory.reload).toHaveBeenCalledTimes(3);
 		app.stop();
 		expect(mocks.stopWatching).toHaveBeenCalledOnce();
@@ -154,26 +183,68 @@ describe('bootApp', () => {
 		expect(mocks.watch).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		{ credentials: { username: sentinel, password: sentinel } },
-		{
-			oidc: {
-				issuer: 'https://identity.example.com',
-				client_id: sentinel,
-				client_secret: sentinel
-			}
+	it.each(authCases)(
+		'creates $strategy authentication once before watching, retaining it across the post-watch reload',
+		async ({ strategy, auth }) => {
+			const config = configuration(auth);
+			const replacement = validateConfig(
+				{ ...config, site: { ...config.site, title: 'Replacement' } },
+				{ env: {} }
+			);
+			const ready = authentication(strategy);
+			const env = {
+				AUTH_SECRET: sentinel.repeat(2),
+				ORIGIN: 'https://directory.example.com',
+				AUTH_URL: 'https://directory.example.com'
+			};
+			mocks.load.mockResolvedValueOnce(config).mockResolvedValue(replacement);
+			mocks.directory.mockImplementationOnce(realDirectory.loadDirectory);
+			mocks.auth.mockImplementationOnce((input) => {
+				expect(input).toEqual(config.auth);
+				expect(input).not.toBe(config.auth);
+				expect(Object.isFrozen(input)).toBe(true);
+				expect(Object.isFrozen('credentials' in input ? input.credentials : input.oidc)).toBe(true);
+				expect(mocks.watch).not.toHaveBeenCalled();
+				return ready;
+			});
+			const app = await bootApp(env);
+			expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(expect.any(Object), env);
+			expect(mocks.auth.mock.invocationCallOrder[0]).toBeLessThan(
+				mocks.watch.mock.invocationCallOrder[0]!
+			);
+			expect(mocks.load).toHaveBeenCalledTimes(2);
+			expect(app.directory.currentSnapshot().display.site.title).toBe('Replacement');
+			expect(app.authentication).toBe(ready);
+			await app.directory.reload();
+			expect(app.authentication).toBe(ready);
+			expect(mocks.auth).toHaveBeenCalledOnce();
+			app.stop();
+			expect(mocks.stopWatching).toHaveBeenCalledOnce();
 		}
-	])('rejects an enabled auth strategy before watching or reloading', async (auth) => {
-		const directory = loadedDirectory(configuration(auth));
-		mocks.directory.mockResolvedValueOnce(directory);
-		const error: unknown = await bootApp().catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expect((error as DirectoryError).issue).toEqual({ code: 'auth_unavailable' });
-		expectRedacted(error);
-		expect(directory.stop).toHaveBeenCalledOnce();
-		expect(directory.reload).not.toHaveBeenCalled();
-		expect(mocks.watch).not.toHaveBeenCalled();
-	});
+	);
+
+	it.each(authCases)(
+		'rejects missing $strategy authentication prerequisites before watching or reloading',
+		async ({ auth }) => {
+			const directory = loadedDirectory(configuration(auth));
+			mocks.directory.mockResolvedValueOnce(directory);
+			mocks.auth.mockImplementationOnce(() => {
+				throw new Error(sentinel, { cause: sentinel });
+			});
+			const env = { ORIGIN: 'https://directory.example.com' };
+			const error: unknown = await bootApp(env).catch((error: unknown) => error);
+			expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(
+				directory.currentSnapshot.mock.results[0]?.value.configuration.auth,
+				env
+			);
+			expect(error).toBeInstanceOf(DirectoryError);
+			expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
+			expectRedacted(error);
+			expect(directory.stop).toHaveBeenCalledOnce();
+			expect(directory.reload).not.toHaveBeenCalled();
+			expect(mocks.watch).not.toHaveBeenCalled();
+		}
+	);
 
 	it('stops the loaded directory and redacts a watcher setup failure', async () => {
 		const directory = loadedDirectory();
@@ -192,7 +263,9 @@ describe('bootApp', () => {
 	it('stops watching and prevents a pending real directory reload from publishing', async () => {
 		mocks.directory.mockImplementationOnce(realDirectory.loadDirectory);
 		const app = await bootApp({});
-		const original = app.currentSnapshot();
+		expect(app.authentication).toBeUndefined();
+		expect(mocks.auth).not.toHaveBeenCalled();
+		const original = app.directory.currentSnapshot();
 		const pending = Promise.withResolvers<DirectoryConfiguration>();
 		const loading = Promise.withResolvers<void>();
 		mocks.load.mockImplementationOnce(() => {
@@ -205,9 +278,9 @@ describe('bootApp', () => {
 		pending.resolve(validateConfig({ site: { title: 'Replacement' }, links: {} }, { env: {} }));
 		await reload;
 		expect(mocks.stopWatching).toHaveBeenCalledOnce();
-		expect(app.currentSnapshot()).toBe(original);
+		expect(app.directory.currentSnapshot()).toBe(original);
 		expect(original.display.site.title).toBe('Family');
-		await app.reload();
+		await app.directory.reload();
 		expect(mocks.load).toHaveBeenCalledTimes(3);
 	});
 });
