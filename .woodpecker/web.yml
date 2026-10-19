@@ -74,6 +74,43 @@ steps:
       - test "$(pnpm --version)" = "11.9.0"
       - pnpm --filter @directory/web test:e2e
 
+  source-dependency-checks:
+    image: node:26.5.0-bookworm
+    environment:
+      COREPACK_HOME: /workspace/src/.pnpm-store/corepack
+    commands:
+      - npm install --global corepack@0.36.0
+      - corepack enable
+      - pnpm schema:check
+      - pnpm --filter '@directory/cli...' build
+      - pnpm --filter @directory/config check
+      - pnpm --filter @directory/config lint
+      - pnpm --filter @directory/config test:coverage
+      - pnpm --filter @directory/cli check
+      - pnpm --filter @directory/cli lint
+      - pnpm --filter @directory/cli test:coverage
+    when:
+      - event: push
+        branch: main
+
+  build-docker-main:
+    image: woodpeckerci/plugin-docker-buildx:6.0.3
+    settings:
+      repo: git.eleith.com/eleith.private/directory
+      username: eleith
+      registry: https://git.eleith.com
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: prod
+      platforms: linux/amd64
+      tags:
+        - latest
+      password:
+        from_secret: gitea_docker_registry
+    when:
+      - event: push
+        branch: main
+
   notify:
     image: deblan/woodpecker-email:3.3.0
     settings:

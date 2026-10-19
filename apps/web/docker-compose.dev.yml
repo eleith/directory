@@ -1,0 +1,42 @@
+services:
+  directory-app:
+    image: directory:dev
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      target: dev
+      args:
+        LOCAL_UID: ${LOCAL_UID:-1000}
+        LOCAL_GID: ${LOCAL_GID:-1000}
+    user: '${LOCAL_UID:-1000}:${LOCAL_GID:-1000}'
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      CONFIG_PATH: /m/apps/web/config/directory.yaml
+      DIRECTORY_PUBLIC_DIR: /m/apps/web/public
+      ORIGIN: ${ORIGIN:-http://localhost:5173}
+      AUTH_URL: ${ORIGIN:-http://localhost:5173}
+    ports:
+      - '127.0.0.1:5173:5173'
+    volumes:
+      - ./src:/m/apps/web/src:ro
+      - ./static:/m/apps/web/static:ro
+      - ./config:/m/apps/web/config:ro
+      - ./public:/m/apps/web/public:ro
+      - ./svelte.config.js:/m/apps/web/svelte.config.js:ro
+      - ./vite.config.ts:/m/apps/web/vite.config.ts:ro
+      - ./tsconfig.json:/m/apps/web/tsconfig.json:ro
+      - ../../packages/config/src:/m/packages/config/src:ro
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - fetch('http://localhost:5173/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 3s
+      start_period: 60s
+      retries: 3

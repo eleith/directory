@@ -11,8 +11,12 @@ test-results/
 .env
 .env.*
 !.env.example
+*.local.toml
+docker-compose*.local.yml
+docker-compose*.local.yaml
 /config/where.yaml
 /apps/web/config/where.yaml
 /config/directory.yaml
 /apps/web/config/directory.yaml
 /public/
+/apps/web/public/

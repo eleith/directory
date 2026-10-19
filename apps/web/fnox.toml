@@ -1,0 +1,4 @@
+#:schema https://fnox.jdx.dev/schema.json
+
+[secrets]
+AUTH_SECRET = { if_missing = "ignore" }

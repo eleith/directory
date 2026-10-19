@@ -2,7 +2,7 @@
 
 ## Current scope
 
-The bootstrap contains all three workspaces, local quality gates, and non-publishing
+The bootstrap contains all three workspaces, local quality gates, and per-package
 Woodpecker/GitHub workflow definitions. CLI help and the SSR placeholder read the
 same supported configuration format version. The TypeBox schema, inferred types
 and deterministic editor-schema generation are implemented, along with YAML
@@ -11,8 +11,9 @@ loading, environment interpolation and standalone CLI validation; see
 configuration path, and captures one immutable snapshot per request. The shell
 shows configured site copy; dashboard links and image serving are still later
 work. Optional credentials or OIDC authentication gates the entire directory;
-no-auth mode stays open and requires no session secret. Application images and
-releases are not implemented yet.
+no-auth mode stays open and requires no session secret. [Docker and Compose](deployment.md)
+provide dev/production containers and main-only image publication. Versioned
+releases remain later work.
 
 ## Toolchain
 
@@ -208,6 +209,8 @@ provider and an allowlist of submitted fields. Return URLs are reduced to safe
 local paths. Sign-out is the root page's named POST action. Login forms work
 without JavaScript. Auth.js owns session encryption/cookies and OIDC callbacks;
 Directory owns default-deny routing, safe diagnostics and fixed-origin policy.
+Auth.js is bundled server-side; its build-time dependency classification keeps
+framework/compiler peers out of the pruned container runtime.
 
 SvelteKit's CSRF protection stays enabled, with an additional exact-origin check
 on state-changing requests independent of content type. Auth.js uses its standard
@@ -304,12 +307,42 @@ separately built Gitea image too. A mismatched image fails rather than silently
 using another toolchain. Local development still needs its own matching browser
 installation as described above.
 
-These workflows do not inject operator YAML or application credentials, write
-package versions, publish images, or deploy. Release/tag jobs remain deferred.
-GitHub's checkout token has only `contents: read`; the public GHCR image requires
-no registry login. The Woodpecker runner needs pull access to the existing Gitea
-CI image, as for `when`. Configure read access at the CI platform, not by exposing
-publishing credentials to application commands or pull requests.
+These workflows do not inject operator YAML/application credentials, write package
+versions or deploy. Release/tag jobs remain deferred. PR jobs retain `contents: read`;
+the public GHCR browser image requires no registry login. The Woodpecker runner
+needs pull access to the existing Gitea CI image, as for `when`. Configure read
+access at the CI platform, not by exposing publishing credentials to application
+commands or pull requests.
+
+### Main image publication
+
+Main pushes add image publication only after web checks and production E2E.
+Both providers also run explicit schema/config/CLI gates before publishing, so
+parallel package pipelines cannot allow a failing dependency check to be bypassed.
+The Docker build copies pruned production dependencies and compiled output into
+the non-root image. It needs no operator YAML or auth secret at build time. See
+[Docker and Compose](deployment.md) for local use and the owner's container,
+bind-mount and image-size checks.
+
+- Woodpecker uses `woodpeckerci/plugin-docker-buildx:6.0.3` to publish
+  `git.eleith.com/eleith.private/directory:latest`, matching When's plugin,
+  registry and `gitea_docker_registry` secret. Allow this plugin in the runner's
+  privileged-plugin configuration. Restrict the secret **server-side** to `push`
+  events and this exact plugin; no PR access, including higher-priority secret
+  overrides. Woodpecker has no native branch filter for secrets: main-only is a
+  workflow condition, not a credential boundary. Trust everyone who can push
+  workflow changes, or enforce stronger policy through your secret backend.
+  Registry credentials belong only in plugin settings, never application commands
+  or build arguments.
+- GitHub's `Publish web image` job depends on checks/E2E and runs only for main
+  pushes. Only that job receives `packages: write`; it authenticates to GHCR with
+  `GITHUB_TOKEN` and publishes `ghcr.io/eleith/directory:latest`. Confirm the
+  repository/package link and write authorization at the provider. Normal PR
+  jobs do not run registry login or receive publication credentials.
+
+Both publish the `prod` target for `linux/amd64`, with `latest` only. Registry
+availability, token scope and runner capability must be confirmed on the real
+providers; static validation is not a successful image build or publication.
 
 ### Woodpecker email notifications
 
@@ -344,9 +377,9 @@ entire workflow is skipped. Do not blindly require every selectively triggered
 package check. Distinct job names avoid ambiguous statuses but do not solve that
 provider policy issue.
 
-Schema generation, YAML loading and CLI validation are available. Image and
-release commands remain deferred. Axe and PageSpeed remain owner-run manual
-checks, not automated gates.
+Schema generation, YAML loading, CLI validation and Compose commands are available.
+Versioned release commands remain deferred. Docker execution and final image checks,
+axe and PageSpeed remain owner-run manual checks, not agent-verified gates.
 
 ## Manual checks
 

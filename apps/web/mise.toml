@@ -1,0 +1,5 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+
+[tasks.docker]
+description = "Docker compose commands for dev environment"
+run = 'fnox exec -- docker compose -f docker-compose.dev.yml'

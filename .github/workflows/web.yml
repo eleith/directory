@@ -71,3 +71,54 @@ jobs:
         run: pnpm --filter '@directory/web...' build
       - name: Browser tests
         run: pnpm --filter @directory/web test:e2e
+
+  build-push:
+    name: Publish web image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, e2e]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check schema drift before building
+        run: pnpm schema:check
+      - name: Build CLI and shared dependencies
+        run: pnpm --filter '@directory/cli...' build
+      - name: Check config dependency
+        run: |
+          pnpm --filter @directory/config check
+          pnpm --filter @directory/config lint
+          pnpm --filter @directory/config test:coverage
+      - name: Check CLI
+        run: |
+          pnpm --filter @directory/cli check
+          pnpm --filter @directory/cli lint
+          pnpm --filter @directory/cli test:coverage
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: prod
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/eleith/directory:latest

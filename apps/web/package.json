@@ -3,6 +3,9 @@
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
+	"files": [
+		"build"
+	],
 	"scripts": {
 		"dev": "vite dev --host 127.0.0.1",
 		"build": "vite build",
@@ -14,11 +17,11 @@
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
-		"@auth/sveltekit": "1.11.3",
 		"@directory/config": "workspace:*",
 		"tslog": "5.2.0"
 	},
 	"devDependencies": {
+		"@auth/sveltekit": "1.11.3",
 		"@playwright/test": "catalog:",
 		"@sveltejs/adapter-node": "catalog:",
 		"@sveltejs/kit": "catalog:",
