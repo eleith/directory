@@ -295,11 +295,17 @@ describe('owned snapshot reloads', () => {
 		expect(current.display.groups[0]?.links[0]?.title).toBe('next photos');
 		expect(current.assets).toEqual({
 			brandingPaths: ['/public/next.svg'],
-			referencedPaths: ['/public/next.svg', '/public/next-photos.svg']
+			referencedPaths: ['/public/next.svg', '/public/next-photos.svg'],
+			bookmarkLogos: realSnapshot.prepareSnapshot(configuration('next', credentials)).assets
+				.bookmarkLogos
 		});
 		expect(current.display.snapshotId).not.toBe(captured.display.snapshotId);
 		expect(captured.configuration.site.title).toBe('boot');
 		expect(captured.display.site.title).toBe('boot');
+		expect(captured.assets.bookmarkLogos.photos).toBe(
+			realSnapshot.prepareSnapshot(configuration('boot', credentials)).assets.bookmarkLogos.photos
+		);
+		expect(current.assets.bookmarkLogos.photos).not.toBe(captured.assets.bookmarkLogos.photos);
 		expect(captured.assets.referencedPaths).toEqual([
 			'/public/boot.svg',
 			'/public/boot-photos.svg'

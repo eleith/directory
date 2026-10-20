@@ -27,10 +27,10 @@ export interface DisplayGroup {
 
 export interface DisplayLink {
 	readonly id: string;
+	readonly logo_path: string;
 	readonly title: string;
 	readonly url: string;
 	readonly description?: string;
-	readonly logo_path?: string;
 	readonly favicon_path?: string;
 	readonly tags: readonly string[];
 	readonly requires_auth: boolean;

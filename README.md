@@ -13,7 +13,10 @@ before serving, polls for file changes, and keeps the last good snapshot after
 invalid edits. Groups and bookmark titles render immediately, with plain shareable
 details and real external service links.
 Authentication is optional: shared credentials or OIDC protect the whole directory,
-including data responses. Images, search, modal details and saved preferences remain later work. See [authentication setup](docs/config.md#authentication-shapes).
+including data responses. Bookmark cards and details use server-prepared bookmark
+logos when no logo path is configured. Configured logo paths are preserved, but
+serving their files remains later work, along with search, modal details and saved
+preferences. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [example](apps/web/config/directory.example.yml).
 

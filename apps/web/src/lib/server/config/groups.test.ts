@@ -39,6 +39,31 @@ describe('prepared directory groups', () => {
 		expect(groupLinkIds(display)).toEqual([['zebra', 'alpha']]);
 	});
 
+	it('preserves a configured logo path and resolves omissions independently of favicons', () => {
+		const display = directory({
+			'photo-album': { title: 'Photos', logo_path: '/public/photos.svg' },
+			files: { title: 'Files', favicon_path: '/public/files.png', group: 'Tools' },
+			plain: { title: 'No configured image' }
+		});
+		const links = Object.fromEntries(
+			display.groups.flatMap((group) => group.links.map((link) => [link.id, link]))
+		);
+		expect(links['photo-album']!.logo_path).toBe('/public/photos.svg');
+		expect(links.files!.logo_path).toBe('/bookmarks/files/logo');
+		expect(links.files!.favicon_path).toBe('/public/files.png');
+		expect(links.plain!.logo_path).toBe('/bookmarks/plain/logo');
+		expect(Object.keys(links.plain!).sort()).toEqual([
+			'admin_only',
+			'id',
+			'internal_only',
+			'logo_path',
+			'requires_auth',
+			'tags',
+			'title',
+			'url'
+		]);
+	});
+
 	it('preserves first group occurrence and link declaration order', () => {
 		const display = directory({
 			zebra: { title: 'Zebra', group: 'Tools' },

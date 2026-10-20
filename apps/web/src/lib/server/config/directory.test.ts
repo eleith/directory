@@ -88,6 +88,7 @@ describe('prepareDirectory', () => {
 					links: [
 						{
 							id: 'photos',
+							logo_path: '/bookmarks/photos/logo',
 							...destination,
 							tags: [],
 							requires_auth: false,
@@ -103,6 +104,7 @@ describe('prepareDirectory', () => {
 			'admin_only',
 			'id',
 			'internal_only',
+			'logo_path',
 			'requires_auth',
 			'tags',
 			'title',

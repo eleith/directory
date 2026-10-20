@@ -17,6 +17,7 @@
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
+		"@dicebear/core": "10.4.0",
 		"@directory/config": "workspace:*",
 		"tslog": "5.2.0"
 	},

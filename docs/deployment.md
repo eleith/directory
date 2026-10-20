@@ -3,8 +3,9 @@
 Directory has one web container, following When's separate development and
 production Compose pattern. No host Node/pnpm installation is needed. Published
 images target Linux amd64; there is no worker, database or writable data volume.
-The current UI renders text-only bookmark groups and plain details with service
-links. Custom images and initials are not part of this slice.
+The UI renders bookmark groups and plain details with service links and prepared
+bookmark logos when no logo path is configured. Configured logo paths are preserved,
+but serving those image files remains a separate follow-up.
 
 ## Local production review
 

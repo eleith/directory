@@ -1,5 +1,6 @@
 import { validateConfig } from '@directory/config';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as bookmarkLogos from '../bookmark-logos.js';
 import { prepareSnapshot } from './snapshot.js';
 
 const service = { title: 'Photos', url: 'https://photos.example.com' };
@@ -47,6 +48,8 @@ describe('private prepared snapshots', () => {
 		expect(Object.isFrozen(snapshot.display)).toBe(true);
 		expect(Object.isFrozen(snapshot.assets)).toBe(true);
 		expect(Object.isFrozen(snapshot.assets.referencedPaths)).toBe(true);
+		expect(Object.isFrozen(snapshot.assets.bookmarkLogos)).toBe(true);
+		expect(Reflect.set(snapshot.assets.bookmarkLogos, 'photos', 'Changed')).toBe(false);
 		input.site.title = 'Changed';
 		input.links.photos!.tags = 'changed';
 		if (input.auth?.credentials) input.auth.credentials.password = 'Changed';
@@ -69,7 +72,13 @@ describe('private prepared snapshots', () => {
 			'/public/photos-icon.png',
 			'/public/shared.png'
 		]);
-		expect(snapshot.display.groups.flatMap((group) => group.links)).toHaveLength(2);
+		const links = snapshot.display.groups.flatMap((group) => group.links);
+		expect(links).toHaveLength(2);
+		expect(Object.keys(snapshot.assets.bookmarkLogos)).toEqual(['photos', 'files']);
+		for (const link of links) {
+			expect(link.logo_path).toBe(snapshot.configuration.links[link.id]!.logo_path);
+			expect(snapshot.assets.bookmarkLogos[link.id]).toMatch(/^<svg\b/u);
+		}
 	});
 
 	it('keeps authentication private while assigning a fresh non-secret display identity', () => {
@@ -87,9 +96,35 @@ describe('private prepared snapshots', () => {
 		expect(first.display).not.toHaveProperty('assets');
 	});
 
+	it('prepares bookmark logos exactly once per cloned snapshot and retains coherent earlier captures', ({
+		onTestFinished
+	}) => {
+		const generate = vi.spyOn(bookmarkLogos, 'getBookmarkLogos');
+		onTestFinished(() => generate.mockRestore());
+		const input = configuration();
+		const captured = prepareSnapshot(input);
+		expect(generate).toHaveBeenCalledTimes(1);
+		expect(generate.mock.calls[0]?.[0]).toBe(captured.configuration);
+		expect(generate.mock.calls[0]?.[0]).not.toBe(input);
+		const capturedSvg = captured.assets.bookmarkLogos.photos;
+		input.links.photos!.title = 'New Gallery';
+		delete input.links.files;
+		const current = prepareSnapshot(input);
+		expect(generate).toHaveBeenCalledTimes(2);
+		expect(current.assets.bookmarkLogos.photos).not.toBe(capturedSvg);
+		expect(current.assets.bookmarkLogos).not.toHaveProperty('files');
+		expect(current.display.groups[0]?.links[0]?.title).toBe('New Gallery');
+		expect(captured.assets.bookmarkLogos.photos).toBe(capturedSvg);
+		expect(captured.assets.bookmarkLogos.files).toMatch(/^<svg\b/u);
+		expect(captured.display.groups[0]?.links[0]?.title).toBe('Photos');
+		expect(JSON.stringify(current.display)).not.toContain('<svg');
+		expect(JSON.stringify(current.display)).not.toContain('dicebear');
+		expect(generate).toHaveBeenCalledTimes(2);
+	});
+
 	it('handles omitted branding, no images and an explicitly empty directory', () => {
 		const snapshot = prepareSnapshot(validateConfig({ links: {} }, { env: {} }));
-		expect(snapshot.assets).toEqual({ referencedPaths: [], brandingPaths: [] });
+		expect(snapshot.assets).toEqual({ referencedPaths: [], brandingPaths: [], bookmarkLogos: {} });
 		expect(snapshot.display.site).not.toHaveProperty('logo_path');
 		expect(snapshot.display.site).not.toHaveProperty('favicon_path');
 		expect(snapshot.display.groups.flatMap((group) => group.links)).toEqual([]);

@@ -48,12 +48,13 @@ export function getGroups(
 }
 
 function prepareLink(id: string, link: DirectoryLink): DisplayLink {
-	const optionalFields: Pick<DirectoryLink, 'description' | 'logo_path' | 'favicon_path'> = {};
+	const logoPath = link.logo_path ?? `/bookmarks/${id}/logo`;
+	const optionalFields: Pick<DirectoryLink, 'description' | 'favicon_path'> = {};
 	if (link.description !== undefined) optionalFields.description = link.description;
-	if (link.logo_path !== undefined) optionalFields.logo_path = link.logo_path;
 	if (link.favicon_path !== undefined) optionalFields.favicon_path = link.favicon_path;
 	return {
 		id,
+		logo_path: logoPath,
 		title: link.title,
 		url: link.url,
 		...optionalFields,

@@ -68,7 +68,7 @@ export async function requireSignIn(
 		return denied(401);
 	}
 	if (event.locals.session?.user || isSignInPage(event)) return resolve(event);
-	if (isHtmlNavigation(event)) {
+	if (!isBookmarkLogoRequest(event) && isHtmlNavigation(event)) {
 		const callbackUrl = localRedirect(event.url.pathname + event.url.search, policy.origin);
 		return new Response(null, {
 			status: 303,
@@ -103,6 +103,10 @@ function isPublicResource(event: RequestEvent): boolean {
 	if (!['GET', 'HEAD'].includes(event.request.method)) return false;
 	const path = event.url.pathname;
 	return path === '/healthz' || path === '/favicon.svg' || path.startsWith('/_app/immutable/');
+}
+
+function isBookmarkLogoRequest(event: RequestEvent): boolean {
+	return event.route.id === '/bookmarks/[id]/logo';
 }
 
 function isHtmlNavigation(event: RequestEvent): boolean {

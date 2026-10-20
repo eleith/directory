@@ -53,6 +53,7 @@
 						<li>
 							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 							<a class="card" href={`/?link=${link.id}`} data-sveltekit-preload-data="off">
+								<img src={link.logo_path} alt="" width="64" height="64" loading="lazy" />
 								{link.title}
 							</a>
 						</li>
@@ -121,7 +122,10 @@
 	}
 
 	.card {
-		display: block;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-4);
 		height: 100%;
 		padding: var(--space-5);
 		background: var(--color-surface-card);
@@ -130,6 +134,11 @@
 		color: var(--color-text);
 		text-decoration: none;
 		font-weight: 600;
+	}
+
+	.card img {
+		display: block;
+		border-radius: var(--radius-sm);
 	}
 
 	.card:hover {

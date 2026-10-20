@@ -5,6 +5,7 @@
 </script>
 
 <div class="details">
+	<img src={link.logo_path} alt="" width="64" height="64" />
 	<h2 id="link-details-title">{link.title}</h2>
 	{#if groupLabel}
 		<p class="group">{groupLabel}</p>
@@ -44,6 +45,11 @@
 		gap: var(--space-4);
 		min-width: 0;
 		overflow-wrap: anywhere;
+	}
+
+	img {
+		display: block;
+		border-radius: var(--radius-sm);
 	}
 
 	h2 {

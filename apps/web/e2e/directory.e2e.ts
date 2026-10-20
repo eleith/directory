@@ -52,7 +52,10 @@ test('groups, bookmark titles and plain details work without JavaScript', async 
 			await expect(link).toContainText(label!);
 			await expect(link).toHaveAttribute('data-sveltekit-preload-data', 'off');
 		}
-		await expect(page.locator('main img')).toHaveCount(0);
+		await expect(page.locator('a[href="/?link=photos"] img')).toHaveAttribute(
+			'src',
+			'/bookmarks/photos/logo'
+		);
 		await page.locator('a[href="/?link=photos"]').click();
 		await expect(page).toHaveURL(`${server.url}/?link=photos`);
 		await expect(page.getByRole('heading', { name: 'Photos', exact: true })).toBeVisible();

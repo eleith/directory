@@ -10,9 +10,10 @@ The shared loader and `directory validate` now read YAML, apply defaults, expand
 environment values and validate the result. The web server loads a complete
 immutable snapshot before serving, captures it once per request, and polls the
 configuration path for changes. Groups and bookmark titles render immediately,
-with plain `?link=<id>` details and external service links. Image rendering remains
-later work. Omit auth for open access, or configure shared
-credentials or OIDC to protect the whole directory. Enabled authentication requires
+with plain `?link=<id>` details and external service links. Cards and details use
+prepared bookmark logos when no logo path is configured. Configured paths are
+preserved, but their image files are not served yet. Omit auth for open access, or
+configure shared credentials or OIDC to protect the whole directory. Enabled authentication requires
 `AUTH_SECRET` and matching `ORIGIN`/`AUTH_URL` before the web server can start.
 
 ## Migrating from Where
@@ -226,7 +227,8 @@ credentials into committed examples.
 Auth is all-or-nothing: a valid session opens the same directory for everyone.
 The service hints never become roles or per-link access rules. Sign-in and the
 required OIDC callback, generic health status and bundled resources are public;
-directory HTML, Kit data responses and future service assets require a session.
+directory HTML, Kit data responses and generated bookmark logos require a session.
+Configured service images remain later work.
 The sign-in page exposes only the site title and sign-in strategy, not links or
 private configuration. Mounted branding/images remain later work.
 
@@ -273,6 +275,24 @@ syntactic validation, not filesystem access or MIME inspection. Containment,
 symlink/type checks and private-asset authentication are later server work. SVG
 files are trusted operator content, not uploads; mounted assets must never be
 served directly by a proxy merely because the directory is named public.
+
+### Prepared bookmark logos
+
+The logo API at `/bookmarks/<id>/logo` currently returns a generated image, prepared
+server-side with the snapshot, not during page or image requests. Display links
+carry one resolved `logo_path`: the configured path when provided, otherwise this
+logo API URL. Cards and details use that value directly. Configured-file serving
+is a separate follow-up; preserving its path does not make that file available.
+
+The current internal renderer uses DiceBear core 10.4.0 and a matching local
+Initials definition; no remote image service or browser generator is involved.
+Letters come from the title, falling back to its slug when the title has no usable
+letters. A stable group/link palette keeps the 64×64 images readable. The renderer
+can change without changing display fields or logo API URLs.
+
+Bookmark logos use the directory's authentication policy, including GET and HEAD.
+A missing or removed bookmark gets a generic 404; responses are private/no-store
+and nosniff. Only the local URL is page data, never SVG bytes or private config.
 
 ## Maintaining the contract
 

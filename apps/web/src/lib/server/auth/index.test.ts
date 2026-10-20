@@ -42,6 +42,11 @@ function eventFor(
 		url: new URL(request.url),
 		request,
 		locals: {},
+		route: {
+			id: /^\/bookmarks\/[^/]+\/logo$/.test(new URL(request.url).pathname)
+				? '/bookmarks/[id]/logo'
+				: null
+		},
 		isDataRequest: options.data ?? false,
 		cookies: { set: vi.fn(), get: vi.fn() }
 	} as unknown as RequestEvent;
@@ -86,6 +91,40 @@ beforeEach(() => {
 	});
 	mocks.session.mockResolvedValue(null);
 	mocks.resolve.mockResolvedValue(new Response('private-page'));
+});
+
+describe('bookmark logo API access', () => {
+	it.each(['GET', 'HEAD'])('requires a session for %s even with HTML Accept', async (method) => {
+		for (const path of ['/bookmarks/photos/logo', '/bookmarks/missing/logo']) {
+			const response = await responseFor(eventFor(path, { method }));
+			expect(response.status).toBe(401);
+			expect(response.headers.get('cache-control')).toBe('private, no-store');
+			expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+		}
+		expect(mocks.resolve).not.toHaveBeenCalled();
+	});
+
+	it.each(['GET', 'HEAD'])(
+		'uses the matched logo API route for encoded %s aliases',
+		async (method) => {
+			for (const path of [
+				'/%62ookmarks/photos/logo',
+				'/bookmarks/%70hotos/logo',
+				'/bookmarks/photos/%6cogo'
+			]) {
+				const event = eventFor(path, { method });
+				event.route.id = '/bookmarks/[id]/logo';
+				expect((await responseFor(event)).status).toBe(401);
+				expect(mocks.resolve).not.toHaveBeenCalled();
+			}
+		}
+	);
+
+	it('lets an authenticated request reach the prepared SVG route', async () => {
+		mocks.session.mockResolvedValueOnce(signedIn);
+		expect((await responseFor(eventFor('/bookmarks/photos/logo'))).status).toBe(200);
+		expect(mocks.resolve).toHaveBeenCalledOnce();
+	});
 });
 
 describe('boot factory', () => {
@@ -133,13 +172,21 @@ describe('boot factory', () => {
 });
 
 describe('whole-directory gate', () => {
-	it('redirects only unauthenticated HTML navigation with a local callback', async () => {
-		const response = await responseFor(eventFor('/private?tag=1'));
-		expect(response.status).toBe(303);
-		expect(response.headers.get('location')).toBe('/signin?callbackUrl=%2Fprivate%3Ftag%3D1');
-		expect(await response.text()).not.toContain('private-page');
-		expect(mocks.resolve).not.toHaveBeenCalled();
-	});
+	it.each([
+		['/private?tag=1', '/signin?callbackUrl=%2Fprivate%3Ftag%3D1'],
+		['/bookmarks', '/signin?callbackUrl=%2Fbookmarks'],
+		['/bookmarks/photos', '/signin?callbackUrl=%2Fbookmarks%2Fphotos'],
+		['/bookmarks/photos/other', '/signin?callbackUrl=%2Fbookmarks%2Fphotos%2Fother']
+	])(
+		'redirects only unauthenticated HTML navigation with a local callback: %s',
+		async (path, location) => {
+			const response = await responseFor(eventFor(path));
+			expect(response.status).toBe(303);
+			expect(response.headers.get('location')).toBe(location);
+			expect(await response.text()).not.toContain('private-page');
+			expect(mocks.resolve).not.toHaveBeenCalled();
+		}
+	);
 
 	it.each([
 		['/', { data: true }],

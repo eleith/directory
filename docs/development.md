@@ -10,7 +10,9 @@ loading, environment interpolation and standalone CLI validation; see
 [configuration](config.md). The web server now loads before serving, polls the
 configuration path, and captures one immutable snapshot per request. The shell
 renders configured groups, bookmark titles and plain details with external service
-links. Image rendering remains later work. Optional credentials or OIDC authentication gates the entire directory;
+links. Cards and details use server-prepared bookmark logos when no logo path is
+configured. Configured paths are preserved, but image-file serving remains later
+work. Optional credentials or OIDC authentication gates the entire directory;
 no-auth mode stays open and requires no session secret. [Docker and Compose](deployment.md)
 provide dev/production containers, main `latest` images and manually tagged
 stable releases.
@@ -128,9 +130,14 @@ claim of full source coverage.
 
 `prepareSnapshot` in `apps/web/src/lib/server/config/snapshot.ts` clones the
 validated private configuration, creates the display model and exact referenced
-asset lists, then freezes the complete snapshot. Only its `display` member may
-be sent to the browser. The client-facing interfaces in `src/lib/display/types.ts`
-contain no server imports. Snapshot IDs are fresh random UUIDs, not hashes of
+asset lists and bookmark logos, then freezes the complete snapshot.
+`getBookmarkLogos` in `bookmark-logos.ts` currently renders SVGs with the internal
+Initials style. SVG strings stay in the private, frozen `assets.bookmarkLogos` map
+for every link, including those with configured logos. Display links carry one
+required `logo_path`, resolved to the configured path or `/bookmarks/<id>/logo`.
+This logo API currently returns a generated image when the configured path is omitted.
+Only the snapshot's `display` member may be sent to the browser. The client-facing
+interfaces in `src/lib/display/types.ts` contain no server imports. Snapshot IDs are fresh random UUIDs, not hashes of
 configuration or credentials.
 
 `prepareDirectory` builds the browser data through `getSite(config)` and
@@ -488,8 +495,10 @@ agent-verified gates.
    require sign-in before site copy/data are returned; missing secret/origin must
    fail startup. Try a wrong password, sign-out and a direct `__data.json` request.
    Follow a bookmark to its plain `?link=<id>` details and return with Back to
-   directory. Images are not rendered in this text-only slice. Stop the server
-   when finished.
+   directory. Omit a bookmark's `logo_path` in the disposable copy and check that its
+   prepared logo renders without JavaScript and remains protected before sign-in,
+   including HEAD and `/bookmarks/<id>/logo` opened as HTML. Configured paths are
+   preserved, but their image files are not served yet. Stop the server when finished.
    For production output, after `pnpm build`, run:
 
    ```sh
@@ -498,9 +507,10 @@ agent-verified gates.
    ```
 
    Open `http://127.0.0.1:3000`, then stop the server when finished. The
-   directory is text-only; images, search, modal details and saved preferences are
-   not implemented. Run manual axe/PageSpeed on this visible baseline when available;
-   this slice is not final UI acceptance.
+   directory uses prepared bookmark logos for omitted logo paths; configured-file
+   serving, search, modal details and saved preferences are not implemented. Run
+   manual axe/PageSpeed on this visible baseline when available; this slice is not
+   final UI acceptance.
 
 Complete agent review before staged owner review. Stage only one coherent commit
 at a time when requested, and wait for manual review and explicit permission

@@ -158,7 +158,11 @@ describe('directory page data', () => {
 		event.locals.snapshot = {
 			...privateSnapshot,
 			display,
-			assets: { referencedPaths: ['PRIVATE_ASSET_BYTES'], brandingPaths: [] }
+			assets: {
+				referencedPaths: ['PRIVATE_ASSET_BYTES'],
+				brandingPaths: [],
+				bookmarkLogos: { photos: 'PRIVATE_SVG_BYTES' }
+			}
 		};
 		expect(load(event)).toEqual({ directory: display, selectedLinkId: 'photos', signedIn: false });
 		for (const id of ['hidden', 'PRIVATE_ASSET_BYTES']) {
