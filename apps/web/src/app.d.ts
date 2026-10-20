@@ -12,6 +12,7 @@ declare global {
 	namespace App {
 		interface Locals {
 			snapshot: PreparedSnapshot;
+			publicDir: string;
 			authentication: Authentication | undefined;
 			session: Session | null;
 		}

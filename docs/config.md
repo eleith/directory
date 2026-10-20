@@ -11,8 +11,8 @@ environment values and validate the result. The web server loads a complete
 immutable snapshot before serving, captures it once per request, and polls the
 configuration path for changes. Groups and bookmark titles render immediately,
 with plain `?link=<id>` details and external service links. Cards and details use
-prepared bookmark logos when no logo path is configured. Configured paths are
-preserved, but their image files are not served yet. Omit auth for open access, or
+prepared bookmark logos when no logo path is configured. Configured image files
+are served only for exact references in the captured snapshot. Omit auth for open access, or
 configure shared credentials or OIDC to protect the whole directory. Enabled authentication requires
 `AUTH_SECRET` and matching `ORIGIN`/`AUTH_URL` before the web server can start.
 
@@ -25,27 +25,35 @@ and the public-directory override is `DIRECTORY_PUBLIC_DIR`. An explicit
 operator environments manually; there is no automatic fallback or migration.
 The configuration format version and fields are unchanged.
 
-## Start with the example
+## Start with the production starter
 
-See [directory.example.yml](../apps/web/config/directory.example.yml). Its schema comment
-points to the actual checked-in artifact relative to `apps/web/config`:
+[directory.example.yml](../apps/web/config/directory.example.yml) is a minimal,
+credential-free production starter. It has an empty directory and open access,
+with no session secret required. **Configure authentication before publishing.**
+Its schema comment points to the checked-in artifact relative to `apps/web/config`:
 
 ```yaml
 # yaml-language-server: $schema=../../../packages/config/src/config.schema.json
-links:
-  photos:
-    title: Photos
-    url: https://photos.example.com
+version: 1
+links: {}
 ```
 
 There is no hosted schema URL. If copying the file elsewhere, update the schema
 comment to the artifact's real location. The package also exports
 `@directory/config/schema.json`; runtime consumers resolve compiled ESM, not TS source.
 
+For the separate populated, authenticated local review fixture and its image
+setup, use [demo/README.md](../demo/README.md). The isolated `demo/` directory is
+excluded from builds, not tests. It is never selected automatically at runtime.
+Native preview can use it directly without changing operator files; Docker
+review requires a deliberate manual copy. Back up existing active configuration
+before replacing it. Auth changes require a process restart, not the config poll.
+
 ## Loading and validation
 
 ```sh
 pnpm cli -- validate apps/web/config/directory.example.yml
+pnpm cli -- validate demo/config/directory.yaml
 ```
 
 The wrapper builds the shared package and standalone CLI first. The compiled
@@ -67,9 +75,15 @@ deployment/
   public/
 ```
 
-`DIRECTORY_PUBLIC_DIR` can override that sibling public directory. Relative overrides
-resolve from the working directory. Validation checks image-path syntax only;
-it does not inspect this directory or contact any destination.
+The server selects the public directory once at startup through the shared
+`resolvePublicDir(configPath, { env, cwd })` helper. By default it uses `public`
+below the selected configuration path's grandparent, as in the layout above.
+`DIRECTORY_PUBLIC_DIR` overrides this location; relative overrides resolve from
+the working directory, not the YAML directory. The helper does not require the
+directory to exist. Environment changes require a restart.
+Validation checks image-path syntax only; neither loading nor snapshot preparation
+inspects image files or contacts any destination. The resolved filesystem root
+stays server-private.
 
 Files use one YAML 1.2 core document. Mapping keys are read as strings; duplicate
 keys, collection keys, unknown tags and other YAML versions are rejected. Merge
@@ -227,10 +241,13 @@ credentials into committed examples.
 Auth is all-or-nothing: a valid session opens the same directory for everyone.
 The service hints never become roles or per-link access rules. Sign-in and the
 required OIDC callback, generic health status and bundled resources are public;
-directory HTML, Kit data responses and generated bookmark logos require a session.
-Configured service images remain later work.
+directory HTML, Kit data responses, generated bookmark logos and all mounted
+configured files require a session, including configured site favicons. Image GET
+and HEAD requests return 401 before sign-in even with HTML Accept, rather than
+redirecting to an HTML sign-in page.
 The sign-in page exposes only the site title and sign-in strategy, not links or
-private configuration. Mounted branding/images remain later work.
+private configuration. Configured site branding is not rendered in this slice;
+the bundled favicon remains unchanged.
 
 When auth is enabled, set these server environment variables:
 
@@ -242,8 +259,14 @@ When auth is enabled, set these server environment variables:
   development, such as `http://localhost:5173`.
 - `AUTH_URL`: the same value as `ORIGIN`. This is Auth.js's standard URL setting;
   callbacks do not depend on client-supplied Host or forwarded headers. The proxy
-  must still use the configured public origin. Legacy Auth.js URL settings, if
-  present, must not conflict.
+  must still use the configured public origin.
+- `NEXTAUTH_URL`: leave unset, or match `ORIGIN` exactly.
+- `AUTH_REDIRECT_PROXY_URL`: unsupported; leave unset.
+
+Invalid auth environment settings fail startup with `auth_failed` and a fixed
+hint naming the failing variable and its requirement. Diagnostics never include
+its value or raw error details. The standalone CLI does not check these web
+runtime settings.
 
 No-auth mode requires none of these variables. Production Node does not automatically
 read `.env`; inject the environment through the process/container or Node's
@@ -271,18 +294,38 @@ or whitespace-containing URLs are rejected by the runtime schema.
 Images are decoded `/public/...` paths with SVG/PNG/JPEG/GIF/WebP extensions.
 Unicode/spaces and nested directories are allowed; empty/dot segments, percent
 escapes, backslashes, queries, fragments and control characters are not. This is
-syntactic validation, not filesystem access or MIME inspection. Containment,
-symlink/type checks and private-asset authentication are later server work. SVG
-files are trusted operator content, not uploads; mounted assets must never be
-served directly by a proxy merely because the directory is named public.
+syntactic validation, not filesystem access or MIME inspection.
+
+The web endpoint serves only exact `assets.referencedPaths` from the request's
+captured snapshot: configured site and bookmark logo/favicon paths, not an
+arbitrary directory listing or static file tree. GET and HEAD use private,
+no-store and nosniff headers; HEAD has the same status/headers without a body.
+There are no range or conditional-cache responses. Missing, unreferenced,
+escaping, unreadable, unstable, oversized or unrecognized files receive a generic
+404 without filesystem details. A missing public directory is valid at startup.
+Accepted YAML reloads replace references; invalid or auth-changing candidates
+retain the last good set. Image bytes are read on request, so missing files and
+atomic image replacements recover without a YAML change.
+
+Reads are bounded to 5 MiB per file. The reader checks canonical containment,
+regular-file type, the opened descriptor's Linux `/proc/self/fd` location and file
+stability. Symlinks resolving inside the selected root are allowed; escapes are
+not. File signatures must match the supported extension; this is not a full image
+decoder or XML validator. SVGs must be UTF-8 with an SVG root and no DTD/entity
+markup. They are **trusted operator content**, not sanitized uploads or a safe
+active-content boundary. Use only trusted files and do not expose the mounted
+directory directly through a proxy. Mounted-file serving needs Linux with procfs;
+without descriptor lookup it fails closed with 404, including in native Node.
 
 ### Prepared bookmark logos
 
 The logo API at `/bookmarks/<id>/logo` currently returns a generated image, prepared
 server-side with the snapshot, not during page or image requests. Display links
 carry one resolved `logo_path`: the configured path when provided, otherwise this
-logo API URL. Cards and details use that value directly. Configured-file serving
-is a separate follow-up; preserving its path does not make that file available.
+logo API URL. Cards and details use that value directly, so configured files now
+render through the protected mounted-image endpoint. The prepared logo API still
+exists for every bookmark, including those with configured paths; a missing or
+invalid configured file does not switch the browser to that API.
 
 The current internal renderer uses DiceBear core 10.4.0 and a matching local
 Initials definition; no remote image service or browser generator is involved.

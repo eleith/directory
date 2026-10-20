@@ -8,6 +8,12 @@ const serverModule = new URL('../../../build/index.js', import.meta.url).href;
 const sentinel = 'PRIVATE_CONFIG_CREDENTIAL_LINK';
 const bookmarkTitle = 'Visible household bookmark';
 const credentialsConfiguration = `links: {}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`;
+const secretHint =
+	'Invalid authentication configuration: AUTH_SECRET is required when authentication is enabled and must contain at least 32 characters.';
+const originHint =
+	'Invalid authentication configuration: ORIGIN must be a canonical HTTPS root origin or HTTP localhost origin, with no trailing slash, path, query or fragment.';
+const authUrlHint =
+	'Invalid authentication configuration: AUTH_URL must be a canonical root origin matching ORIGIN exactly.';
 
 function source(title: string): string {
 	return `
@@ -81,6 +87,7 @@ process.send(server.server.address().port);
 		closed,
 		stop,
 		output: () => output,
+		socketOpened: () => port !== undefined,
 		async ready() {
 			await vi.waitUntil(() => port !== undefined || finished, { timeout: 10_000 });
 			expect(port, output).toBeTypeOf('number');
@@ -118,23 +125,27 @@ describe('production configuration startup', () => {
 		{
 			name: 'credentials auth missing AUTH_SECRET',
 			code: 'auth_failed',
+			hint: secretHint,
 			contents: credentialsConfiguration
 		},
 		{
 			name: 'enabled auth without ORIGIN',
 			code: 'auth_failed',
+			hint: originHint,
 			contents: credentialsConfiguration,
 			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: undefined }
 		},
 		{
 			name: 'enabled auth without AUTH_URL',
 			code: 'auth_failed',
+			hint: authUrlHint,
 			contents: credentialsConfiguration,
 			environment: { AUTH_SECRET: sentinel.repeat(2), AUTH_URL: undefined }
 		},
 		{
 			name: 'enabled auth over an HTTP IP address',
 			code: 'auth_failed',
+			hint: originHint,
 			contents: credentialsConfiguration,
 			environment: {
 				AUTH_SECRET: sentinel.repeat(2),
@@ -145,18 +156,21 @@ describe('production configuration startup', () => {
 		{
 			name: 'enabled auth with a non-root ORIGIN',
 			code: 'auth_failed',
+			hint: originHint,
 			contents: credentialsConfiguration,
 			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: `http://localhost/${sentinel}` }
 		},
 		{
 			name: 'enabled auth with a trailing-slash ORIGIN',
 			code: 'auth_failed',
+			hint: originHint,
 			contents: credentialsConfiguration,
 			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: 'http://localhost/' }
 		},
 		{
 			name: 'enabled auth with a mismatched AUTH_URL',
 			code: 'auth_failed',
+			hint: authUrlHint,
 			contents: credentialsConfiguration,
 			environment: {
 				AUTH_SECRET: sentinel.repeat(2),
@@ -166,9 +180,37 @@ describe('production configuration startup', () => {
 		{
 			name: 'OIDC auth missing AUTH_SECRET',
 			code: 'auth_failed',
+			hint: secretHint,
 			contents: `links: {}\nauth:\n  oidc:\n    issuer: https://identity.example.com\n    client_id: ${sentinel}\n    client_secret: ${sentinel}`
+		},
+		{
+			name: 'enabled auth with a short AUTH_SECRET',
+			code: 'auth_failed',
+			hint: secretHint,
+			contents: credentialsConfiguration,
+			environment: { AUTH_SECRET: sentinel }
+		},
+		{
+			name: 'enabled auth with a mismatched NEXTAUTH_URL',
+			code: 'auth_failed',
+			hint: 'Invalid authentication configuration: NEXTAUTH_URL must match ORIGIN exactly or be unset.',
+			contents: credentialsConfiguration,
+			environment: {
+				AUTH_SECRET: sentinel.repeat(2),
+				NEXTAUTH_URL: `https://foreign.example.com/${sentinel}`
+			}
+		},
+		{
+			name: 'enabled auth with an unsupported redirect proxy',
+			code: 'auth_failed',
+			hint: 'Invalid authentication configuration: AUTH_REDIRECT_PROXY_URL is unsupported and must be unset.',
+			contents: credentialsConfiguration,
+			environment: {
+				AUTH_SECRET: sentinel.repeat(2),
+				AUTH_REDIRECT_PROXY_URL: `https://proxy.example.com/${sentinel}`
+			}
 		}
-	])('rejects $name before opening a socket', async ({ contents, code, environment }) => {
+	])('rejects $name before opening a socket', async ({ contents, code, environment, hint }) => {
 		const server = await launchServer(contents, environment);
 		const result = await server.closed;
 		expect(result.signal).toBeNull();
@@ -184,11 +226,21 @@ describe('production configuration startup', () => {
 				message: `Application startup failed (${code}).`
 			})
 		);
+		if (hint !== undefined) {
+			expect(records).toContainEqual(expect.objectContaining({ level: 'ERROR', message: hint }));
+		}
 		for (const record of records) {
 			expect(record).not.toHaveProperty('error');
+			expect(record).not.toHaveProperty('cause');
 			expect(record).not.toHaveProperty('_logMeta.path');
 		}
+		expect(server.socketOpened()).toBe(false);
 		expect(server.output()).not.toContain('Listening on');
+		expect(server.output()).not.toContain('foreign.example.com');
+		expect(server.output()).not.toContain('proxy.example.com');
+		for (const value of Object.values(environment ?? {})) {
+			if (value !== undefined) expect(server.output()).not.toContain(value);
+		}
 		expect(server.output()).not.toContain(sentinel);
 		expect(server.output()).not.toContain(server.path);
 	});

@@ -23,3 +23,4 @@ docker-compose*.local.yaml
 /apps/web/config/directory.yaml
 /public/
 /apps/web/public/
+/demo/

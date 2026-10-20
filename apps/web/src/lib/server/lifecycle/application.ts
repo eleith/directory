@@ -3,6 +3,7 @@ import type { Directory } from '../config/load-directory.js';
 
 export interface Application {
 	readonly directory: Directory;
+	readonly publicDir: string;
 	readonly authentication: Authentication | undefined;
 	stop(): void;
 }

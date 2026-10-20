@@ -39,6 +39,7 @@ function eventFor(query = '', withAuth = false) {
 	const snapshot = prepareSnapshot(validateConfig(configuration, { env: {} }));
 	const locals = {
 		snapshot,
+		publicDir: '/PRIVATE_PUBLIC_ROOT',
 		session: null,
 		authentication: undefined
 	} satisfies Partial<App.Locals>;
@@ -112,7 +113,8 @@ describe('directory page data', () => {
 			'authentication',
 			'auth',
 			'configPath',
-			'publicRoot'
+			'publicRoot',
+			'publicDir'
 		]) {
 			expect(data).not.toHaveProperty(field);
 			expect(data.directory).not.toHaveProperty(field);

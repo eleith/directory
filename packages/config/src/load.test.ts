@@ -243,13 +243,24 @@ describe('default, interpolate, then validate', () => {
 });
 
 describe('YAML file loader', () => {
-	it('validates the documented example with the production parser', async () => {
+	it('validates the minimal production starter with defaults and no auth', async () => {
 		const path = fileURLToPath(
 			new URL('../../../apps/web/config/directory.example.yml', import.meta.url)
 		);
 		const config = await loadConfigFile(path, { env: {} });
-		expect(Object.keys(config.links).length).toBeGreaterThan(0);
-		expect(config.links.photos?.tags).toBeTypeOf('string');
+		expect(config.version).toBe(1);
+		expect(config.links).toEqual({});
+		expect(config).not.toHaveProperty('auth');
+		expect(config.site).toEqual({
+			title: 'Directory',
+			description: '',
+			footer: '',
+			order: 'configured'
+		});
+		expect(config.appearance).toEqual({
+			primary_light_color: '#0f766e',
+			primary_dark_color: '#5eead4'
+		});
 	});
 
 	it('loads an empty directory, flat links, multiline descriptions and native booleans', async () => {

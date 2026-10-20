@@ -16,7 +16,8 @@ export default defineConfig(
 			'**/coverage/**',
 			'**/playwright-report/**',
 			'**/test-results/**',
-			'.pnpm-store/**'
+			'.pnpm-store/**',
+			'demo/**'
 		]
 	},
 	js.configs.recommended,

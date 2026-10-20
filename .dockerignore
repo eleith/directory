@@ -30,3 +30,4 @@ apps/web/public
 *.md
 docs
 .vscode
+/demo/

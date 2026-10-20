@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,6 +29,7 @@ async function reservePort(): Promise<number> {
 
 interface ServerOptions {
 	configuration: string;
+	publicDir?: string;
 	secret?: string | null;
 	origin?: string | null;
 	port?: number;
@@ -40,6 +41,8 @@ export async function startServer(options: ServerOptions) {
 	const path = join(temporary, 'directory.yaml');
 	try {
 		await writeFile(path, options.configuration);
+		const publicDir = options.publicDir ?? join(temporary, 'public');
+		if (options.publicDir === undefined) await mkdir(publicDir);
 		const port = options.port ?? (await reservePort());
 		const url = `http://localhost:${port}`;
 		const origin = options.origin === undefined ? url : options.origin;
@@ -48,6 +51,7 @@ export async function startServer(options: ServerOptions) {
 			HOST: '127.0.0.1',
 			PORT: String(port),
 			CONFIG_PATH: path,
+			DIRECTORY_PUBLIC_DIR: publicDir,
 			NODE_ENV: 'production',
 			SHUTDOWN_TIMEOUT: '1'
 		};

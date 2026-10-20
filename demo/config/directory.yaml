@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../../packages/config/src/config.schema.json
+# Local demo only: replace these known credentials before exposing the directory.
+# Runtime auth still needs a unique generated AUTH_SECRET and matching ORIGIN/AUTH_URL.
+# See demo/README.md for a preview that leaves operator configuration untouched.
+version: 1
+site:
+  title: Home Server
+  description: Useful things running at home.
+  footer: Something not working? Ask your household maintainer.
+  order: configured # Or alphabetical.
+
+appearance:
+  primary_light_color: '#0f766e'
+  primary_dark_color: '#5eead4'
+
+auth:
+  credentials:
+    username: demo
+    password: directory-demo
+
+# Reserved example.com destinations are placeholders, not live integrations.
+# Four logos come from demo/public/demo; five use prepared bookmark logos.
+links:
+  photos:
+    title: Photos
+    url: https://photos.example.com
+    description: |
+      Family photos and videos, all in one place.
+      Install your photo service's mobile app for automatic uploads.
+    logo_path: /public/demo/photos.svg
+    tags: photos, videos, memories
+    group: Photos & files
+    requires_auth: true
+  files:
+    title: Files
+    url: https://files.example.com
+    description: Shared documents, school projects and household paperwork.
+    logo_path: /public/demo/files.svg
+    tags: documents, sharing, storage
+    group: Photos & files
+  backups:
+    title: Backups
+    url: https://backups.example.com
+    description: |
+      Check the latest backup status before you need a restore.
+      Ask your household maintainer for help recovering a file.
+    tags: backup, recovery, storage
+    group: Photos & files
+  music:
+    title: Music
+    url: https://music.example.com
+    description: Albums, playlists and a soundtrack for dinner.
+    logo_path: /public/demo/music.svg
+    tags: music, audio, playlists
+    group: Entertainment
+  movies:
+    title: Movies
+    url: https://movies.example.com
+    description: Browse the family movie and television library.
+    tags: movies, television, streaming
+    group: Entertainment
+  books:
+    title: Books
+    url: https://books.example.com
+    description: Find your next ebook or audiobook for the commute.
+    tags: books, reading, audiobooks
+    group: Entertainment
+  home-automation:
+    title: Home automation
+    url: https://home.example.com
+    description: |
+      Lights, room temperatures and everyday routines.
+      Connect to the home network or VPN before opening this service.
+    logo_path: /public/demo/home.svg
+    tags: home, lights, routines
+    group: Everyday tools
+    internal_only: true
+  recipes:
+    title: Recipes
+    url: https://recipes.example.com
+    description: Favorite meals, shopping lists and this week's dinner plan.
+    tags: cooking, meals, shopping
+    group: Everyday tools
+  router:
+    title: Router
+    url: https://router.example.com
+    description: Manage the home network; leave changes to your household maintainer.
+    tags: network, router, maintenance
+    group: Everyday tools
+    requires_auth: true
+    internal_only: true
+    admin_only: true

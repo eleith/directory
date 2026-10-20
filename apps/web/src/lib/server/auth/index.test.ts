@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isHttpError, isRedirect, redirect, type Handle, type RequestEvent } from '@sveltejs/kit';
 import type { Session, SvelteKitAuthConfig } from '@auth/sveltekit';
+import { validateConfig } from '@directory/config';
+import { prepareSnapshot } from '../config/snapshot.js';
 import { createAuthentication } from './index.js';
 
 const mocks = vi.hoisted(() => ({
@@ -26,6 +28,22 @@ const origin = 'https://directory.example';
 const env = { ORIGIN: origin, AUTH_URL: origin, AUTH_SECRET: 'x'.repeat(32) };
 const credentials = { username: 'family', password: 'private-password' };
 const signedIn: Session = { user: { name: 'Directory' }, expires: '2030-01-01T00:00:00.000Z' };
+const snapshot = prepareSnapshot(
+	validateConfig(
+		{
+			site: { favicon_path: '/public/site.svg', logo_path: '/public/site-logo.svg' },
+			links: {
+				photos: {
+					title: 'Photos',
+					url: 'https://photos.example',
+					logo_path: '/public/logos/photos.svg',
+					favicon_path: '/public/bookmark-favicon.svg'
+				}
+			}
+		},
+		{ env: {} }
+	)
+);
 
 function eventFor(
 	path = '/',
@@ -41,7 +59,7 @@ function eventFor(
 	return {
 		url: new URL(request.url),
 		request,
-		locals: {},
+		locals: { snapshot, publicDir: '/mounted/public' },
 		route: {
 			id: /^\/bookmarks\/[^/]+\/logo$/.test(new URL(request.url).pathname)
 				? '/bookmarks/[id]/logo'
@@ -125,6 +143,53 @@ describe('bookmark logo API access', () => {
 		expect((await responseFor(eventFor('/bookmarks/photos/logo'))).status).toBe(200);
 		expect(mocks.resolve).toHaveBeenCalledOnce();
 	});
+});
+
+describe('mounted image access', () => {
+	it.each(['GET', 'HEAD'])(
+		'requires a session for every mounted %s path, even configured site favicons and HTML Accept',
+		async (method) => {
+			for (const path of [
+				'/public/site.svg',
+				'/public/site-logo.svg',
+				'/public/logos/photos.svg',
+				'/public/bookmark-favicon.svg',
+				'/public/unreferenced.svg',
+				'/public',
+				'/public/'
+			]) {
+				const response = await responseFor(eventFor(path, { method }));
+				expect(response.status).toBe(401);
+				expect(response.headers.has('location')).toBe(false);
+				expect(response.headers.get('cache-control')).toBe('private, no-store');
+				expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+			}
+			expect(mocks.resolve).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each(['GET', 'HEAD'])(
+		'uses the matched mounted route for encoded %s aliases',
+		async (method) => {
+			for (const path of ['/%70ublic/site.svg', '/public/site%2Esvg', '/public/caf%C3%A9.svg']) {
+				const event = eventFor(path, { method });
+				event.route.id = '/public/[...file]';
+				expect((await responseFor(event)).status).toBe(401);
+			}
+			expect(mocks.resolve).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each(['/public/site.svg', '/public/logos/photos.svg'])(
+		'permits a signed-in request for %s',
+		async (path) => {
+			mocks.session.mockResolvedValueOnce(signedIn);
+			const event = eventFor(path);
+			event.route.id = '/public/[...file]';
+			expect((await responseFor(event)).status).toBe(200);
+			expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith(event);
+		}
+	);
 });
 
 describe('boot factory', () => {

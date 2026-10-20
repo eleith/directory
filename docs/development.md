@@ -11,8 +11,8 @@ loading, environment interpolation and standalone CLI validation; see
 configuration path, and captures one immutable snapshot per request. The shell
 renders configured groups, bookmark titles and plain details with external service
 links. Cards and details use server-prepared bookmark logos when no logo path is
-configured. Configured paths are preserved, but image-file serving remains later
-work. Optional credentials or OIDC authentication gates the entire directory;
+configured. Configured image files now serve through exact captured snapshot
+references, not an arbitrary static directory. Optional credentials or OIDC authentication gates the entire directory;
 no-auth mode stays open and requires no session secret. [Docker and Compose](deployment.md)
 provide dev/production containers, main `latest` images and manually tagged
 stable releases.
@@ -76,26 +76,43 @@ commands, arguments and generated help, matching When. It uses catalog-pinned es
 **0.28.2** for its Node bundle; dependency install scripts are disabled for
 esbuild because the platform binary ships as an optional dependency.
 
-The web server now needs configuration at runtime, not at build time. To preview
-without creating operator configuration:
+The web server needs configuration at runtime, not at build time. From the
+repository root, preview the isolated demo without creating or modifying
+operator configuration or copying images:
 
 ```sh
-CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" pnpm dev
+CONFIG_PATH="$PWD/demo/config/directory.yaml" \
+  DIRECTORY_PUBLIC_DIR="$PWD/demo/public" \
+  AUTH_SECRET="$(openssl rand -base64 32)" \
+  ORIGIN=http://localhost:5173 AUTH_URL=http://localhost:5173 pnpm dev
 ```
 
+Open **http://localhost:5173**. See [the demo quickstart](../demo/README.md) for
+local-only credentials, manual preview scope and production preview. This command uses
+real authentication with a fresh ephemeral secret, not an auth bypass. Mounted
+image reads require Linux procfs. The explicit public root overrides any operator
+environment value; by default this demo config also resolves to `demo/public`.
+The separate `apps/web/config/directory.example.yml` starter is empty and open,
+requires no session secret, and must have authentication added before publishing.
+
 `pnpm dev` runs Vite from `apps/web`, so its default path is
-`apps/web/config/directory.yaml`. Absolute `CONFIG_PATH` values work independently of
-the command's working directory. Never overwrite an existing operator file with
-the example. With auth enabled, also supply a random `AUTH_SECRET` and matching
-`ORIGIN`/`AUTH_URL`; see [authentication setup](config.md#authentication-shapes).
-Use HTTPS or `http://localhost:5173` for local development, updating both URL
-settings if the development port changes.
+`apps/web/config/directory.yaml`. Absolute `CONFIG_PATH` and `DIRECTORY_PUBLIC_DIR`
+values avoid working-directory ambiguity. An existing active configuration stays
+unchanged with the command above. Back it up yourself before explicitly choosing
+to replace it with a demo copy; setup must never automatically overwrite it.
+Auth changes require a process restart, not just waiting for the file poll.
+Use HTTPS or `http://localhost:5173`, never an HTTP IP address with auth enabled;
+update both `ORIGIN` and `AUTH_URL` if the port changes. See
+[authentication setup](config.md#authentication-shapes) and
+[Compose setup](deployment.md#local-production-review) for stable secrets and
+manual, non-overwriting asset copying.
 
 ### CLI validation
 
 ```sh
 pnpm cli -- --help
 pnpm cli -- validate apps/web/config/directory.example.yml
+pnpm cli -- validate demo/config/directory.yaml
 ```
 
 The root command builds shared config and the CLI, then runs its compiled Node
@@ -135,7 +152,8 @@ asset lists and bookmark logos, then freezes the complete snapshot.
 Initials style. SVG strings stay in the private, frozen `assets.bookmarkLogos` map
 for every link, including those with configured logos. Display links carry one
 required `logo_path`, resolved to the configured path or `/bookmarks/<id>/logo`.
-This logo API currently returns a generated image when the configured path is omitted.
+This logo API remains available for every bookmark; the display uses it only when
+`logo_path` is omitted. Configured paths now reach the mounted-image endpoint.
 Only the snapshot's `display` member may be sent to the browser. The client-facing
 interfaces in `src/lib/display/types.ts` contain no server imports. Snapshot IDs are fresh random UUIDs, not hashes of
 configuration or credentials.
@@ -180,7 +198,10 @@ YAML or credentials. Startup errors stay fatal and are reported without raw erro
 values. Enabled auth requires a random 32+ character `AUTH_SECRET` and matching
 root `ORIGIN`/`AUTH_URL` with no trailing slash. Authenticated deployments use
 HTTPS; HTTP is supported only on `localhost` for local development. Missing or inconsistent auth settings
-report `auth_failed`; no mode falls back to open access after an auth failure.
+report `auth_failed` followed by a fixed hint naming the failing environment
+variable and its requirement, without values or raw error details. Unknown auth
+initialization failures report only `auth_failed`. No mode falls back to open
+access after an auth failure.
 
 Only a valid startup installs `watchConfig`, a non-persistent one-second path
 poll. Inode, modification-time or size changes request a serialized reload;
@@ -190,11 +211,14 @@ Invalid later edits keep the last good snapshot and generic health readiness.
 
 The request hook captures `directory.currentSnapshot()` once into
 `event.locals.snapshot`; nested loaders use that reference even if a reload
-publishes meanwhile. The page returns only the captured display model, a validated selected-link
+publishes meanwhile. Boot resolves the public root once through the existing
+`resolvePublicDir` helper, using the same selected config path and environment as
+configuration loading. The application captures it as `event.locals.publicDir`;
+it never enters page data. Missing roots or files do not prevent startup. The page returns only the captured display model, a validated selected-link
 identity and a signed-in boolean after the access gate. Private configuration,
 assets, sessions and filesystem paths are not page data.
-`/healthz` returns only `{ "status": "ok" }` after initialization. Requests load
-neither YAML nor asset fallbacks. Shutdown stops the watcher and blocks pending
+`/healthz` returns only `{ "status": "ok" }` after initialization. Requests do not
+load YAML or regenerate bookmark logos. Shutdown stops the watcher and blocks pending
 publication. Polling/config preparation are not browser code.
 
 Production lifecycle handling uses adapter-node's `sveltekit:shutdown` event.
@@ -203,6 +227,26 @@ pending-startup cleanup, and the small serve-only Vite close bridge. Kit's pinne
 SSR loader does not run `import.meta.hot.dispose`, so that bridge remains
 application-specific. Development cleanup happens at the next initialization or
 server close, not immediately when source is invalidated.
+
+### Configured image files
+
+`/public/[...file]` checks exact membership in the captured
+`assets.referencedPaths` before any image I/O. The server-only `assets.ts` reader
+uses bounded 5 MiB reads, canonical containment, regular-file and stability checks,
+and the same opened descriptor's `/proc/self/fd` location. This requires Linux
+procfs even in native Node; unavailable descriptor lookup fails closed. Symlinks
+inside the root work, escapes do not. Extension/signature checks recognize
+PNG/JPEG/GIF/WebP and UTF-8 SVG without DTD/entity markup; this is neither a full
+codec/XML decoder nor an SVG sanitizer. SVG files are trusted operator content.
+
+The route shares only response formatting with `/bookmarks/[id]/logo`; the
+snapshot renderer is unchanged. GET and HEAD return private/no-store, nosniff and
+byte lengths, with no HEAD body or range/conditional caching. Failures are generic
+404s. Config loads/preparation do not inspect images. References update only with
+accepted snapshots; image bytes update independently on subsequent requests.
+All mounted files, including configured site favicons, remain private when auth
+is enabled. HTML Accept does not turn image requests into sign-in redirects.
+The bundled favicon and existing UI/head remain unchanged.
 
 ### Authentication boundary
 
@@ -244,6 +288,9 @@ afterwards. Build before invoking E2E independently. Playwright explicitly sets
 `CONFIG_PATH` to the checked-in empty-directory fixture under `e2e/fixtures`, not
 the process's operator path. Tests use no personal configuration, credentials,
 or development server. Unit discovery is separate from browser specs.
+Application tests use only their own fixtures and disposable data, never the
+manual `demo/` configuration or images. The demo is not an automated test, build,
+lint, formatting or package input and does not trigger CI.
 
 The co-located process tests launch the real adapter-node build with disposable
 YAML and OS-assigned ports. They check fatal invalid configuration or auth
@@ -257,14 +304,19 @@ coverage of `src/index.ts`.
 Authentication browser/HTTP tests use separate disposable production servers and
 a test-only local OIDC issuer built from Node HTTP/crypto. They exercise real
 Auth.js flows, discovery, PKCE/state/nonce, invalid claims/outages, cookie expiry/rotation,
-private data routes and cross-origin/redirect attacks. No live IdP or operator
+private data routes and cross-origin/redirect attacks. Configured-image tests use
+disposable mounts for real production HTTP authentication, exact references,
+symlinks, MIME, HEAD/cache headers, reloads and byte recovery, plus the existing
+SSR logo consumer with JavaScript disabled. Reader unit tests cover bounded I/O,
+ordinary races and descriptor cleanup. These are not Docker/procfs deployment
+checks. No live IdP or operator
 config is used; real HTTPS/proxy and provider registration remain manual checks.
 
 Root commands cover all three workspaces, ordered by their declared package
 dependencies. Each workspace's lint/format commands explicitly share the root
 ignore file, so formatting after a build/test run must not rewrite generated
-output. Build output, coverage, operator configuration, local plans, and
-prototypes remain outside formatting.
+output. Build output, coverage, operator configuration, local plans, manual demo
+data, and prototypes remain outside formatting; ESLint also ignores `demo/`.
 
 ## Manual app releases
 
@@ -337,8 +389,9 @@ covered; this intentionally overlaps workspace lint.
 
 Path filters include dependencies and shared tooling, not just app directories:
 
-- `packages/config/**` and the shared `apps/web/config/directory.example.yml` run
-  config, CLI, and web checks.
+- `packages/config/**` and the shared `apps/web/config/directory.example.yml`
+  starter run config, CLI, and web checks. The manual-only `demo/` does not trigger
+  pipelines or supply automated test fixtures.
 - `apps/cli/**` or `apps/web/**` selects that application's pipeline.
 - Root files (`'*'`, including dotfiles), `.changeset/**`, `docs/**`, and both
   workflow directories run all three. This covers the lockfile, catalog,
@@ -461,7 +514,7 @@ agent-verified gates.
 ## Manual checks
 
 1. Follow the clean setup in an isolated export of the staged commit. Check root
-   verification, CLI help and validation of the documented example without
+   verification, CLI help and validation of both the production starter and demo without
    personal config. Use a disposable file with a missing environment reference
    or malformed YAML and check the failure output stays redacted. In a YAML-aware
    editor, check template syntax and required-field diagnostics.
@@ -479,15 +532,23 @@ agent-verified gates.
    arrive. Verify failure delivery in a controlled runner test, not by breaking
    main. Do not inject operator YAML or credentials into application checks.
 4. Make a disposable copy to try startup and file changes without editing the
-   checked-in example or operator configuration:
+   checked-in demo or operator configuration:
 
    ```sh
    preview=$(mktemp -d)
-   cp apps/web/config/directory.example.yml "$preview/directory.yaml"
-   CONFIG_PATH="$preview/directory.yaml" pnpm dev
+   cp demo/config/directory.yaml "$preview/directory.yaml"
+   CONFIG_PATH="$preview/directory.yaml" \
+     DIRECTORY_PUBLIC_DIR="$PWD/demo/public" \
+     AUTH_SECRET="$(openssl rand -base64 32)" \
+     ORIGIN=http://localhost:5173 AUTH_URL=http://localhost:5173 pnpm dev
    ```
 
-   Check desktop/narrow widths, OS light/dark and JavaScript disabled. Edit the
+   Run from the repository root; open `http://localhost:5173` and use
+   **demo / directory-demo**. This generates a unique demo-only secret per run.
+   Check desktop/narrow widths, OS light/dark and JavaScript disabled. Confirm
+   four configured primary logos and five generated logos load on cards and
+   details; service URLs are placeholders. These are primary logo fixtures, not
+   service-favicon or broken-image-fallback acceptance tests. Edit the
    copied site's title/description and refresh after approximately one second.
    Try an atomic rename save, invalid YAML, deletion and restoration: the last
    good copy should remain until a valid file returns. `/healthz` exposes only
@@ -497,18 +558,31 @@ agent-verified gates.
    Follow a bookmark to its plain `?link=<id>` details and return with Back to
    directory. Omit a bookmark's `logo_path` in the disposable copy and check that its
    prepared logo renders without JavaScript and remains protected before sign-in,
-   including HEAD and `/bookmarks/<id>/logo` opened as HTML. Configured paths are
-   preserved, but their image files are not served yet. Stop the server when finished.
+   including HEAD and `/bookmarks/<id>/logo` opened as HTML. For a configured logo,
+   use a disposable public directory and set `DIRECTORY_PUBLIC_DIR` to its absolute
+   path before starting. Check mounted logos on cards/details without JavaScript,
+   generic 404s for unreferenced or missing files, then atomic file replacement
+   and recovery. Authenticated mounted GET/HEAD work; unauthenticated requests
+   return 401 even with HTML Accept, including configured site favicons. Verify
+   Linux procfs availability and private/no-store, nosniff and bodyless HEAD.
+   See the [owner Docker checklist](deployment.md#owner-docker-review-checklist)
+   for the separate real-image/mount/procfs review. Stop the server when finished.
    For production output, after `pnpm build`, run:
 
    ```sh
-   CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" \
-     HOST=127.0.0.1 PORT=3000 ORIGIN=http://127.0.0.1:3000 node apps/web/build/index.js
+   CONFIG_PATH="$PWD/demo/config/directory.yaml" \
+     DIRECTORY_PUBLIC_DIR="$PWD/demo/public" \
+     AUTH_SECRET="$(openssl rand -base64 32)" \
+     ORIGIN=http://localhost:3000 AUTH_URL=http://localhost:3000 \
+     HOST=127.0.0.1 PORT=3000 node apps/web/build/index.js
    ```
 
-   Open `http://127.0.0.1:3000`, then stop the server when finished. The
-   directory uses prepared bookmark logos for omitted logo paths; configured-file
-   serving, search, modal details and saved preferences are not implemented. Run
+   Run from the repository root. Open `http://localhost:3000`, sign in with
+   **demo / directory-demo**, then stop the server when finished. This production
+   preview also generates a demo-only secret per run. The
+   directory uses prepared bookmark logos for omitted logo paths and serves exact
+   configured image references. Search, modal details and saved preferences are
+   not implemented. Run
    manual axe/PageSpeed on this visible baseline when available; this slice is not
    final UI acceptance.
 

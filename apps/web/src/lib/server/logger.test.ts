@@ -1,5 +1,6 @@
 import { ConfigError } from '@directory/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AuthSettingsError } from './auth/settings.js';
 import { DirectoryError } from './config/load-directory.js';
 import { logger, reportDirectoryIssue, reportStartupFailure } from './logger.js';
 
@@ -35,6 +36,49 @@ describe('safe server reporting', () => {
 		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
 		reportStartupFailure(new DirectoryError({ code: 'prepare_failed' }));
 		expect(output).toHaveBeenCalledExactlyOnceWith('Application startup failed (prepare_failed).');
+	});
+
+	it.each([
+		[
+			'AUTH_SECRET',
+			'Invalid authentication configuration: AUTH_SECRET is required when authentication is enabled and must contain at least 32 characters.'
+		],
+		[
+			'ORIGIN',
+			'Invalid authentication configuration: ORIGIN must be a canonical HTTPS root origin or HTTP localhost origin, with no trailing slash, path, query or fragment.'
+		],
+		[
+			'AUTH_URL',
+			'Invalid authentication configuration: AUTH_URL must be a canonical root origin matching ORIGIN exactly.'
+		],
+		[
+			'NEXTAUTH_URL',
+			'Invalid authentication configuration: NEXTAUTH_URL must match ORIGIN exactly or be unset.'
+		],
+		[
+			'AUTH_REDIRECT_PROXY_URL',
+			'Invalid authentication configuration: AUTH_REDIRECT_PROXY_URL is unsupported and must be unset.'
+		]
+	] as const)(
+		'reports only a fixed hint for %s, ignoring even mutated error details',
+		(setting, hint) => {
+			const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
+			const error = new AuthSettingsError(setting);
+			error.message = sentinel;
+			error.stack = sentinel;
+			error.cause = new Error(sentinel);
+			reportStartupFailure(error);
+			expect(output.mock.calls).toEqual([['Application startup failed (auth_failed).'], [hint]]);
+			expect(JSON.stringify(output.mock.calls)).not.toContain(sentinel);
+		}
+	);
+
+	it('does not interpolate an unrecognized setting even on a typed error', () => {
+		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
+		const error = new AuthSettingsError('AUTH_SECRET');
+		Object.defineProperty(error, 'setting', { value: sentinel });
+		reportStartupFailure(error);
+		expect(output).toHaveBeenCalledExactlyOnceWith('Application startup failed (auth_failed).');
 	});
 
 	it.each([

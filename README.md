@@ -14,27 +14,22 @@ invalid edits. Groups and bookmark titles render immediately, with plain shareab
 details and real external service links.
 Authentication is optional: shared credentials or OIDC protect the whole directory,
 including data responses. Bookmark cards and details use server-prepared bookmark
-logos when no logo path is configured. Configured logo paths are preserved, but
-serving their files remains later work, along with search, modal details and saved
-preferences. See [authentication setup](docs/config.md#authentication-shapes).
+logos when no logo path is configured. Configured images are now served only when
+referenced by the captured configuration, with bounded 5 MiB reads and the same
+authentication policy as the directory. Mounted files require Linux procfs;
+SVGs are trusted operator content, not sanitized uploads. Search, modal details
+and saved preferences remain later work. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
-[example](apps/web/config/directory.example.yml).
+[production starter](apps/web/config/directory.example.yml). For the isolated,
+local-only nine-bookmark review, see [the demo](demo/README.md).
 
 ## Run with Docker
 
-From a checkout, without host Node/pnpm:
-
-```sh
-cd apps/web
-test -e .env || cp .env.example .env
-test -e config/directory.yaml || cp config/directory.example.yml config/directory.yaml
-mkdir -p public
-docker compose up --build --pull never
-```
-
-Open **http://localhost:3000**. See [Docker and Compose](docs/deployment.md) for
-development containers, authentication, HTTPS, published images and manual checks.
-Existing operator files are preserved; the example starts without auth.
+Follow [local production review](docs/deployment.md#local-production-review) to
+bootstrap the minimal, empty production starter without overwriting operator files.
+It has open access and needs no session secret; enable authentication before
+publishing. No host Node/pnpm is needed. For a populated local review instead,
+follow [the isolated demo quickstart](demo/README.md).
 
 ## Development with Node
 
@@ -47,17 +42,20 @@ pnpm verify
 CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" pnpm dev
 ```
 
-Open `http://localhost:5173`. Groups, bookmark titles and `?link=<id>` details
-render with JavaScript disabled, too. `/healthz` returns generic readiness. To try reloads,
-point `CONFIG_PATH` at a disposable copy of the example and edit it; invalid saves
-keep the previous copy serving. Linux prerequisites, shutdown and other commands
-are documented in [development](docs/development.md).
+Run from the repository root and open `http://localhost:5173`. This starter is
+empty and has no authentication. For the populated, authenticated preview that
+leaves operator configuration and media untouched, use [demo/README.md](demo/README.md).
+Groups, bookmark titles and `?link=<id>` details also render without JavaScript.
+`/healthz` returns generic readiness. Invalid auth environment settings stop startup
+with `auth_failed` and a fixed, value-free setting hint. Linux prerequisites,
+reload checks and shutdown are documented in [development](docs/development.md).
 
-Validate the example or your own configuration:
+Validate the production starter, isolated demo or your own configuration:
 
 ```sh
 pnpm cli -- --help
 pnpm cli -- validate apps/web/config/directory.example.yml
+pnpm cli -- validate demo/config/directory.yaml
 ```
 
 Validation returns 0 for a valid file and nonzero for unreadable or invalid input.

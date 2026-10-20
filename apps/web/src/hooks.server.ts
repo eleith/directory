@@ -28,6 +28,7 @@ export const handle: Handle = ({ event, resolve }) => {
 		});
 	}
 	event.locals.snapshot = application.directory.currentSnapshot();
+	event.locals.publicDir = application.publicDir;
 	event.locals.authentication = application.authentication;
 	event.locals.session = null;
 	if (application.authentication === undefined) {

@@ -20,6 +20,7 @@ function application(title: string) {
 			reload: vi.fn<Directory['reload']>(),
 			stop: vi.fn<Directory['stop']>()
 		},
+		publicDir: '/mounted/public',
 		authentication: undefined,
 		stop: vi.fn<Application['stop']>()
 	};

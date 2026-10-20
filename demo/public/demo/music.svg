@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Music</title>
+  <rect width="64" height="64" rx="12" fill="#581c87"/>
+  <path d="M27 43V20l22-5v23M27 27l22-5" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="21" cy="44" rx="7" ry="5" fill="#fff"/>
+  <ellipse cx="43" cy="39" rx="7" ry="5" fill="#fff"/>
+</svg>

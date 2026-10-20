@@ -4,18 +4,38 @@ Directory has one web container, following When's separate development and
 production Compose pattern. No host Node/pnpm installation is needed. Published
 images target Linux amd64; there is no worker, database or writable data volume.
 The UI renders bookmark groups and plain details with service links and prepared
-bookmark logos when no logo path is configured. Configured logo paths are preserved,
-but serving those image files remains a separate follow-up.
+bookmark logos when no logo path is configured. Configured image files are now
+served only for exact snapshot references, with bounded 5 MiB reads and the
+directory's authentication policy, including configured site favicons.
 
 ## Local production review
 
-Run from the checkout's web directory so Compose reads the adjacent `.env`:
+From the repository root, prepare files in the web directory so Compose reads
+the adjacent `.env`. These commands create only missing config/env files and
+preserve any existing operator configuration:
 
 ```sh
 cd apps/web
-test -e .env || cp .env.example .env
-test -e config/directory.yaml || cp config/directory.example.yml config/directory.yaml
+test -e .env || cp -n .env.example .env
+test -e config/directory.yaml || cp -n config/directory.example.yml config/directory.yaml
 mkdir -p public
+```
+
+The production starter is empty and has **open access**, with no session secret
+required. Enable your own [authentication](#authentication-and-https) before
+publishing. Existing active YAML remains unchanged and may have different auth
+requirements. If auth is enabled, set a unique random `AUTH_SECRET` of at least
+32 characters and a matching origin before starting; there is no fallback.
+
+For the populated local-only review instead, follow [demo/README.md](../demo/README.md).
+It documents explicit configuration replacement after backup, non-overwriting
+image copies into the runtime mount, and the required secret. Its preferred
+native preview leaves operator configuration and media untouched. Demo files
+are excluded from the Docker build context, not copied into the image.
+
+Once the configuration choice and any auth settings are ready, still in `apps/web`:
+
+```sh
 docker compose up --build --pull never
 ```
 
@@ -24,23 +44,35 @@ Open **http://localhost:3000**, not an HTTP IP address when auth is enabled.
 removes the container, not your mounted files. Add `-d` to run in the background
 and use `docker compose logs -f` for diagnostics.
 
-The initial example has no auth and needs no secret. Edit your ignored
-`config/directory.yaml`, never the tracked example, to try site-copy reloads.
-The **directory** mount keeps atomic rename saves visible. Invalid later YAML
-keeps the last valid snapshot; invalid initial YAML prevents startup. Auth changes
-require a restart. See the [configuration contract](config.md).
+Edit your ignored `config/directory.yaml`, never the tracked starter or demo, to try
+site-copy reloads. The **directory** mount keeps atomic rename saves visible.
+Invalid later YAML keeps the last valid snapshot; invalid initial YAML prevents
+startup. Auth changes require a process restart, not just a polling interval.
+See the [configuration contract](config.md).
 
 The production service runs as UID/GID **1000:1000**, with a read-only root
 filesystem, temporary `/tmp`, and read-only config/public mounts. Ensure this
 identity can read the mounted files and traverse their directories. Do not fix
 permissions with a recursive world-writable change. Nothing writes to your
-configuration or assets. The `public` mount is reserved for the later protected
-image endpoint; **do not serve it directly through a proxy**.
+configuration or assets. The `public` mount supplies the protected image endpoint;
+**do not serve it directly through a proxy**. Only trusted operator SVGs belong
+here: image recognition is not sanitization or a full decoder. Missing directories
+or files do not prevent startup; unavailable images return generic 404s.
+
+Mounted-file reads require Linux `/proc/self/fd` access to validate the opened
+inode. This applies to the container and native Node; missing procfs fails closed
+with 404. The root is resolved once at boot, by default as `public` below the
+selected config path's grandparent (`/app/public` in production Compose).
+`DIRECTORY_PUBLIC_DIR` can override it; relative values use the process working
+directory. This selects the root, not permission to serve arbitrary files under
+it. See [image behavior](config.md#urls-and-images).
 
 ## Authentication and HTTPS
 
-Enable exactly one [auth strategy](config.md#authentication-shapes) in your
-mounted YAML. Set a fresh session secret and the YAML's environment references in
+The production starter has no auth. Before publishing, configure your own
+[credentials or OIDC strategy](config.md#authentication-shapes) in the mounted YAML;
+never use the isolated demo's known credentials for a deployment.
+Set a unique generated session secret and any custom YAML environment references in
 `.env`; generate `AUTH_SECRET` with:
 
 ```sh
@@ -56,7 +88,8 @@ auth:
     password: '${DIRECTORY_PASSWORD}'
 ```
 
-Set `AUTH_SECRET` and `DIRECTORY_PASSWORD` in `.env`. Do not put real credentials
+This custom YAML needs `DIRECTORY_PASSWORD` in `.env`, in addition to `AUTH_SECRET`.
+Only YAML that references it needs that variable. Do not put real credentials
 in the image, build arguments, tracked examples or shell history. Compose injects
 `.env` at runtime; YAML references are expanded by Directory, not Compose.
 
@@ -70,7 +103,8 @@ Compose sets **both `ORIGIN` and `AUTH_URL`** to this value. Do not include a
 trailing slash or path. Without an override, local production review uses
 `http://localhost:3000`. If you change `DIRECTORY_PORT`, set `ORIGIN` to the URL
 you actually open. Production Node trusts that fixed origin rather than
-client-supplied forwarding headers.
+client-supplied forwarding headers. Invalid auth environment settings stop
+startup with `auth_failed` and a fixed, value-free hint naming the setting to fix.
 
 The host binding defaults to `127.0.0.1`. A host reverse proxy can reach port
 3000; a containerized proxy needs an operator-configured shared network, or an
@@ -92,7 +126,8 @@ HTTPS/cookie/proxy and external-provider behavior still need deployment testing.
 
 ## Development container
 
-Use the same `.env`, YAML and public directory. If your host identity is not
+First complete the configuration choice and, if enabling auth, the stable
+`AUTH_SECRET` setup above. Use the same `.env`, YAML and public directory. If your host identity is not
 1000:1000, set `LOCAL_UID`/`LOCAL_GID` in `.env` using `id -u` and `id -g`.
 These settings control both image-generated directory ownership and the running
 user. Rebuild after changing them.
@@ -105,9 +140,10 @@ With mise and fnox installed, `ORIGIN=http://localhost:5173 mise docker up --bui
 is an optional shortcut from this directory. It uses `docker-compose.dev.yml`.
 The `*.local.toml` files stay outside Git, formatting and the Docker build context.
 
-The shared fnox config has no session-secret default. Supply a random
-`AUTH_SECRET` through your local fnox provider, shell or `.env` when enabling
-authentication. Compose passes that value into the container; the app still
+The shared fnox config has no session-secret default. If auth is enabled, supply
+a random `AUTH_SECRET` through your local fnox provider, shell or `.env`. No-auth
+configurations need no secret. If your existing `mise docker` workflow supplies
+that secret through fnox, keep using it. Compose passes that value into the container; the app still
 rejects missing or short secrets when auth is enabled. Other YAML environment
 references remain configured in `.env`.
 
@@ -181,7 +217,8 @@ by release tags. Confirm provider permissions and actual runs as described in
 
 The Docker build copies compiled output and pruned production dependencies into
 the non-root runtime image. Operator
-YAML, secrets and mounted public files are excluded from the build context.
+YAML, secrets, mounted public files and the isolated `demo/` directory are excluded
+from the build context.
 The runtime contains no application source, build toolchain or browser installation.
 Final container behavior, mounts and image size are owner-run manual checks.
 
@@ -229,7 +266,24 @@ a Docker pass. Use disposable copies of any real configuration.
    real `?link=<id>` details, use the separate new-tab service link and return with
    Back to directory. Try JavaScript disabled. Changing auth must require a
    restart, not silently alter a running session policy.
-5. In the normal HTTPS/proxy setup, verify redirects, Secure cookies, CSRF,
+5. In a disposable public mount, configure a bookmark's `logo_path` to a small
+   trusted SVG. With JavaScript disabled, check its card and details render after
+   sign-in. Without a session, GET/HEAD requests to both mounted files and
+   `/bookmarks/<id>/logo` must return 401 even with `Accept: text/html`; configured
+   site favicons are private too. Check private/no-store and nosniff headers,
+   bodyless HEAD, unreferenced and escaping-symlink 404s, missing-file recovery,
+   atomic image replacement, and valid/invalid YAML reference reloads. Omit
+   `logo_path` to check the prepared logo remains usable. Verify the actual
+   container's procfs descriptor lookup as its non-root runtime user:
+
+   ```sh
+   docker compose exec directory-app node --input-type=module --eval \
+     "import {open,realpath} from 'node:fs/promises'; const f=await open('/app/config/directory.yaml'); try { await realpath('/proc/self/fd/'+f.fd); console.log('procfs descriptor lookup available'); } finally { await f.close(); }"
+   ```
+
+   Do not replace this owner-run image/mount check with a host-only Node result.
+
+6. In the normal HTTPS/proxy setup, verify redirects, Secure cookies, CSRF,
    configured OIDC callback and proxy throttling. Rotate the session secret and
    confirm old sessions stop working. Do not treat local HTTP smoke or a fake
    issuer as a verified external-provider deployment.

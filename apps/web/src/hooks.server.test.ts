@@ -2,6 +2,10 @@ import { validateConfig } from '@directory/config';
 import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Authentication } from './lib/server/auth/index.js';
+import { requireSignIn } from './lib/server/auth/access.js';
+import { readImage } from './lib/server/assets.js';
+import { GET as mountedImage } from './routes/public/[...file]/+server.js';
+import { GET as bookmarkLogo } from './routes/bookmarks/[id]/logo/+server.js';
 import type { Application } from './lib/server/lifecycle/application.js';
 import type { Directory } from './lib/server/config/load-directory.js';
 
@@ -25,6 +29,7 @@ vi.mock('$app/environment', () => ({
 		return mocks.dev;
 	}
 }));
+vi.mock('./lib/server/assets.js', () => ({ readImage: vi.fn() }));
 vi.mock('./lib/server/boot.js', () => ({ bootApp: mocks.boot }));
 vi.mock('./lib/server/logger.js', () => ({ reportStartupFailure: mocks.report }));
 vi.mock('@directory/config', async (importOriginal) => ({
@@ -44,9 +49,15 @@ function snapshot(title: string) {
 	return realSnapshot.prepareSnapshot(
 		validateConfig(
 			{
-				site: { title, description: `${title} description` },
+				site: { title, description: `${title} description`, favicon_path: '/public/site.svg' },
 				auth: { credentials: { username: 'family', password: sentinel } },
-				links: { photos: { title: 'Photos', url: 'https://photos.example.com' } }
+				links: {
+					photos: {
+						title: 'Photos',
+						url: 'https://photos.example.com',
+						logo_path: '/public/photo.svg'
+					}
+				}
 			},
 			{ env: {} }
 		)
@@ -64,6 +75,7 @@ function application(title: string, authentication?: Authentication) {
 			reload: vi.fn<Directory['reload']>(),
 			stop: vi.fn<Directory['stop']>()
 		},
+		publicDir: '/mounted/public',
 		authentication,
 		stop: vi.fn<Application['stop']>()
 	};
@@ -175,6 +187,7 @@ describe('server hooks', () => {
 					expect(event.locals.snapshot).toBe(
 						ready.directory.currentSnapshot.mock.results[0]?.value
 					);
+					expect(event.locals.publicDir).toBe(ready.publicDir);
 					expect(event.locals.authentication).toBe(authentication);
 					expect(event.locals.session).toBeNull();
 					return response;
@@ -198,6 +211,77 @@ describe('server hooks', () => {
 		}
 	);
 
+	it.each(['GET', 'HEAD'])(
+		'never reaches an image reader before authentication for %s, including the configured favicon',
+		async (method) => {
+			const session = vi.fn<App.Locals['auth']>().mockResolvedValue(null);
+			const authentication: Authentication = {
+				strategy: 'credentials',
+				handle: async (input) => {
+					input.event.locals.auth = session;
+					return requireSignIn(input, {
+						origin: 'https://directory.example',
+						strategy: 'credentials'
+					});
+				},
+				signIn: vi.fn<Authentication['signIn']>(),
+				signOut: vi.fn<Authentication['signOut']>()
+			};
+			const ready = application('Ready', authentication);
+			mocks.boot.mockResolvedValueOnce(ready);
+			const hooks = await import('./hooks.server.js');
+			await hooks.init();
+			const resolve = vi.fn<Resolve>().mockImplementation(async (event) => {
+				if (event.route.id === '/public/[...file]') {
+					return mountedImage(event as Parameters<typeof mountedImage>[0]);
+				}
+				return bookmarkLogo(event as Parameters<typeof bookmarkLogo>[0]);
+			});
+			for (const cookie of ['', 'authjs.session-token=invalid-session']) {
+				for (const [path, routeId, params] of [
+					['/public/photo.svg', '/public/[...file]', { file: 'photo.svg' }],
+					['/public/site.svg', '/public/[...file]', { file: 'site.svg' }],
+					['/%70ublic/photo.svg', '/public/[...file]', { file: 'photo.svg' }],
+					['/public/unknown.svg', '/public/[...file]', { file: 'unknown.svg' }],
+					['/bookmarks/photos/logo', '/bookmarks/[id]/logo', { id: 'photos' }],
+					['/%62ookmarks/photos/logo', '/bookmarks/[id]/logo', { id: 'photos' }]
+				] as const) {
+					const url = new URL(path, 'https://directory.example');
+					const request = {
+						url,
+						request: new Request(url, { method, headers: { accept: 'text/html', cookie } }),
+						route: { id: routeId },
+						params,
+						isDataRequest: false,
+						locals: {}
+					} as unknown as RequestEvent;
+					expect((await hooks.handle({ event: request, resolve })).status).toBe(401);
+					expect(request.locals.publicDir).toBe(ready.publicDir);
+				}
+			}
+			expect(session).toHaveBeenCalledTimes(12);
+			expect(resolve).not.toHaveBeenCalled();
+			expect(readImage).not.toHaveBeenCalled();
+
+			session.mockResolvedValue({ user: { name: 'Directory' }, expires: '2030-01-01' });
+			vi.mocked(readImage).mockResolvedValue({
+				bytes: new TextEncoder().encode('<svg/>'),
+				contentType: 'image/svg+xml'
+			});
+			const url = new URL('https://directory.example/public/photo.svg');
+			const authorized = {
+				url,
+				request: new Request(url, { method }),
+				route: { id: '/public/[...file]' },
+				params: { file: 'photo.svg' },
+				isDataRequest: false,
+				locals: {}
+			} as unknown as RequestEvent;
+			expect((await hooks.handle({ event: authorized, resolve })).status).toBe(200);
+			expect(readImage).toHaveBeenCalledExactlyOnceWith(ready.publicDir, '/public/photo.svg');
+		}
+	);
+
 	it('captures exactly once per request so nested loaders keep the original snapshot after publication', async () => {
 		const initial = snapshot('Initial');
 		const replacement = snapshot('Replacement');
@@ -207,18 +291,26 @@ describe('server hooks', () => {
 			reload: vi.fn<Directory['reload']>(),
 			stop: vi.fn()
 		};
-		const app = { directory, authentication: undefined, stop: vi.fn<Application['stop']>() };
+		const app = {
+			directory,
+			publicDir: '/mounted/public',
+			authentication: undefined,
+			stop: vi.fn<Application['stop']>()
+		};
 		mocks.boot.mockResolvedValueOnce(app);
 		const hooks = await import('./hooks.server.js');
 		await hooks.init();
+		const capturedPaths: string[] = [];
 		const resolve = vi.fn<Resolve>().mockImplementation(async (event) => {
 			const parent = async () => {
 				const captured = event.locals.snapshot;
+				capturedPaths.push(event.locals.publicDir);
 				published = replacement;
 				return captured.display.site.title;
 			};
 			const first = await parent();
 			const second = event.locals.snapshot.display.site.title;
+			capturedPaths.push(event.locals.publicDir);
 			return Response.json({ first, second });
 		});
 		const firstEvent = event();
@@ -234,11 +326,14 @@ describe('server hooks', () => {
 		expect(body).not.toContain(sentinel);
 		expect(body).not.toContain('configuration');
 		expect(body).not.toContain('auth');
+		expect(body).not.toContain(app.publicDir);
+		expect(capturedPaths).toEqual([app.publicDir, app.publicDir]);
 		const secondEvent = event();
 		const second = await hooks.handle({ event: secondEvent, resolve });
 		expect(directory.currentSnapshot).toHaveBeenCalledTimes(2);
 		expect(secondEvent.locals.snapshot).toBe(replacement);
 		expect(await second.json()).toEqual({ first: 'Replacement', second: 'Replacement' });
+		expect(capturedPaths).toEqual(Array<string>(4).fill(app.publicDir));
 		expect(mocks.boot).toHaveBeenCalledOnce();
 		expect(mocks.path).not.toHaveBeenCalled();
 		expect(mocks.load).not.toHaveBeenCalled();
