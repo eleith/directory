@@ -20,9 +20,13 @@
 		"test:e2e": "pnpm --filter @directory/web test:e2e",
 		"verify": "pnpm schema:check && pnpm build && pnpm check && pnpm lint && pnpm test:coverage && pnpm test:e2e",
 		"dev": "pnpm build:packages && pnpm --filter @directory/web dev",
-		"cli": "pnpm build:packages && pnpm --filter @directory/cli build && node apps/cli/dist/index.js"
+		"cli": "pnpm build:packages && pnpm --filter @directory/cli build && node apps/cli/dist/index.js",
+		"changeset": "changeset",
+		"version:apps": "changeset version",
+		"tag:apps": "changeset git-tag"
 	},
 	"devDependencies": {
+		"@changesets/cli": "catalog:",
 		"@eslint/js": "catalog:",
 		"eslint": "catalog:",
 		"eslint-config-prettier": "catalog:",

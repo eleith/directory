@@ -70,11 +70,20 @@ Package-scoped checks use frozen installs; shared-package and root-tooling
 changes trigger dependent pipelines. Web E2E reuses the matching Playwright
 images. `pnpm verify` remains a local all-workspace convenience, not a pipeline.
 Main builds publish Linux amd64 `latest` images to the confirmed Gitea and GHCR
-registries after web/E2E and schema/config/CLI gates. PRs do not publish. Versioned
-releases and automatic deployment remain later work.
+registries after web/E2E and schema/config/CLI gates. Qualified stable web tags
+publish versioned images after the same gates; PRs do not publish. Automatic
+deployment is not included.
 
 Each Woodpecker pipeline has one status-aware email step for main pushes, using `when`'s
 notification secret names. Confirm those bindings, publishing authorization and Gitea CI-image pull access
 on the actual provider; a Gitea PR does not itself trigger GitHub Actions. See
 [development](docs/development.md) for routing, safe secret setup, first-run
 checks, and scope limits.
+
+## Releases
+
+Changesets records app changes; the private web and CLI apps version together.
+Versioning, release commits and tag pushes are manual and require owner review
+and authorization. Only stable `@directory/web@<version>` tags publish versioned
+images; `latest` remains main-only. See the
+[release workflow](docs/development.md#manual-app-releases).

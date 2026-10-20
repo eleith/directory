@@ -143,6 +143,14 @@ Successful main builds publish `latest` to:
 - `git.eleith.com/eleith.private/directory:latest`
 - `ghcr.io/eleith/directory:latest`
 
+Manually authorized stable web tags publish versioned images to the same two
+repositories. For example, `@directory/web@1.2.3` creates `:1.2.3`, `:1.2` and
+`:1` aliases, never `:latest`. The tag must be a complete stable version with no
+leading zeroes and exactly match the web manifest; validation happens before
+registry login/publication. CLI tags do not publish another image. See the
+[manual release workflow](development.md#manual-app-releases) for Changesets,
+version review and separately authorized tag pushes.
+
 Image availability and registry read permissions are operator setup. Before the
 first successful publishing run, build locally as above. Afterwards, with `.env`
 and mounts already prepared:
@@ -154,13 +162,24 @@ docker compose up -d --no-build
 ```
 
 To choose GHCR, set `DIRECTORY_IMAGE=ghcr.io/eleith/directory:latest` in `.env`
-and authenticate there if required. Pulling does not apply an update until you
-recreate the container. There is no automatic homelab deployment, version/tag
-release workflow or separately published CLI image.
+and authenticate there if required. To select a published release instead, set
+`DIRECTORY_IMAGE=git.eleith.com/eleith.private/directory:1.2.3` (or the GHCR
+equivalent); use a real published version, not this illustrative value. Minor
+and major aliases move with releases; use a full version or digest for pinning.
+Pulling does not apply an update until you recreate the container. There is no
+automatic homelab deployment or separately published CLI image.
 
-Both providers keep PRs non-publishing. Main publication waits for web checks/E2E
-and explicit schema/config/CLI gates. The Docker build copies compiled output
-and pruned production dependencies into the non-root runtime image. Operator
+Both providers keep PRs non-publishing. Main and stable web-tag publication wait
+for web checks/E2E and explicit schema/config/CLI gates. On Woodpecker, authorize
+`gitea_docker_registry` server-side for `push` and `tag` events and the exact
+`woodpeckerci/plugin-docker-buildx:6.0.3` image, never PRs. There is no native
+branch filter for secrets; workflow conditions do not replace trusting push
+writers or stronger secret-backend policy. SMTP stays main-push-only, unchanged
+by release tags. Confirm provider permissions and actual runs as described in
+[development](development.md#main-and-release-image-publication).
+
+The Docker build copies compiled output and pruned production dependencies into
+the non-root runtime image. Operator
 YAML, secrets and mounted public files are excluded from the build context.
 The runtime contains no application source, build toolchain or browser installation.
 Final container behavior, mounts and image size are owner-run manual checks.

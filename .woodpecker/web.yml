@@ -8,6 +8,7 @@ when:
     path:
       include:
         - '*'
+        - .changeset/**
         - docs/**
         - .github/workflows/**
         - .woodpecker/**
@@ -17,11 +18,15 @@ when:
     path:
       include:
         - '*'
+        - .changeset/**
         - docs/**
         - .github/workflows/**
         - .woodpecker/**
         - apps/web/**
         - packages/**
+
+  - event: tag
+    ref: 'refs/tags/@directory/web@*'
 
 steps:
   prepare:
@@ -92,6 +97,31 @@ steps:
     when:
       - event: push
         branch: main
+      - event: tag
+        ref: 'refs/tags/@directory/web@*'
+
+  check-version-and-extract-tags:
+    image: node:26.5.0-bookworm
+    commands:
+      - |
+        node --input-type=module <<'NODE'
+        import { readFileSync, writeFileSync } from 'node:fs';
+
+        const tag = process.env.CI_COMMIT_TAG ?? '';
+        const match = /^@directory\/web@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$/.exec(tag);
+        if (!match || match[0] !== tag) {
+          throw new Error('Expected a stable @directory/web@<major>.<minor>.<patch> tag');
+        }
+        const version = JSON.parse(readFileSync('apps/web/package.json', 'utf8')).version;
+        if (match[1] !== version) {
+          throw new Error('Release tag must exactly match apps/web/package.json version');
+        }
+        const [major, minor] = version.split('.');
+        writeFileSync('.tags', [version, major + '.' + minor, major].join('\n') + '\n');
+        NODE
+    when:
+      - event: tag
+        ref: 'refs/tags/@directory/web@*'
 
   build-docker-main:
     image: woodpeckerci/plugin-docker-buildx:6.0.3
@@ -110,6 +140,23 @@ steps:
     when:
       - event: push
         branch: main
+
+  build-docker-tag:
+    image: woodpeckerci/plugin-docker-buildx:6.0.3
+    settings:
+      repo: git.eleith.com/eleith.private/directory
+      username: eleith
+      registry: https://git.eleith.com
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: prod
+      platforms: linux/amd64
+      tags_file: .tags
+      password:
+        from_secret: gitea_docker_registry
+    when:
+      - event: tag
+        ref: 'refs/tags/@directory/web@*'
 
   notify:
     image: deblan/woodpecker-email:3.3.0

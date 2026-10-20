@@ -12,8 +12,8 @@ configuration path, and captures one immutable snapshot per request. The shell
 shows configured site copy; dashboard links and image serving are still later
 work. Optional credentials or OIDC authentication gates the entire directory;
 no-auth mode stays open and requires no session secret. [Docker and Compose](deployment.md)
-provide dev/production containers and main-only image publication. Versioned
-releases remain later work.
+provide dev/production containers, main `latest` images and manually tagged
+stable releases.
 
 ## Toolchain
 
@@ -30,6 +30,7 @@ dependencies exactly, including:
 | Prettier / prettier-plugin-svelte | 3.8.3 / 3.5.2   |
 | Vitest / coverage-v8              | 4.1.7 / 4.1.7   |
 | Playwright                        | 1.61.1          |
+| Changesets CLI                    | 3.0.1           |
 
 Published peer ranges support this combination. `@types/node` 24.12.4 satisfies
 Vite/Vitest's peer ranges; it does not describe every Node 26 API. The base ESLint
@@ -257,6 +258,61 @@ ignore file, so formatting after a build/test run must not rewrite generated
 output. Build output, coverage, operator configuration, local plans, and
 prototypes remain outside formatting.
 
+## Manual app releases
+
+Directory follows When's thin Changesets CLI pattern, with no release bot,
+prerelease flow or automatic commit, tag push or deployment. The three root
+commands are `pnpm changeset`, `pnpm version:apps` and `pnpm tag:apps`; root
+quality commands still cover all workspaces, not just web.
+
+The fixed group contains only `@directory/web` and `@directory/cli`. Both are
+private, but `privatePackages.version` and `privatePackages.tag` are enabled so
+Changesets can version and tag them together. `commit: false` keeps commits
+manual; `baseBranch: main` is the comparison base. `@directory/config` is internal
+and ignored for independent versioning, **not ignored for release impact**:
+record behavior/schema changes in an explicit changeset for each affected
+consuming app. Its checks remain required. Tooling/docs-only setup needs no
+retroactive app changeset or version bump.
+
+1. With each feature or fix, run `pnpm changeset`. Select the affected app(s),
+   choose major/minor/patch by consumer impact and write a useful release note.
+   Review the generated `.changeset/*.md` with the feature. The fixed group
+   synchronizes app versions at release time, even for a web-only change.
+2. When preparing a release on reviewed main, inspect pending changesets with
+   `pnpm changeset status`, then manually run `pnpm version:apps`. This consumes
+   pending entries, updates app manifests and generates app changelogs. Review
+   the complete diff, including any lockfile changes, and verify the intended
+   versions and notes. Do not hand-bump versions or run this in CI.
+3. Run the frozen-install and all-workspace quality gates (`pnpm verify`), then
+   obtain owner review and explicit authorization before committing the release
+   manifests, changelogs, consumed changesets and any lockfile changes. Do not
+   mix unrelated working changes into the release commit.
+4. Only after the release commit is approved, and tagging is explicitly
+   authorized, run `pnpm tag:apps`. It creates local qualified tags such as
+   `@directory/web@1.2.3` and `@directory/cli@1.2.3`; it does not push them.
+   Inspect tags and their target commit. Push the approved release commit and
+   only the intended release tags when separately authorized; do not blindly
+   push every local tag.
+5. Inspect both providers' runs and registry outputs. Only the qualified web tag
+   publishes the web image; the accompanying CLI tag must not publish a second
+   image. There is no npm publication or separately published CLI image.
+
+The publisher accepts only stable `@directory/web@<major>.<minor>.<patch>` tags
+with no leading zeroes, matching `apps/web/package.json` exactly. Partial,
+prerelease, build-metadata, malformed and mismatched tags are rejected before
+registry login/publication. After web checks/E2E and schema/config/CLI gates,
+`@directory/web@1.2.3` publishes `1.2.3`, `1.2` and `1` image aliases to both
+`git.eleith.com/eleith.private/directory` and `ghcr.io/eleith/directory`. Tags
+never move `latest`; only successful main pushes do. Minor/major aliases move
+when a release is published; select a full version or digest for deployment
+pinning. See [published images](deployment.md#published-production-images).
+
+Rehearse authoring, versioning and tagging only in an independent disposable Git
+repository, never the working repository or a worktree that shares its refs.
+Before a real release, check private-app lockstep, ignored-config app impact,
+consumed notes/changelogs and qualified tags there. Hosted publication and
+registry authorization still require actual authorized provider runs.
+
 ## Continuous integration
 
 Each provider has separate `config.yml`, `cli.yml`, and `web.yml` pipelines,
@@ -276,12 +332,16 @@ Path filters include dependencies and shared tooling, not just app directories:
 - `packages/config/**` and the shared `apps/web/config/directory.example.yml` run
   config, CLI, and web checks.
 - `apps/cli/**` or `apps/web/**` selects that application's pipeline.
-- Root files (`'*'`, including dotfiles), `docs/**`, and both workflow directories
-  run all three. This covers the lockfile, catalog, package manager/Node pins,
-  base TypeScript, ESLint/Prettier settings, docs, and workflow changes.
+- Root files (`'*'`, including dotfiles), `.changeset/**`, `docs/**`, and both
+  workflow directories run all three. This covers the lockfile, catalog,
+  package manager/Node pins, base TypeScript, ESLint/Prettier settings, docs, and
+  workflow changes.
 
-Both providers check main pushes and pull requests. Keep these filters and the
-package gates current when adding shared tools or commands.
+Both providers check main pushes and pull requests. The web pipeline also
+selects qualified web-tag candidates and runs all workspace gates before image
+publication, even when the other package pipelines do not select tag events.
+Keep these filters and the package gates current when adding shared tools or
+commands.
 
 - GitHub Actions uses `ubuntu-24.04`, Node 26.5.0, pnpm from the `packageManager`
   pin, and a pnpm store cache. Job names are distinct: `Config checks`, `CLI
@@ -308,15 +368,17 @@ using another toolchain. Local development still needs its own matching browser
 installation as described above.
 
 These workflows do not inject operator YAML/application credentials, write package
-versions or deploy. Release/tag jobs remain deferred. PR jobs retain `contents: read`;
-the public GHCR browser image requires no registry login. The Woodpecker runner
+versions or deploy. Release versioning and tag pushes remain manual. PR jobs
+retain `contents: read`; the public GHCR browser image requires no registry
+login. The Woodpecker runner
 needs pull access to the existing Gitea CI image, as for `when`. Configure read
 access at the CI platform, not by exposing publishing credentials to application
 commands or pull requests.
 
-### Main image publication
+### Main and release image publication
 
-Main pushes add image publication only after web checks and production E2E.
+Main pushes and validated stable web tags add image publication only after web
+checks and production E2E.
 Both providers also run explicit schema/config/CLI gates before publishing, so
 parallel package pipelines cannot allow a failing dependency check to be bypassed.
 The Docker build copies pruned production dependencies and compiled output into
@@ -325,23 +387,29 @@ the non-root image. It needs no operator YAML or auth secret at build time. See
 bind-mount and image-size checks.
 
 - Woodpecker uses `woodpeckerci/plugin-docker-buildx:6.0.3` to publish
-  `git.eleith.com/eleith.private/directory:latest`, matching When's plugin,
-  registry and `gitea_docker_registry` secret. Allow this plugin in the runner's
-  privileged-plugin configuration. Restrict the secret **server-side** to `push`
-  events and this exact plugin; no PR access, including higher-priority secret
-  overrides. Woodpecker has no native branch filter for secrets: main-only is a
-  workflow condition, not a credential boundary. Trust everyone who can push
-  workflow changes, or enforce stronger policy through your secret backend.
+  `git.eleith.com/eleith.private/directory`, matching When's plugin, registry and
+  `gitea_docker_registry` secret. Main publishes `latest`; stable web tags use
+  the validated `.tags` file for full/minor/major aliases. Allow this plugin in
+  the runner's privileged-plugin configuration. Restrict the secret
+  **server-side** to `push` and `tag` events and this exact plugin; no PR access,
+  including higher-priority secret overrides. Woodpecker has no native branch
+  filter for secrets: workflow branch/tag conditions are not a credential
+  boundary. Trust everyone who can push workflow changes, or enforce stronger
+  policy through your secret backend.
   Registry credentials belong only in plugin settings, never application commands
   or build arguments.
 - GitHub's `Publish web image` job depends on checks/E2E and runs only for main
-  pushes. Only that job receives `packages: write`; it authenticates to GHCR with
-  `GITHUB_TOKEN` and publishes `ghcr.io/eleith/directory:latest`. Confirm the
-  repository/package link and write authorization at the provider. Normal PR
+  pushes or qualified stable web tags. Only that job receives `packages: write`;
+  it authenticates to GHCR with `GITHUB_TOKEN` and publishes
+  `ghcr.io/eleith/directory`. `docker/metadata-action@v6` disables automatic
+  `latest`, selecting it explicitly for main and full/minor/major aliases for
+  validated web tags. Confirm the repository/package link and write
+  authorization at the provider. Normal PR
   jobs do not run registry login or receive publication credentials.
 
-Both publish the `prod` target for `linux/amd64`, with `latest` only. Registry
-availability, token scope and runner capability must be confirmed on the real
+Both publish the `prod` target for `linux/amd64`. CLI tags do not publish images;
+release tags never update main's `latest`. Registry availability, token scope
+and runner capability must be confirmed on the real
 providers; static validation is not a successful image build or publication.
 
 ### Woodpecker email notifications
@@ -378,8 +446,9 @@ package check. Distinct job names avoid ambiguous statuses but do not solve that
 provider policy issue.
 
 Schema generation, YAML loading, CLI validation and Compose commands are available.
-Versioned release commands remain deferred. Docker execution and final image checks,
-axe and PageSpeed remain owner-run manual checks, not agent-verified gates.
+Release commands are manual as described above. Docker execution and final
+image checks, axe and PageSpeed remain owner-run manual checks, not
+agent-verified gates.
 
 ## Manual checks
 

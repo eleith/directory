@@ -3,8 +3,10 @@ name: CI (Web App)
 on:
   push:
     branches: [main]
+    tags: ['@directory/web@*']
     paths:
       - '*'
+      - .changeset/**
       - docs/**
       - .github/workflows/**
       - .woodpecker/**
@@ -13,6 +15,7 @@ on:
   pull_request:
     paths:
       - '*'
+      - .changeset/**
       - docs/**
       - .github/workflows/**
       - .woodpecker/**
@@ -74,7 +77,7 @@ jobs:
 
   build-push:
     name: Publish web image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/@directory/web@'))
     needs: [check, e2e]
     runs-on: ubuntu-24.04
     permissions:
@@ -107,6 +110,33 @@ jobs:
           pnpm --filter @directory/cli check
           pnpm --filter @directory/cli lint
           pnpm --filter @directory/cli test:coverage
+      - name: Check release version
+        if: github.ref_type == 'tag'
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const tag = process.env.GITHUB_REF_NAME ?? '';
+          const match = /^@directory\/web@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$/.exec(tag);
+          if (!match || match[0] !== tag) {
+            throw new Error('Expected a stable @directory/web@<major>.<minor>.<patch> tag');
+          }
+          const version = JSON.parse(readFileSync('apps/web/package.json', 'utf8')).version;
+          if (match[1] !== version) {
+            throw new Error('Release tag must exactly match apps/web/package.json version');
+          }
+          NODE
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/eleith/directory
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=match,pattern=^@directory/web@(\d+\.\d+\.\d+)$,group=1
+            type=match,pattern=^@directory/web@(\d+\.\d+)\.\d+$,group=1
+            type=match,pattern=^@directory/web@(\d+)\.\d+\.\d+$,group=1
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
@@ -121,4 +151,5 @@ jobs:
           target: prod
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/eleith/directory:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

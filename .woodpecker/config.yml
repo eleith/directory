@@ -8,6 +8,7 @@ when:
     path:
       include:
         - '*'
+        - .changeset/**
         - docs/**
         - .github/workflows/**
         - .woodpecker/**
@@ -17,6 +18,7 @@ when:
     path:
       include:
         - '*'
+        - .changeset/**
         - docs/**
         - .github/workflows/**
         - .woodpecker/**

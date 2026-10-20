@@ -1,6 +1,8 @@
 .git
 .github
 .woodpecker
+.changeset
+.tags
 .plans
 .nono.json
 **/node_modules
