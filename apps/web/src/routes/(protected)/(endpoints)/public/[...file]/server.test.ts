@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readImage } from '../../../lib/server/assets.js';
+import { readImage } from '../../../../../lib/server/assets.js';
 import { GET, HEAD } from './+server.js';
 
-vi.mock('../../../lib/server/assets.js', () => ({ readImage: vi.fn() }));
+vi.mock('../../../../../lib/server/assets.js', () => ({ readImage: vi.fn() }));
 
 const publicDir = '/mounted/private-images';
 const image = { bytes: new TextEncoder().encode('<svg/>'), contentType: 'image/svg+xml' };

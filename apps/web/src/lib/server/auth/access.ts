@@ -60,15 +60,19 @@ export async function requireSignIn(
 	policy: AccessPolicy
 ): Promise<Response> {
 	event.locals.session = null;
-	if (isPublicResource(event)) return resolve(event);
+	const routeId = event.route.id ?? '';
+	const publicRoute = routeId === '/(public)' || routeId.startsWith('/(public)/');
+	if (publicRoute) return resolve(event);
 	try {
 		event.locals.session = await event.locals.auth();
 	} catch {
 		logger.error('Authentication session failed (auth_session_failed).');
 		return denied(401);
 	}
-	if (event.locals.session?.user || isSignInPage(event)) return resolve(event);
-	if (!isPrivateImage(event) && isHtmlNavigation(event)) {
+	if (event.locals.session?.user) return resolve(event);
+	const endpoint =
+		routeId === '/(protected)/(endpoints)' || routeId.startsWith('/(protected)/(endpoints)/');
+	if (!endpoint && isHtmlNavigation(event)) {
 		const callbackUrl = localRedirect(event.url.pathname + event.url.search, policy.origin);
 		return new Response(null, {
 			status: 303,
@@ -93,24 +97,6 @@ function isOidcCallback(event: RequestEvent, policy: AccessPolicy): boolean {
 		!event.isDataRequest &&
 		event.url.pathname === '/auth/callback/oidc'
 	);
-}
-
-function isSignInPage(event: RequestEvent): boolean {
-	return event.url.pathname === '/signin' && ['GET', 'POST'].includes(event.request.method);
-}
-
-function isPublicResource(event: RequestEvent): boolean {
-	if (!['GET', 'HEAD'].includes(event.request.method)) return false;
-	const path = event.url.pathname;
-	return path === '/healthz' || path === '/favicon.svg' || path.startsWith('/_app/immutable/');
-}
-
-function isPrivateImage(event: RequestEvent): boolean {
-	if (event.route.id === '/public/[...file]' || event.route.id === '/bookmarks/[id]/logo') {
-		return true;
-	}
-	const path = event.url.pathname;
-	return path === '/public' || path.startsWith('/public/');
 }
 
 function isHtmlNavigation(event: RequestEvent): boolean {

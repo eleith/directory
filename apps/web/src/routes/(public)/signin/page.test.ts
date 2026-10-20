@@ -1,8 +1,11 @@
 import { validateConfig } from '@directory/config';
 import { describe, expect, it, vi } from 'vitest';
-import type { Authentication } from '../../lib/server/auth/index.js';
-import { prepareSnapshot } from '../../lib/server/config/snapshot.js';
+import type { Authentication } from '../../../lib/server/auth/index.js';
+import { prepareSnapshot } from '../../../lib/server/config/snapshot.js';
+import { logger } from '../../../lib/server/logger.js';
 import { actions, load } from './+page.server.js';
+
+vi.mock('../../../lib/server/logger.js', () => ({ logger: { error: vi.fn() } }));
 
 function eventFor(query = '', strategy: Authentication['strategy'] = 'credentials') {
 	const snapshot = prepareSnapshot(
@@ -43,8 +46,9 @@ describe('sign-in page', () => {
 	it.each(['credentials', 'oidc'] as const)(
 		'exposes only the public sign-in fields for %s',
 		async (strategy) => {
-			const { event } = eventFor('?callbackUrl=%2F%3Flink%3Dphotos', strategy);
+			const { event, auth } = eventFor('?callbackUrl=%2F%3Flink%3Dphotos', strategy);
 			const data = await load(event);
+			expect(auth).toHaveBeenCalledOnce();
 			expect(data).toEqual({
 				title: 'Home Server',
 				strategy,
@@ -122,7 +126,14 @@ describe('sign-in page', () => {
 		const { event, auth } = eventFor();
 		const failure = new Error('PRIVATE_SESSION_FAILURE');
 		auth.mockRejectedValue(failure);
-		await expect(load(event)).rejects.toBe(failure);
+		await expect(load(event)).rejects.toMatchObject({
+			status: 401,
+			body: { message: 'Access denied' }
+		});
+		expect(auth).toHaveBeenCalledOnce();
+		expect(vi.mocked(logger.error).mock.calls).toEqual([
+			['Authentication session failed (auth_session_failed).']
+		]);
 	});
 });
 

@@ -38,7 +38,7 @@ function expectLocalLocation(response: Response, server: TestServer): URL {
 }
 
 async function expectUnauthorized(response: Response) {
-	expect(response.status).toBe(401);
+	expect(response.status, response.url).toBe(401);
 	expect(response.headers.get('cache-control')).toContain('no-store');
 	expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 	expectPublic(await response.text());
@@ -130,7 +130,10 @@ test('enabled authentication gates HTML, actual Kit data, HEAD, unknown routes a
 			'/',
 			'/__data.json?x-sveltekit-invalidated=11',
 			'/unknown',
-			'/public/private.svg'
+			'/public/private.svg',
+			'/healthz/extra',
+			'/signin/extra',
+			'/favicon-missing.svg'
 		]) {
 			await expectUnauthorized(
 				await server.fetch(pathname, { headers: { accept: 'application/json' } })
@@ -169,9 +172,65 @@ test('enabled authentication gates HTML, actual Kit data, HEAD, unknown routes a
 		const headHealth = await server.fetch('/healthz', { method: 'HEAD' });
 		expect(headHealth.status).toBe(200);
 		expect(await headHealth.text()).toBe('');
-		const favicon = await server.fetch('/favicon.svg');
-		expect(favicon.status).toBe(200);
-		expect(favicon.headers.get('content-type')).toContain('image/svg+xml');
+		const scriptPath = html.match(/_app\/immutable\/[^"'\s]+\.js/)?.[0];
+		expect(scriptPath).toBeDefined();
+		for (const method of ['GET', 'HEAD']) {
+			for (const [path, contentType] of [
+				['/favicon.svg', 'image/svg+xml'],
+				[`/${scriptPath!}`, 'javascript']
+			] as const) {
+				const asset = await server.fetch(path, { method });
+				expect(asset.status).toBe(200);
+				expect(asset.headers.get('content-type')).toContain(contentType);
+				const body = await asset.text();
+				if (method === 'HEAD') expect(body).toBe('');
+				else expect(body.length).toBeGreaterThan(0);
+				expectPublic(body);
+			}
+		}
+		const missingScript = await server.fetch('/_app/immutable/missing.js');
+		expect(missingScript.status).toBe(404);
+		expectPublic(await missingScript.text());
+		expectSafeLogs(server);
+	} finally {
+		expect(await server.stop()).toEqual({ code: 0, signal: null });
+	}
+});
+
+test('native routes reject unsupported verbs instead of serving public or private content', async () => {
+	const server = await startServer({ configuration: configuration() });
+	try {
+		await server.ready();
+		for (const path of ['/signin', '/healthz']) {
+			for (const method of ['PUT', 'PATCH', 'DELETE']) {
+				const response = await server.fetch(path, {
+					method,
+					headers: { origin: server.origin }
+				});
+				expect(response.status).toBe(405);
+				expectPublic(await response.text());
+			}
+		}
+		const healthPost = await server.fetch('/healthz', {
+			method: 'POST',
+			headers: { origin: server.origin }
+		});
+		expect(healthPost.status).toBe(405);
+		expectPublic(await healthPost.text());
+
+		const cookie = sessionCookie(await postCredentials(server)).pair;
+		for (const path of ['/', '/public/private.svg', '/bookmarks/photos/logo']) {
+			for (const method of ['PUT', 'PATCH', 'DELETE']) {
+				for (const session of ['', cookie]) {
+					const response = await server.fetch(path, {
+						method,
+						headers: { origin: server.origin, cookie: session }
+					});
+					expect(response.status).toBe(session ? 405 : 401);
+					expectPublic(await response.text());
+				}
+			}
+		}
 		expectSafeLogs(server);
 	} finally {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });

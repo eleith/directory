@@ -1,5 +1,6 @@
-import { redirect } from '@sveltejs/kit';
-import { localRedirect } from '../../lib/server/auth/redirect.js';
+import { error as httpError, redirect } from '@sveltejs/kit';
+import { localRedirect } from '../../../lib/server/auth/redirect.js';
+import { logger } from '../../../lib/server/logger.js';
 import type { Actions, PageServerLoad } from './$types.js';
 
 export const load = (async ({ locals, url }) => {
@@ -7,7 +8,10 @@ export const load = (async ({ locals, url }) => {
 	if (!authentication) redirect(303, '/');
 
 	const callbackUrl = localRedirect(url.searchParams.get('callbackUrl'), url.origin);
-	const session = await locals.auth();
+	const session = await locals.auth().catch(() => {
+		logger.error('Authentication session failed (auth_session_failed).');
+		httpError(401, 'Access denied');
+	});
 	if (session?.user) redirect(303, callbackUrl);
 
 	const rawError = url.searchParams.get('error');

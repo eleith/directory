@@ -44,7 +44,7 @@ comment to the artifact's real location. The package also exports
 
 For the separate populated, authenticated local review fixture and its image
 setup, use [demo/README.md](../demo/README.md). The isolated `demo/` directory is
-excluded from builds, not tests. It is never selected automatically at runtime.
+manual-only and excluded from builds and automated checks. It is never selected automatically at runtime.
 Native preview can use it directly without changing operator files; Docker
 review requires a deliberate manual copy. Back up existing active configuration
 before replacing it. Auth changes require a process restart, not the config poll.

@@ -1,5 +1,5 @@
-import { readImage } from '../../../lib/server/assets.js';
-import { imageResponse } from '../../../lib/server/image-response.js';
+import { readImage } from '../../../../../lib/server/assets.js';
+import { imageResponse } from '../../../../../lib/server/image-response.js';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals, params, request }) => {

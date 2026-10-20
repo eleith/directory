@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import type { Authentication } from './lib/server/auth/index.js';
 import { requireSignIn } from './lib/server/auth/access.js';
 import { readImage } from './lib/server/assets.js';
-import { GET as mountedImage } from './routes/public/[...file]/+server.js';
-import { GET as bookmarkLogo } from './routes/bookmarks/[id]/logo/+server.js';
+import { GET as mountedImage } from './routes/(protected)/(endpoints)/public/[...file]/+server.js';
+import { GET as bookmarkLogo } from './routes/(protected)/(endpoints)/bookmarks/[id]/logo/+server.js';
 import type { Application } from './lib/server/lifecycle/application.js';
 import type { Directory } from './lib/server/config/load-directory.js';
 
@@ -232,19 +232,35 @@ describe('server hooks', () => {
 			const hooks = await import('./hooks.server.js');
 			await hooks.init();
 			const resolve = vi.fn<Resolve>().mockImplementation(async (event) => {
-				if (event.route.id === '/public/[...file]') {
+				if (event.route.id === '/(protected)/(endpoints)/public/[...file]') {
 					return mountedImage(event as Parameters<typeof mountedImage>[0]);
 				}
 				return bookmarkLogo(event as Parameters<typeof bookmarkLogo>[0]);
 			});
 			for (const cookie of ['', 'authjs.session-token=invalid-session']) {
 				for (const [path, routeId, params] of [
-					['/public/photo.svg', '/public/[...file]', { file: 'photo.svg' }],
-					['/public/site.svg', '/public/[...file]', { file: 'site.svg' }],
-					['/%70ublic/photo.svg', '/public/[...file]', { file: 'photo.svg' }],
-					['/public/unknown.svg', '/public/[...file]', { file: 'unknown.svg' }],
-					['/bookmarks/photos/logo', '/bookmarks/[id]/logo', { id: 'photos' }],
-					['/%62ookmarks/photos/logo', '/bookmarks/[id]/logo', { id: 'photos' }]
+					['/public/photo.svg', '/(protected)/(endpoints)/public/[...file]', { file: 'photo.svg' }],
+					['/public/site.svg', '/(protected)/(endpoints)/public/[...file]', { file: 'site.svg' }],
+					[
+						'/%70ublic/photo.svg',
+						'/(protected)/(endpoints)/public/[...file]',
+						{ file: 'photo.svg' }
+					],
+					[
+						'/public/unknown.svg',
+						'/(protected)/(endpoints)/public/[...file]',
+						{ file: 'unknown.svg' }
+					],
+					[
+						'/bookmarks/photos/logo',
+						'/(protected)/(endpoints)/bookmarks/[id]/logo',
+						{ id: 'photos' }
+					],
+					[
+						'/%62ookmarks/photos/logo',
+						'/(protected)/(endpoints)/bookmarks/[id]/logo',
+						{ id: 'photos' }
+					]
 				] as const) {
 					const url = new URL(path, 'https://directory.example');
 					const request = {
@@ -272,7 +288,7 @@ describe('server hooks', () => {
 			const authorized = {
 				url,
 				request: new Request(url, { method }),
-				route: { id: '/public/[...file]' },
+				route: { id: '/(protected)/(endpoints)/public/[...file]' },
 				params: { file: 'photo.svg' },
 				isDataRequest: false,
 				locals: {}

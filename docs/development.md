@@ -257,6 +257,33 @@ then runs Auth.js and the whole-directory access checks. Only a signed-in boolea
 added to the directory page data; sessions, provider configuration and Auth.js handles
 remain server-side.
 
+Route folders declare access ownership; SvelteKit groups do not change URLs:
+
+```text
+routes/
+  +layout.svelte
+  (public)/
+    signin/
+    healthz/
+  (protected)/
+    +page.server.ts
+    +page.svelte
+    (endpoints)/
+      bookmarks/[id]/logo/
+      public/[...file]/
+```
+
+With authentication enabled, the hook bypasses the session gate only for matched
+`(public)` route IDs. All other application routes, including unmatched requests,
+require a session by default. Anonymous HTML GET page navigation redirects to
+sign-in; data, HEAD and non-navigation requests return 401. The nested `(endpoints)`
+group always returns 401 to anonymous requests, even with HTML Accept, and is also
+where future private APIs belong. Route handlers and Kit reject unsupported verbs;
+public ownership does not permit arbitrary writes. Configured image references do
+not create access exceptions. Bundled static files are served by adapter-node or
+Vite before application hooks, not by a public URL-prefix rule in the gate.
+No-auth mode, origin/CSRF checks and the native Auth.js sequence are unchanged.
+
 Sign-in uses native SvelteKit form actions, as in When, with a server-selected
 provider and an allowlist of submitted fields. Return URLs are reduced to safe
 local paths. Sign-out is the root page's named POST action. Login forms work

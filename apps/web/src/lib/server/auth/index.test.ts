@@ -47,7 +47,13 @@ const snapshot = prepareSnapshot(
 
 function eventFor(
 	path = '/',
-	options: { method?: string; headers?: HeadersInit; body?: BodyInit; data?: boolean } = {}
+	options: {
+		method?: string;
+		headers?: HeadersInit;
+		body?: BodyInit;
+		data?: boolean;
+		routeId?: RequestEvent['route']['id'];
+	} = {}
 ): RequestEvent {
 	const method = options.method ?? 'GET';
 	const headers = new Headers({ accept: 'text/html', ...options.headers });
@@ -56,15 +62,17 @@ function eventFor(
 		headers,
 		...(options.body === undefined ? {} : { body: options.body })
 	});
+	const pathname = new URL(request.url).pathname;
+	let routeId: RequestEvent['route']['id'] = null;
+	if (pathname === '/' || pathname === '/__data.json') routeId = '/(protected)';
+	if (pathname === '/signin') routeId = '/(public)/signin';
+	if (pathname === '/healthz') routeId = '/(public)/healthz';
+	if (options.routeId !== undefined) routeId = options.routeId;
 	return {
 		url: new URL(request.url),
 		request,
 		locals: { snapshot, publicDir: '/mounted/public' },
-		route: {
-			id: /^\/bookmarks\/[^/]+\/logo$/.test(new URL(request.url).pathname)
-				? '/bookmarks/[id]/logo'
-				: null
-		},
+		route: { id: routeId },
 		isDataRequest: options.data ?? false,
 		cookies: { set: vi.fn(), get: vi.fn() }
 	} as unknown as RequestEvent;
@@ -114,7 +122,9 @@ beforeEach(() => {
 describe('bookmark logo API access', () => {
 	it.each(['GET', 'HEAD'])('requires a session for %s even with HTML Accept', async (method) => {
 		for (const path of ['/bookmarks/photos/logo', '/bookmarks/missing/logo']) {
-			const response = await responseFor(eventFor(path, { method }));
+			const response = await responseFor(
+				eventFor(path, { method, routeId: '/(protected)/(endpoints)/bookmarks/[id]/logo' })
+			);
 			expect(response.status).toBe(401);
 			expect(response.headers.get('cache-control')).toBe('private, no-store');
 			expect(response.headers.get('x-content-type-options')).toBe('nosniff');
@@ -131,7 +141,7 @@ describe('bookmark logo API access', () => {
 				'/bookmarks/photos/%6cogo'
 			]) {
 				const event = eventFor(path, { method });
-				event.route.id = '/bookmarks/[id]/logo';
+				event.route.id = '/(protected)/(endpoints)/bookmarks/[id]/logo';
 				expect((await responseFor(event)).status).toBe(401);
 				expect(mocks.resolve).not.toHaveBeenCalled();
 			}
@@ -140,7 +150,10 @@ describe('bookmark logo API access', () => {
 
 	it('lets an authenticated request reach the prepared SVG route', async () => {
 		mocks.session.mockResolvedValueOnce(signedIn);
-		expect((await responseFor(eventFor('/bookmarks/photos/logo'))).status).toBe(200);
+		const event = eventFor('/bookmarks/photos/logo', {
+			routeId: '/(protected)/(endpoints)/bookmarks/[id]/logo'
+		});
+		expect((await responseFor(event)).status).toBe(200);
 		expect(mocks.resolve).toHaveBeenCalledOnce();
 	});
 });
@@ -158,7 +171,9 @@ describe('mounted image access', () => {
 				'/public',
 				'/public/'
 			]) {
-				const response = await responseFor(eventFor(path, { method }));
+				const response = await responseFor(
+					eventFor(path, { method, routeId: '/(protected)/(endpoints)/public/[...file]' })
+				);
 				expect(response.status).toBe(401);
 				expect(response.headers.has('location')).toBe(false);
 				expect(response.headers.get('cache-control')).toBe('private, no-store');
@@ -173,7 +188,7 @@ describe('mounted image access', () => {
 		async (method) => {
 			for (const path of ['/%70ublic/site.svg', '/public/site%2Esvg', '/public/caf%C3%A9.svg']) {
 				const event = eventFor(path, { method });
-				event.route.id = '/public/[...file]';
+				event.route.id = '/(protected)/(endpoints)/public/[...file]';
 				expect((await responseFor(event)).status).toBe(401);
 			}
 			expect(mocks.resolve).not.toHaveBeenCalled();
@@ -185,7 +200,7 @@ describe('mounted image access', () => {
 		async (path) => {
 			mocks.session.mockResolvedValueOnce(signedIn);
 			const event = eventFor(path);
-			event.route.id = '/public/[...file]';
+			event.route.id = '/(protected)/(endpoints)/public/[...file]';
 			expect((await responseFor(event)).status).toBe(200);
 			expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith(event);
 		}
@@ -238,6 +253,47 @@ describe('boot factory', () => {
 
 describe('whole-directory gate', () => {
 	it.each([
+		['/(public)/future', 200],
+		['/(public)', 200],
+		['/(publicity)/future', 303],
+		['/(public)-other/future', 303],
+		['/(protected)', 303],
+		['/(protected)/future', 303],
+		['/(protected)/(endpoints)/future', 401],
+		['/(protected)/(endpoints)', 401],
+		['/(protected)/(endpoints-other)/future', 303],
+		['/(other)/future', 303],
+		[null, 303]
+	] as const)('uses route-group boundaries, not URL ownership: %s', async (routeId, status) => {
+		const response = await responseFor(
+			eventFor('/future', { routeId: routeId as RequestEvent['route']['id'] })
+		);
+		expect(response.status).toBe(status);
+		if (status === 200) {
+			expect(mocks.session).not.toHaveBeenCalled();
+			expect(mocks.resolve).toHaveBeenCalledOnce();
+		} else {
+			expect(mocks.session).toHaveBeenCalledOnce();
+			expect(mocks.resolve).not.toHaveBeenCalled();
+		}
+	});
+
+	it.each(['/signin', '/healthz', '/favicon.svg', '/_app/immutable/missing.js'])(
+		'does not make unresolved URLs public: %s',
+		async (path) => {
+			const response = await responseFor(
+				eventFor(path, {
+					routeId: null,
+					headers: { accept: 'application/json' }
+				})
+			);
+			expect(response.status).toBe(401);
+			expect(mocks.resolve).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each([
+		['/', '/signin?callbackUrl=%2F'],
 		['/private?tag=1', '/signin?callbackUrl=%2Fprivate%3Ftag%3D1'],
 		['/bookmarks', '/signin?callbackUrl=%2Fbookmarks'],
 		['/bookmarks/photos', '/signin?callbackUrl=%2Fbookmarks%2Fphotos'],
@@ -288,13 +344,12 @@ describe('whole-directory gate', () => {
 		['/signin', 'GET', true],
 		['/signin', 'POST', false],
 		['/healthz', 'GET', false],
-		['/healthz', 'HEAD', false],
-		['/favicon.svg', 'GET', false],
-		['/_app/immutable/assets/app.hash.css', 'GET', false]
-	])('allows only documented public resources: %s %s', async (path, method, data) => {
+		['/healthz', 'HEAD', false]
+	])('lets public routes handle their requests: %s %s', async (path, method, data) => {
 		const response = await responseFor(eventFor(path, { method, data, headers: { origin } }));
 		expect(response.status).toBe(200);
 		expect(mocks.resolve).toHaveBeenCalledOnce();
+		expect(mocks.session).not.toHaveBeenCalled();
 	});
 
 	it.each([
@@ -357,9 +412,9 @@ describe('whole-directory gate', () => {
 		expect(mocks.resolve).not.toHaveBeenCalled();
 	});
 
-	it('denies session errors even on the sign-in page, without logging causes', async () => {
+	it('denies protected-route session errors without logging causes', async () => {
 		mocks.session.mockRejectedValue(new Error('token sentinel'));
-		const response = await responseFor(eventFor('/signin'));
+		const response = await responseFor(eventFor('/'));
 		expect(response.status).toBe(401);
 		expect(mocks.resolve).not.toHaveBeenCalled();
 		expect(mocks.logError).toHaveBeenCalledWith(
