@@ -6,6 +6,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const serverModule = new URL('../../../build/index.js', import.meta.url).href;
 const sentinel = 'PRIVATE_CONFIG_CREDENTIAL_LINK';
+const bookmarkTitle = 'Visible household bookmark';
 const credentialsConfiguration = `links: {}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`;
 
 function source(title: string): string {
@@ -15,8 +16,8 @@ site:
   description: ${title} description
 links:
   private-service:
-    title: ${sentinel}
-    url: https://service.example.com/${sentinel}
+    title: ${bookmarkTitle}
+    url: https://service.example.com/household
 `;
 }
 
@@ -92,8 +93,9 @@ async function expectPage(origin: string, title: string): Promise<void> {
 	const response = await fetch(origin, { headers: { connection: 'close' } });
 	expect(response.status).toBe(200);
 	const html = await response.text();
-	expect(html).toContain(`${title} — Homelab dashboard`);
+	expect(html).toContain(`<title>${title}</title>`);
 	expect(html).toContain(`${title} description`);
+	expect(html).toContain(bookmarkTitle);
 	expect(html).not.toContain(sentinel);
 }
 

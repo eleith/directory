@@ -9,8 +9,9 @@ credentials remain required.
 The shared loader and `directory validate` now read YAML, apply defaults, expand
 environment values and validate the result. The web server loads a complete
 immutable snapshot before serving, captures it once per request, and polls the
-configuration path for changes. The shell renders configured site copy; dashboard
-links and images are not served yet. Omit auth for open access, or configure shared
+configuration path for changes. Groups and bookmark titles render immediately,
+with plain `?link=<id>` details and external service links. Image rendering remains
+later work. Omit auth for open access, or configure shared
 credentials or OIDC to protect the whole directory. Enabled authentication requires
 `AUTH_SECRET` and matching `ORIGIN`/`AUTH_URL` before the web server can start.
 
@@ -190,8 +191,8 @@ The three booleans are **informational service hints only** and default to false
 
 False means no advisory badge, not a verified claim about the service. All
 visitors authorized to open Directory still see the same links. These flags neither
-hide links nor change the directory's actual `auth` strategy. Prepared grouping
-and ordering are implemented; rendering, badges and search remain later work.
+hide links nor change the directory's actual `auth` strategy. Grouping,
+ordering and informational detail labels are rendered; search remains later work.
 All advisory flag combinations preserve the same link inclusion.
 
 ## Authentication shapes

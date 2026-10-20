@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import {
+	clientId,
 	clientSecret,
 	configuration,
 	credentialsAuth,
@@ -622,7 +623,16 @@ test('real OIDC discovery and browser roundtrip use PKCE, state and nonce and th
 		expect(payload).toContain(privateDescription);
 		expect(payload).not.toContain('PRIVATE_C6_IDENTITY');
 		expect(payload).not.toContain('roles');
-		expectPublic(payload.replace(privateDescription, ''), [issuer.origin, ...issuer.tokens]);
+		for (const value of [
+			username,
+			password,
+			clientId,
+			clientSecret,
+			issuer.origin,
+			...issuer.tokens
+		]) {
+			expect(payload).not.toContain(value);
+		}
 		const replay = await server.fetch(
 			`/auth/callback/oidc?${new URLSearchParams({
 				code: issuer.authorizations[0]!.code,

@@ -3,8 +3,8 @@
 Directory has one web container, following When's separate development and
 production Compose pattern. No host Node/pnpm installation is needed. Published
 images target Linux amd64; there is no worker, database or writable data volume.
-The current UI shows site copy and optional sign-in, not dashboard links or
-mounted images yet.
+The current UI renders text-only bookmark groups and plain details with service
+links. Custom images and initials are not part of this slice.
 
 ## Local production review
 
@@ -224,7 +224,9 @@ a Docker pass. Use disposable copies of any real configuration.
    or invalid origin must fail closed on startup. Restore valid settings afterwards.
 4. In credentials mode, try wrong/right passwords, JavaScript disabled, sign-out,
    and a private `__data.json` URL without a session. Only the signed-in session
-   should reach configured directory copy/data. Changing auth must require a
+   should reach bookmark cards, details and directory data. Click a card to its
+   real `?link=<id>` details, use the separate new-tab service link and return with
+   Back to directory. Try JavaScript disabled. Changing auth must require a
    restart, not silently alter a running session policy.
 5. In the normal HTTPS/proxy setup, verify redirects, Secure cookies, CSRF,
    configured OIDC callback and proxy throttling. Rotate the session secret and

@@ -5,15 +5,15 @@ right link. The dashboard will be driven by one mounted YAML file.
 
 ## Current state
 
-The bootstrap includes a server-rendered placeholder, a compiled shared config
-package, and per-package CI checks. The shared loader reads YAML, applies
+The app includes a server-rendered text directory, a compiled shared config
+package, a standalone validator, and per-package CI checks. The shared loader reads YAML, applies
 defaults, expands environment values, and validates the TypeBox contract. The
 standalone CLI uses that same loader. The web server loads an immutable directory
 before serving, polls for file changes, and keeps the last good snapshot after
-invalid edits. The shell shows configured site copy, not dashboard links.
+invalid edits. Groups and bookmark titles render immediately, with plain shareable
+details and real external service links.
 Authentication is optional: shared credentials or OIDC protect the whole directory,
-including data responses. Mounted image serving and the full dashboard remain
-later work. See [authentication setup](docs/config.md#authentication-shapes).
+including data responses. Images, search, modal details and saved preferences remain later work. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [example](apps/web/config/directory.example.yml).
 
@@ -44,8 +44,8 @@ pnpm verify
 CONFIG_PATH="$PWD/apps/web/config/directory.example.yml" pnpm dev
 ```
 
-Open `http://localhost:5173`. The configured site title and description render
-with JavaScript disabled, too. `/healthz` returns generic readiness. To try reloads,
+Open `http://localhost:5173`. Groups, bookmark titles and `?link=<id>` details
+render with JavaScript disabled, too. `/healthz` returns generic readiness. To try reloads,
 point `CONFIG_PATH` at a disposable copy of the example and edit it; invalid saves
 keep the previous copy serving. Linux prerequisites, shutdown and other commands
 are documented in [development](docs/development.md).

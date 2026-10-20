@@ -3,14 +3,14 @@
 ## Current scope
 
 The bootstrap contains all three workspaces, local quality gates, and per-package
-Woodpecker/GitHub workflow definitions. CLI help and the SSR placeholder read the
+Woodpecker/GitHub workflow definitions. CLI help and the SSR directory read the
 same supported configuration format version. The TypeBox schema, inferred types
 and deterministic editor-schema generation are implemented, along with YAML
 loading, environment interpolation and standalone CLI validation; see
 [configuration](config.md). The web server now loads before serving, polls the
 configuration path, and captures one immutable snapshot per request. The shell
-shows configured site copy; dashboard links and image serving are still later
-work. Optional credentials or OIDC authentication gates the entire directory;
+renders configured groups, bookmark titles and plain details with external service
+links. Image rendering remains later work. Optional credentials or OIDC authentication gates the entire directory;
 no-auth mode stays open and requires no session secret. [Docker and Compose](deployment.md)
 provide dev/production containers, main `latest` images and manually tagged
 stable releases.
@@ -183,8 +183,9 @@ Invalid later edits keep the last good snapshot and generic health readiness.
 
 The request hook captures `directory.currentSnapshot()` once into
 `event.locals.snapshot`; nested loaders use that reference even if a reload
-publishes meanwhile. The shell returns only the captured public site title and
-description plus the format version, not private configuration or link metadata.
+publishes meanwhile. The page returns only the captured display model, a validated selected-link
+identity and a signed-in boolean after the access gate. Private configuration,
+assets, sessions and filesystem paths are not page data.
 `/healthz` returns only `{ "status": "ok" }` after initialization. Requests load
 neither YAML nor asset fallbacks. Shutdown stops the watcher and blocks pending
 publication. Polling/config preparation are not browser code.
@@ -486,7 +487,9 @@ agent-verified gates.
    readiness, not configuration names or paths. Configured authentication must
    require sign-in before site copy/data are returned; missing secret/origin must
    fail startup. Try a wrong password, sign-out and a direct `__data.json` request.
-   Links and mounted images are not rendered yet. Stop the server when finished.
+   Follow a bookmark to its plain `?link=<id>` details and return with Back to
+   directory. Images are not rendered in this text-only slice. Stop the server
+   when finished.
    For production output, after `pnpm build`, run:
 
    ```sh
@@ -494,9 +497,10 @@ agent-verified gates.
      HOST=127.0.0.1 PORT=3000 ORIGIN=http://127.0.0.1:3000 node apps/web/build/index.js
    ```
 
-   Open `http://127.0.0.1:3000`, then stop the server when finished. Only the site
-   copy is configured; no dashboard controls are expected. Run manual axe/PageSpeed when the actual UI exists;
-   placeholder scores do not establish final-app accessibility/performance.
+   Open `http://127.0.0.1:3000`, then stop the server when finished. The
+   directory is text-only; images, search, modal details and saved preferences are
+   not implemented. Run manual axe/PageSpeed on this visible baseline when available;
+   this slice is not final UI acceptance.
 
 Complete agent review before staged owner review. Stage only one coherent commit
 at a time when requested, and wait for manual review and explicit permission

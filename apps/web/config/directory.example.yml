@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../../../packages/config/src/config.schema.json
-# Use CONFIG_PATH to preview this file. The shell shows site copy; mounted images are not served yet.
+# Use CONFIG_PATH to preview the text-only directory. Mounted images are not served yet.
 version: 1
 site:
   title: Home Server
