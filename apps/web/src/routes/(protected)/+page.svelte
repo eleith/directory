@@ -6,10 +6,14 @@
 	import DetailContent from '$lib/components/DetailContent.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import Search from '$lib/components/Search.svelte';
+	import type { DisplayLink } from '$lib/display/types.js';
+	import type { SearchResult } from '$lib/search/engine.js';
 	import type { PageData } from './$types.js';
 
 	let { data }: { data: PageData } = $props();
 
+	let searchResults = $state<SearchResult[] | null>(null);
 	let DetailDialog = $state<typeof import('$lib/components/DetailDialog.svelte').default>();
 	let dialogImport: Promise<typeof import('$lib/components/DetailDialog.svelte')> | undefined;
 	let mounted = false;
@@ -137,6 +141,7 @@
 			</div>
 		</div>
 		<div class="header-actions">
+			<Search directory={data.directory} bind:results={searchResults} />
 			<ThemeToggle />
 			{#if data.signedIn}
 				<form method="POST" action="?/signout">
@@ -161,35 +166,52 @@
 		</section>
 	{/if}
 
+	{#snippet tile(link: DisplayLink, groupLabel: string | undefined)}
+		<!-- eslint-disable svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
+		<a
+			class="tile"
+			href={`/?link=${link.id}`}
+			data-sveltekit-preload-data="off"
+			onclick={(event) => openDetails(event, link.id)}
+		>
+			<BookmarkLogo {link} loading="lazy" />
+			<span>{link.title}</span>
+			{#if groupLabel}
+				<small class="group-caption">{groupLabel}</small>
+			{/if}
+		</a>
+		<!-- eslint-enable svelte/no-navigation-without-resolve -->
+	{/snippet}
+
 	<div class="groups">
-		{#each data.directory.groups as group (group.id)}
-			<section aria-label={group.label ?? 'Directory links'}>
-				{#if group.label}
-					<h2>{group.label}</h2>
-				{/if}
+		{#if searchResults !== null}
+			<section aria-label="Search results">
 				<ul class="link-grid">
-					{#each group.links as link (link.id)}
-						<li>
-							<!-- eslint-disable svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
-							<a
-								class="tile"
-								href={`/?link=${link.id}`}
-								data-sveltekit-preload-data="off"
-								onclick={(event) => openDetails(event, link.id)}
-							>
-								<BookmarkLogo {link} loading="lazy" />
-								<span>{link.title}</span>
-							</a>
-							<!-- eslint-enable svelte/no-navigation-without-resolve -->
-						</li>
+					{#each searchResults as result (result.link.id)}
+						<li>{@render tile(result.link, result.groupLabel)}</li>
 					{/each}
 				</ul>
 			</section>
 		{:else}
-			<p class="empty">
-				No bookmarks yet. Add links to the directory configuration to get started.
-			</p>
-		{/each}
+			{#each data.directory.groups as group (group.id)}
+				<section aria-label={group.label ?? 'Directory links'}>
+					{#if group.label}
+						<h2>{group.label}</h2>
+					{/if}
+					<ul class="link-grid">
+						{#each group.links as link (link.id)}
+							<li>
+								{@render tile(link, undefined)}
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{:else}
+				<p class="empty">
+					No bookmarks yet. Add links to the directory configuration to get started.
+				</p>
+			{/each}
+		{/if}
 	</div>
 
 	{#if data.directory.site.footer}
@@ -217,9 +239,12 @@
 	.header-actions {
 		display: flex;
 		align-items: center;
+		justify-content: flex-end;
 		flex-wrap: wrap;
 		gap: var(--space-4);
 		margin-inline-start: auto;
+		max-width: 100%;
+		flex: 1 1 22rem;
 	}
 
 	.site-brand {
@@ -284,6 +309,12 @@
 		text-decoration: none;
 		font-weight: 600;
 		line-height: var(--line-height-heading);
+	}
+
+	.group-caption {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		font-weight: 400;
 	}
 
 	.tile:hover {

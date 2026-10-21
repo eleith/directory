@@ -119,6 +119,10 @@ for (const javaScriptEnabled of [true, false]) {
 					).toBe(true);
 					await page.keyboard.press('Tab');
 					if (javaScriptEnabled) {
+						const search = page.getByRole('searchbox', { name: 'Search', exact: true });
+						await expect(search).toBeFocused();
+						await expect(search).toHaveCSS('outline-color', accent);
+						await page.keyboard.press('Tab');
 						const toggle = page.getByRole('button', { name: 'Switch to dark theme', exact: true });
 						await expect(toggle).toBeFocused();
 						await expect(toggle).toHaveCSS('outline-color', accent);
@@ -245,6 +249,7 @@ test('configured theme inputs stay private and leave sign-in on the default pale
 			await close.click();
 			await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
 			for (const control of [
+				page.getByRole('searchbox', { name: 'Search', exact: true }),
 				page.getByRole('button', { name: 'Switch to dark theme', exact: true }),
 				page.getByRole('button', { name: 'Sign out' })
 			]) {

@@ -67,6 +67,8 @@ test('keyboard cycle, next-action icons, focus, persistence and Kit navigation',
 	expect(box!.height).toBeGreaterThanOrEqual(44);
 	const headerImage = await page.locator('header img').elementHandle();
 	await page.keyboard.press('Tab');
+	await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeFocused();
+	await page.keyboard.press('Tab');
 	await expect(toggle).toBeFocused();
 	await expect(toggle).toHaveCSS('outline-style', 'solid');
 	await expect(toggle).toHaveCSS('outline-color', accents.light);

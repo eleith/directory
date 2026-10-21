@@ -33,6 +33,7 @@ dependencies exactly, including:
 | Vitest / coverage-v8              | 4.1.7 / 4.1.7   |
 | Playwright                        | 1.61.1          |
 | Bits UI                           | 2.18.1          |
+| Fuse.js (full build)              | 7.5.0           |
 | Changesets CLI                    | 3.0.1           |
 
 Published peer ranges support this combination. `@types/node` 24.12.4 satisfies
@@ -316,6 +317,31 @@ server snapshot. Grid close goes back once; direct close safely replaces the URL
 with `/`. Bits owns trapping, dismissal and scroll lock, with focus returning to
 the connected activating tile or directory heading. Its portal targets the
 protected `.directory-theme` boundary so configured accents stay private.
+
+### Local search
+
+The header search shell is server-rendered but disabled until hydration. Its first
+focus or input dynamically imports `lib/search/engine.ts`, the only runtime Fuse
+import. Tile-only visits do not load search. Fuse.js 7.5.0's full build uses token
+search with all query words required, independent of word order or field. The
+fixed threshold is 0.35 with location ignored; weights are title 4, prepared tags
+3, description 2 and remaining link-local public text 1. Unit fixtures cover
+ranking, typos, fragments, long queries and metadata boundaries.
+
+The index includes only explicit bookmark text: title, prepared tags, description,
+ID, URL, group label and enabled advisory labels. Image references, private config
+and common site copy are not search content. One successful index is retained for
+the loaded snapshot ID; real navigation accepting a different snapshot rebuilds
+it. Search never requests new configuration. Queries are not saved or put in URLs.
+
+Nonempty queries show flat ranked tiles with group captions. Empty/whitespace
+queries restore the original groups and order. Clear returns focus to the input;
+result counts, loading, no-results and failure messages are announced. A failed
+import leaves the full grid usable and suggests reloading, without an automatic
+retry or reload loop. Without JavaScript the full HTML and detail URLs still work.
+Search is discovery, not access control: details always resolve against the full
+loaded directory. Shallow dialog history preserves query/results and returns
+focus to the connected activating tile or directory heading.
 
 ### Authentication boundary
 
@@ -627,6 +653,15 @@ Throttle hydration to check restoration before paint; block localStorage to chec
 usable in-memory toggling. Sign out with a saved manual theme and confirm public
 sign-in keeps that scheme but uses only default colors, with no private site data
 or CSP script errors. Disable JavaScript to check OS colors and native navigation.
+Tab first to Search, then Theme and Sign out; check search focus and Clear at
+360/1280px in both schemes. Try typos, reversed multiword queries, tags and deep
+description text; clear or enter whitespace to restore configured grouping.
+Inspect the network before focus and after tile-only activation: no search/Fuse
+chunk should load. Throttle search loading, change/clear the query, and block the
+chunk to check announcements and the usable full-grid fallback. Open a result,
+Close/Back/Forward, and confirm the query and return focus survive. A native
+navigation or refresh should accept replacement metadata, while local search and
+dialog actions keep their loaded snapshot.
 
 1. Follow the clean setup in an isolated export of the staged commit. Check root
    verification, CLI help and validation of both the production starter and demo without
@@ -715,7 +750,7 @@ or CSP script errors. Disable JavaScript to check OS colors and native navigatio
    **demo / directory-demo**, then stop the server when finished. This production
    preview also generates a demo-only secret per run. The
    directory uses prepared bookmark logos for omitted logo paths and serves exact
-   configured image references. Search is not implemented. Run
+   configured image references. Review local search with the checks above. Run
    manual axe/PageSpeed on this visible baseline when available; this slice is not
    final UI acceptance.
 

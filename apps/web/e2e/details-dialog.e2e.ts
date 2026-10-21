@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clientManifest, dialogScript, navigateQuery } from './support/details.js';
+import { dialogScript, eagerClientFiles, navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const longCopy =
@@ -35,7 +35,10 @@ test.afterAll(async () => {
 });
 
 async function hydrated(page: Page) {
-	await expect(page.locator('.header-actions button')).toBeEnabled();
+	await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeEnabled();
+	await expect(
+		page.getByRole('button', { name: 'Switch to dark theme', exact: true })
+	).toBeEnabled();
 }
 
 async function holdDialog(page: Page) {
@@ -117,17 +120,7 @@ test('grid has no eager dialog imports or speculative requests; activation reuse
 }) => {
 	const requested: string[] = [];
 	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
-	const eagerFiles = new Set<string>();
-	function visit(key: string) {
-		const entry = clientManifest[key]!;
-		if (eagerFiles.has(entry.file)) return;
-		eagerFiles.add(entry.file);
-		for (const dependency of entry.imports ?? []) visit(dependency);
-	}
-	for (const key of Object.keys(clientManifest)) {
-		if (key.includes('/nodes/') || key.includes('/entry.js') || key.endsWith('/app.js')) visit(key);
-	}
-	expect(eagerFiles.has(dialogScript.slice(1))).toBe(false);
+	expect(eagerClientFiles.has(dialogScript.slice(1))).toBe(false);
 	await page.goto(server.url);
 	await hydrated(page);
 	const tile = page.locator('a[href="/?link=alpha"]');

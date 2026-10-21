@@ -12,6 +12,11 @@ standalone CLI uses that same loader. The web server loads an immutable director
 before serving, polls for file changes, and keeps the last good snapshot after
 invalid edits. Compact icon-and-title tiles flow into a responsive grid with muted
 group headings, plain shareable details and real external service links.
+Header search loads on first focus/input and finds bookmarks with typo-tolerant,
+word-order-independent matching across public bookmark metadata. Results rank by
+relevance; clearing restores the configured groups and order. Search stays local
+to the loaded directory and is disabled without JavaScript; the full directory
+and real detail URLs still work.
 The header theme button cycles System → Dark → Light → System and saves the
 choice in this browser. System follows OS changes; without JavaScript the OS
 scheme applies and the button stays disabled. Existing
@@ -42,7 +47,7 @@ authentication policy as the directory for mounted source URLs. Selecting
 including before sign-in; its source URI stays out of the shared layout. Omission
 uses the bundled `/favicon.svg`; unavailable configured images return 404, not a
 bundled fallback. Mounted files require Linux procfs; SVGs are trusted operator
-content, not sanitized uploads. Search remains later work. See [authentication setup](docs/config.md#authentication-shapes).
+content, not sanitized uploads. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [production starter](apps/web/config/directory.example.yml). For the isolated,
 local-only nine-bookmark review, see [the demo](demo/README.md).
