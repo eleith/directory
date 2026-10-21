@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { DisplayLink } from '$lib/display/types.js';
+	import BookmarkLogo from './BookmarkLogo.svelte';
 
 	let { link, groupLabel }: { link: DisplayLink; groupLabel?: string | undefined } = $props();
 </script>
 
 <div class="details">
-	<img src={link.logo_path} alt="" width="64" height="64" />
+	<BookmarkLogo {link} />
 	<h2 id="link-details-title">{link.title}</h2>
 	{#if groupLabel}
 		<p class="group">{groupLabel}</p>
@@ -45,11 +46,6 @@
 		gap: var(--space-4);
 		min-width: 0;
 		overflow-wrap: anywhere;
-	}
-
-	img {
-		display: block;
-		border-radius: var(--radius-sm);
 	}
 
 	h2 {

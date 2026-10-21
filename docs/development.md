@@ -152,8 +152,14 @@ asset lists and bookmark logos, then freezes the complete snapshot.
 Initials style. SVG strings stay in the private, frozen `assets.bookmarkLogos` map
 for every link, including those with configured logos. Display links carry one
 required `logo_path`, resolved to the configured path or `/bookmarks/<id>/logo`.
-This logo API remains available for every bookmark; the display uses it only when
-`logo_path` is omitted. Configured paths now reach the mounted-image endpoint.
+This logo API remains available for every bookmark. `BookmarkLogo.svelte` uses the
+resolved primary in SSR, deriving the same private API URL for a one-time
+JavaScript fallback on cards and details. Its mount check catches image failures
+before hydration; fallback failures stop, including when the primary already is
+the API. Source URL or link identity changes reset the attempt in place. Repairing
+bytes at an unchanged URL requires a document refresh, not automatic polling.
+Without JavaScript, broken configured images stay broken; text and links remain
+usable. Configured paths still reach the mounted-image endpoint.
 Only the snapshot's `display` member may be sent to the browser. The client-facing
 interfaces in `src/lib/display/types.ts` contain no server imports. Snapshot IDs are fresh random UUIDs, not hashes of
 configuration or credentials.
@@ -600,7 +606,13 @@ agent-verified gates.
    use a disposable public directory and set `DIRECTORY_PUBLIC_DIR` to its absolute
    path before starting. Check mounted logos on cards/details without JavaScript,
    generic 404s for unreferenced or missing files, then atomic file replacement
-   and recovery. Authenticated mounted GET/HEAD work; unauthenticated requests
+   and recovery. To exercise browser fallback manually, block a configured bookmark
+   image in browser devtools or choose a missing image path in the disposable YAML.
+   With JavaScript, cards and details should switch once to their prepared logo;
+   blocking that endpoint too must stop without a retry loop. Disable JavaScript
+   to check broken images leave the text and links usable. Unblock or repair the
+   primary and refresh to try the unchanged URL again. Leave the curated demo
+   files untouched. Authenticated mounted GET/HEAD work; unauthenticated requests
    return 401 even with HTML Accept, including the selected favicon's raw source.
    Before sign-in, check the tab icon and `/favicon` GET/HEAD: only the selected
    bytes are public, with private/no-store, nosniff and bodyless HEAD. Change the

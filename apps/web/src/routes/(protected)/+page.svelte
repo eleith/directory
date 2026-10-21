@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BookmarkLogo from '$lib/components/BookmarkLogo.svelte';
 	import DetailContent from '$lib/components/DetailContent.svelte';
 	import type { PageData } from './$types.js';
 
@@ -53,7 +54,7 @@
 						<li>
 							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 							<a class="card" href={`/?link=${link.id}`} data-sveltekit-preload-data="off">
-								<img src={link.logo_path} alt="" width="64" height="64" loading="lazy" />
+								<BookmarkLogo {link} loading="lazy" />
 								{link.title}
 							</a>
 						</li>
@@ -134,11 +135,6 @@
 		color: var(--color-text);
 		text-decoration: none;
 		font-weight: 600;
-	}
-
-	.card img {
-		display: block;
-		border-radius: var(--radius-sm);
 	}
 
 	.card:hover {

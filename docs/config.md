@@ -334,10 +334,15 @@ without descriptor lookup it fails closed with 404, including in native Node.
 The logo API at `/bookmarks/<id>/logo` currently returns a generated image, prepared
 server-side with the snapshot, not during page or image requests. Display links
 carry one resolved `logo_path`: the configured path when provided, otherwise this
-logo API URL. Cards and details use that value directly, so configured files now
-render through the protected mounted-image endpoint. The prepared logo API still
-exists for every bookmark, including those with configured paths; a missing or
-invalid configured file does not switch the browser to that API.
+logo API URL. Cards and details render that value in the initial HTML. With
+JavaScript, a failed configured bookmark logo switches once to the same private
+logo API, including when the image failed before hydration. A failed fallback
+stops; an omitted primary already uses the API and is not retried on failure.
+Without JavaScript, valid configured and prepared logos still render, but a broken
+configured image cannot switch; text and navigation remain usable. Changing the
+primary URL or selected link allows a fresh primary attempt in the existing image.
+Repairing file bytes at the same URL does not trigger a browser retry: refresh the
+document to try again. No second image field or client-side generator is involved.
 
 The current internal renderer uses DiceBear core 10.4.0 and a matching local
 Initials definition; no remote image service or browser generator is involved.

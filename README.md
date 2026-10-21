@@ -14,7 +14,11 @@ invalid edits. Groups and bookmark titles render immediately, with plain shareab
 details and real external service links.
 Authentication is optional: shared credentials or OIDC protect the whole directory,
 including data responses. Bookmark cards and details use server-prepared bookmark
-logos when no logo path is configured. Configured images are now served only when
+logos when no logo path is configured. With JavaScript, a failed configured bookmark
+logo switches once to its prepared logo; a failed fallback stops without retrying.
+Without JavaScript, broken configured images stay broken, but text and links remain
+usable. After repairing an image at the same URL, refresh to try it again.
+Configured images are now served only when
 referenced by the captured configuration, with bounded 5 MiB reads and the same
 authentication policy as the directory for mounted source URLs. Selecting
 `site.favicon_path` publishes that image's bytes at the public `/favicon` alias,

@@ -4,7 +4,12 @@ Directory has one web container, following When's separate development and
 production Compose pattern. No host Node/pnpm installation is needed. Published
 images target Linux amd64; there is no worker, database or writable data volume.
 The UI renders bookmark groups and plain details with service links and prepared
-bookmark logos when no logo path is configured. Configured image files are now
+bookmark logos when no logo path is configured. With JavaScript, failed configured
+bookmark logos on cards and details switch once to their private prepared logo;
+failed fallbacks stop without retrying. Without JavaScript, broken configured
+images stay broken while text and links remain usable. After repairing bytes at
+the same URL, refresh the document to retry the primary image.
+Configured image files are now
 served only for exact snapshot references, with bounded 5 MiB reads and the
 directory's authentication policy for all mounted source URLs. Selecting
 `site.favicon_path` deliberately publishes that image's bytes at public `/favicon`,
@@ -282,8 +287,11 @@ a Docker pass. Use disposable copies of any real configuration.
    Check private/no-store and nosniff headers,
    bodyless HEAD, unreferenced and escaping-symlink 404s, missing-file recovery,
    atomic image replacement, and valid/invalid YAML reference reloads. Omit
-   `logo_path` to check the prepared logo remains usable. Verify the actual
-   container's procfs descriptor lookup as its non-root runtime user:
+   `logo_path` to check the prepared logo remains usable. With JavaScript enabled,
+   block a configured bookmark image in devtools and check cards/details use the
+   prepared logo once; block the fallback too and check there is no retry loop.
+   Restore access and refresh to retry the primary. Verify the actual container's
+   procfs descriptor lookup as its non-root runtime user:
 
    ```sh
    docker compose exec directory-app node --input-type=module --eval \
