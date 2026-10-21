@@ -25,6 +25,11 @@ Sign out stays visible beside or below it. In a disposable config copy, omit
 switches once to the bundle with JavaScript, but stays broken without JavaScript.
 The independent site favicon selection is unchanged.
 
+After sign-in, click Photos: its Open service link includes a decorative 24px
+icon from `links.photos.favicon_path`, reusing the private Photos asset. Other
+bookmarks omit that field and show no small icon. The nine primary logos remain
+four provided and five generated; the header and public site favicon are unchanged.
+
 ## Preferred native preview
 
 With the [development prerequisites](../docs/development.md#setup-and-commands)

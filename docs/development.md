@@ -160,6 +160,13 @@ and bundled `/favicon.svg` as fallback. Omitted sources use the fallback in SSR.
 Sign-in keeps its bundled mark; no configured site logo URI enters public HTML or
 shared layout data. The site favicon remains independent.
 
+Details optionally pass `links.*.favicon_path` to the same `Logo` at 24px inside
+Open service, with `/bookmarks/<id>/logo` as its one-time JavaScript fallback.
+Omission renders no service icon. This instance is independent of the 64px primary
+`logo_path`; without JavaScript, a broken icon leaves the service link usable.
+Mounted service sources and prepared fallbacks remain private with auth, unlike
+bytes explicitly selected by `site.favicon_path` for the public `/favicon` alias.
+
 `Logo` makes one JavaScript fallback attempt. Its mount check catches image failures
 before hydration; fallback failures stop, including when primary and fallback
 are the same. Changing the source/fallback pair resets the attempt in place,

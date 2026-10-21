@@ -30,6 +30,7 @@ links:
       Family photos and videos, all in one place.
       Install your photo service's mobile app for automatic uploads.
     logo_path: /public/demo/photos.svg
+    favicon_path: /public/demo/photos.svg
     tags: photos, videos, memories
     group: Photos & files
     requires_auth: true

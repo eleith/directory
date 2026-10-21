@@ -18,6 +18,11 @@ logos when no logo path is configured. With JavaScript, a failed configured book
 logo switches once to its prepared logo; a failed fallback stops without retrying.
 Without JavaScript, broken configured images stay broken, but text and links remain
 usable. After repairing an image at the same URL, refresh to try it again.
+Optional `links.*.favicon_path` adds a decorative 24px icon to the details' Open
+service link; omission shows no small icon. With JavaScript, failure switches once
+to the same private prepared bookmark logo, independently of the 64px primary
+`logo_path`; without JavaScript, a broken icon leaves the link usable. Service
+icons stay private with auth and do not select the public site favicon.
 The directory header shows `site.logo_path` at 48px beside its title and description,
 using bundled `/favicon.svg` when omitted or once after a JavaScript image error.
 Without JavaScript, a broken configured header image stays broken. With auth enabled,

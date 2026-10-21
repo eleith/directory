@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { DisplayLink } from '$lib/display/types.js';
 	import BookmarkLogo from './BookmarkLogo.svelte';
+	import Logo from './Logo.svelte';
 
 	let { link, groupLabel }: { link: DisplayLink; groupLabel?: string | undefined } = $props();
 </script>
@@ -36,7 +37,10 @@
 	{/if}
 	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Prepared service URLs are external destinations, not application routes. -->
 	<a href={link.url} target="_blank" rel="noopener noreferrer">
-		Open service <span class="new-tab">(opens in a new tab)</span>
+		{#if link.favicon_path !== undefined}
+			<Logo source={link.favicon_path} fallback={`/bookmarks/${link.id}/logo`} size={24} />
+		{/if}
+		<span>Open service <span class="new-tab">(opens in a new tab)</span></span>
 	</a>
 </div>
 
@@ -85,6 +89,10 @@
 	}
 
 	a {
+		display: inline-flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: var(--space-4);
 		justify-self: start;
 		max-width: 100%;
 		color: inherit;

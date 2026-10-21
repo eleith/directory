@@ -9,6 +9,11 @@ bookmark logos on cards and details switch once to their private prepared logo;
 failed fallbacks stop without retrying. Without JavaScript, broken configured
 images stay broken while text and links remain usable. After repairing bytes at
 the same URL, refresh the document to retry the primary image.
+Optional `links.*.favicon_path` shows a 24px icon in the details' Open service
+link; omission shows none. Its one-time JavaScript fallback uses the private
+prepared bookmark logo, independently of the 64px primary `logo_path`. Without
+JavaScript, a broken icon leaves the link usable. Mounted service icons and their
+fallback stay private with auth; this does not select the public site favicon.
 The directory header renders `site.logo_path` at 48px, or bundled `/favicon.svg`
 when omitted. JavaScript switches a failed configured header image to the bundle
 once; without JavaScript, a broken configured image stays broken. Sign-in always

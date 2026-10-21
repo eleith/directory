@@ -300,6 +300,16 @@ Unicode/spaces and nested directories are allowed; empty/dot segments, percent
 escapes, backslashes, queries, fragments and control characters are not. This is
 syntactic validation, not filesystem access or MIME inspection.
 
+`links.*.favicon_path` optionally renders a decorative 24×24 icon inside the details'
+Open service link. Omission renders no service icon. It is independent of the 64px
+primary `links.*.logo_path`: with JavaScript, a failed service icon switches once
+to `/bookmarks/<id>/logo`, not to the configured primary logo. A failed fallback
+stops. Source or selected-link changes reset the attempt in place; repairing bytes
+at an unchanged URL requires refresh. Without JavaScript, a broken icon stays
+broken but the service link remains usable. Both the mounted source and prepared
+fallback require a session when auth is enabled. This field does not publish bytes
+through the separate `site.favicon_path` public `/favicon` alias.
+
 `site.logo_path` renders a decorative, eager 48×48 image beside the directory title
 and description. Omission uses bundled `/favicon.svg` directly in server-rendered
 HTML, independently of `site.favicon_path`. With JavaScript, a failed configured
