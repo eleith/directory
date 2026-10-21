@@ -9,11 +9,16 @@ bookmark logos on cards and details switch once to their private prepared logo;
 failed fallbacks stop without retrying. Without JavaScript, broken configured
 images stay broken while text and links remain usable. After repairing bytes at
 the same URL, refresh the document to retry the primary image.
+The directory header renders `site.logo_path` at 48px, or bundled `/favicon.svg`
+when omitted. JavaScript switches a failed configured header image to the bundle
+once; without JavaScript, a broken configured image stays broken. Sign-in always
+uses the bundled mark. With auth enabled, the configured site logo URL stays
+private and is absent from public HTML and shared layout data.
 Configured image files are now
 served only for exact snapshot references, with bounded 5 MiB reads and the
 directory's authentication policy for all mounted source URLs. Selecting
 `site.favicon_path` deliberately publishes that image's bytes at public `/favicon`,
-including before sign-in, even when the source is also a bookmark logo. Its raw
+including before sign-in, even when the source is also a bookmark or site logo. Its raw
 `/public/...` URL stays protected. The shared layout sends only the constant alias,
 not the source URI. Omission uses bundled `/favicon.svg`; a missing or invalid
 selected file returns 404, without a bundled fallback.

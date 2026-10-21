@@ -154,15 +154,15 @@ secrets stay outside its display model. The validator prints neither kind.
 
 ## Fields and defaults
 
-| Field                                 | Contract                                                                                                                                                                      |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`                             | Only `1`; defaults to `1`. This is the file format, not the app release.                                                                                                      |
-| `site`                                | Optional object. Defaults: title `Directory`, description/footer empty, order `configured`.                                                                                   |
-| `site.logo_path`, `site.favicon_path` | Optional independent local images. Site favicon selection publishes bytes at `/favicon`; omission uses bundled `/favicon.svg`. Site logo UI is not included yet.              |
-| `site.order`                          | `configured` or `alphabetical`; defaults to `configured`.                                                                                                                     |
-| `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                          |
-| `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                          |
-| `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `''` and the three advisory booleans default to `false`. |
+| Field                                 | Contract                                                                                                                                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                             | Only `1`; defaults to `1`. This is the file format, not the app release.                                                                                                                                               |
+| `site`                                | Optional object. Defaults: title `Directory`, description/footer empty, order `configured`.                                                                                                                            |
+| `site.logo_path`, `site.favicon_path` | Optional independent local images. The directory header shows the site logo at 48px, defaulting to bundled `/favicon.svg`. Site favicon selection publishes bytes at `/favicon`; omission uses bundled `/favicon.svg`. |
+| `site.order`                          | `configured` or `alphabetical`; defaults to `configured`.                                                                                                                                                              |
+| `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                                                                   |
+| `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                                                                   |
+| `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `''` and the three advisory booleans default to `false`.                                          |
 
 Site copy and optional link `description` are plain strings. Description supports
 multiline guidance; there is no separate `good_to_know` field. Logo and favicon
@@ -248,9 +248,10 @@ Accept, rather than redirecting to an HTML sign-in page.
 The sign-in page exposes the site title, sign-in strategy and a constant favicon
 URI, not links or private configuration. The dedicated public `/favicon` endpoint
 publishes only the selected site favicon's bytes, regardless of session. Selecting
-a bookmark's image as the site favicon deliberately publishes those same bytes
-through this alias; the raw bookmark URL stays protected. Site logo UI is not
-included yet.
+a bookmark or site logo image as the site favicon deliberately publishes those same
+bytes through this alias; its raw source URL stays protected. The sign-in mark
+always uses bundled `/favicon.svg`, never `site.logo_path`. No configured site
+logo URI is sent in public HTML or shared layout data.
 
 When auth is enabled, set these server environment variables:
 
@@ -298,6 +299,15 @@ Images are decoded `/public/...` paths with SVG/PNG/JPEG/GIF/WebP extensions.
 Unicode/spaces and nested directories are allowed; empty/dot segments, percent
 escapes, backslashes, queries, fragments and control characters are not. This is
 syntactic validation, not filesystem access or MIME inspection.
+
+`site.logo_path` renders a decorative, eager 48×48 image beside the directory title
+and description. Omission uses bundled `/favicon.svg` directly in server-rendered
+HTML, independently of `site.favicon_path`. With JavaScript, a failed configured
+image switches once to the bundle, including failures before hydration; a failed
+bundle stops without retrying. Without JavaScript, a broken configured image stays
+broken while the title and navigation remain usable. Changing the source URL
+allows a fresh primary attempt; repairing bytes at an unchanged URL requires a
+refresh. With auth enabled, the configured source URL requires a session.
 
 `site.favicon_path` selects a source image, not the public alias. The shared layout
 returns only `/favicon` when selected, otherwise the bundled `/favicon.svg`; it

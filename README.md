@@ -18,6 +18,11 @@ logos when no logo path is configured. With JavaScript, a failed configured book
 logo switches once to its prepared logo; a failed fallback stops without retrying.
 Without JavaScript, broken configured images stay broken, but text and links remain
 usable. After repairing an image at the same URL, refresh to try it again.
+The directory header shows `site.logo_path` at 48px beside its title and description,
+using bundled `/favicon.svg` when omitted or once after a JavaScript image error.
+Without JavaScript, a broken configured header image stays broken. With auth enabled,
+the header image's source URL stays private; sign-in always uses the bundled mark
+and exposes no configured site logo URI.
 Configured images are now served only when
 referenced by the captured configuration, with bounded 5 MiB reads and the same
 authentication policy as the directory for mounted source URLs. Selecting

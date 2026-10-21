@@ -152,14 +152,22 @@ asset lists and bookmark logos, then freezes the complete snapshot.
 Initials style. SVG strings stay in the private, frozen `assets.bookmarkLogos` map
 for every link, including those with configured logos. Display links carry one
 required `logo_path`, resolved to the configured path or `/bookmarks/<id>/logo`.
-This logo API remains available for every bookmark. `BookmarkLogo.svelte` uses the
-resolved primary in SSR, deriving the same private API URL for a one-time
-JavaScript fallback on cards and details. Its mount check catches image failures
-before hydration; fallback failures stop, including when the primary already is
-the API. Source URL or link identity changes reset the attempt in place. Repairing
-bytes at an unchanged URL requires a document refresh, not automatic polling.
-Without JavaScript, broken configured images stay broken; text and links remain
-usable. Configured paths still reach the mounted-image endpoint.
+This logo API remains available for every bookmark. `BookmarkLogo.svelte` is a
+thin domain wrapper: it passes the resolved primary and derives the same private
+API fallback for the shared `Logo.svelte`, at 64px on cards and details. The
+protected header also uses `Logo`, at 48px with eager loading, `site.logo_path`
+and bundled `/favicon.svg` as fallback. Omitted sources use the fallback in SSR.
+Sign-in keeps its bundled mark; no configured site logo URI enters public HTML or
+shared layout data. The site favicon remains independent.
+
+`Logo` makes one JavaScript fallback attempt. Its mount check catches image failures
+before hydration; fallback failures stop, including when primary and fallback
+are the same. Changing the source/fallback pair resets the attempt in place,
+including revisiting a previously failed source. The bookmark fallback encodes
+link identity, so switching links also resets the attempt. Repairing bytes at an
+unchanged URL requires a document refresh, not automatic polling. Without
+JavaScript, broken configured images stay broken; text and links remain usable.
+Configured paths still reach the mounted-image endpoint.
 Only the snapshot's `display` member may be sent to the browser. The client-facing
 interfaces in `src/lib/display/types.ts` contain no server imports. Snapshot IDs are fresh random UUIDs, not hashes of
 configuration or credentials.
@@ -611,8 +619,13 @@ agent-verified gates.
    With JavaScript, cards and details should switch once to their prepared logo;
    blocking that endpoint too must stop without a retry loop. Disable JavaScript
    to check broken images leave the text and links usable. Unblock or repair the
-   primary and refresh to try the unchanged URL again. Leave the curated demo
-   files untouched. Authenticated mounted GET/HEAD work; unauthenticated requests
+   primary and refresh to try the unchanged URL again. In the disposable config,
+   set `site.logo_path` to check a 48px header logo beside wrapped title/description
+   at 360px, with Sign out still visible. Omit it to check the bundled default;
+   break it to check the one-time JavaScript fallback and no-JavaScript limitation.
+   Before sign-in, the mark must stay bundled and the configured site logo URI
+   must not appear in HTML or public data. Leave the curated demo files untouched.
+   Authenticated mounted GET/HEAD work; unauthenticated requests
    return 401 even with HTML Accept, including the selected favicon's raw source.
    Before sign-in, check the tab icon and `/favicon` GET/HEAD: only the selected
    bytes are public, with private/no-store, nosniff and bodyless HEAD. Change the

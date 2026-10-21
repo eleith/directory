@@ -9,6 +9,7 @@ site:
   footer: Something not working? Ask your household maintainer.
   order: configured # Or alphabetical.
   favicon_path: /public/demo/favicon.svg
+  logo_path: /public/demo/home.svg
 
 appearance:
   primary_light_color: '#0f766e'

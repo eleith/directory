@@ -7,14 +7,23 @@ required; there is no shared secret fallback.
 
 The nine bookmarks span three groups: four use the original project-authored MIT
 SVGs in `public/demo`, and five use generated bookmark logos. A fifth original
-SVG is the site favicon; the site logo is omitted. Destinations are reserved
+SVG is the site favicon; the 48px directory header reuses `home.svg` as its site
+logo beside the title and description after sign-in. Destinations are reserved
 example.com placeholders, not live
 integrations. Check all nine cards and plain `?link=<id>` details with JavaScript
 on and off; after sign-out, mounted and generated bookmark images must be private.
 Before sign-in, check the tab icon: `/favicon` publicly serves the selected image's
 bytes, while its raw `/public/demo/favicon.svg` URL still returns 401 (GET/HEAD,
-even with HTML Accept). Bookmark images stay private. Mounted-image reads require
-Linux procfs.
+even with HTML Accept). Bookmark images and the raw `/public/demo/home.svg` site
+logo URL stay private. The sign-in mark always uses bundled `/favicon.svg`, with
+no configured site logo URI in public HTML or layout data. Mounted-image reads
+require Linux procfs.
+
+After sign-in, check the header at desktop and 360px widths: the title wraps and
+Sign out stays visible beside or below it. In a disposable config copy, omit
+`site.logo_path` and refresh to see the bundled default; a broken configured logo
+switches once to the bundle with JavaScript, but stays broken without JavaScript.
+The independent site favicon selection is unchanged.
 
 ## Preferred native preview
 

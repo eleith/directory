@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BookmarkLogo from '$lib/components/BookmarkLogo.svelte';
 	import DetailContent from '$lib/components/DetailContent.svelte';
+	import Logo from '$lib/components/Logo.svelte';
 	import type { PageData } from './$types.js';
 
 	let { data }: { data: PageData } = $props();
@@ -22,11 +23,19 @@
 
 <main>
 	<header>
-		<div class="site-copy">
-			<h1>{data.directory.site.title}</h1>
-			{#if data.directory.site.description}
-				<p class="description">{data.directory.site.description}</p>
-			{/if}
+		<div class="site-brand">
+			<Logo
+				source={data.directory.site.logo_path}
+				fallback="/favicon.svg"
+				size={48}
+				loading="eager"
+			/>
+			<div class="site-copy">
+				<h1>{data.directory.site.title}</h1>
+				{#if data.directory.site.description}
+					<p class="description">{data.directory.site.description}</p>
+				{/if}
+			</div>
 		</div>
 		{#if data.signedIn}
 			<form method="POST" action="?/signout">
@@ -88,9 +97,20 @@
 		margin-block-end: var(--space-8);
 	}
 
-	.site-copy {
+	.site-brand {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-4);
 		min-width: 0;
 		flex: 1 1 16rem;
+	}
+
+	.site-brand :global(img) {
+		flex-shrink: 0;
+	}
+
+	.site-copy {
+		min-width: 0;
 	}
 
 	h1 {
