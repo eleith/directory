@@ -173,6 +173,7 @@ for (const saved of ['dark', 'light', 'system']) {
 		const nonce = /<script nonce="([^"]+)"/.exec(html)?.[1];
 		expect(nonce).toBeTruthy();
 		const policy = response!.headers()['content-security-policy'];
+		if (!policy) throw new Error('Expected a Content-Security-Policy response header');
 		const scripts = policy
 			.split(';')
 			.find((directive) => directive.trim().startsWith('script-src'))!;

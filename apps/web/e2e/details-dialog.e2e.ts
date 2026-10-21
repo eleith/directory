@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 import { dialogScript, eagerClientFiles, navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
@@ -45,11 +45,11 @@ async function holdDialog(page: Page) {
 	const requested = Promise.withResolvers<void>();
 	const release = Promise.withResolvers<void>();
 	const settled = Promise.withResolvers<void>();
-	for (const event of ['requestfinished', 'requestfailed'] as const) {
-		page.on(event, (request) => {
-			if (request.url().endsWith(dialogScript)) settled.resolve();
-		});
+	function markSettled(request: Request) {
+		if (request.url().endsWith(dialogScript)) settled.resolve();
 	}
+	page.on('requestfinished', markSettled);
+	page.on('requestfailed', markSettled);
 	await page.route(`**${dialogScript}`, async (route) => {
 		requested.resolve();
 		await release.promise;

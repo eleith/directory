@@ -414,6 +414,9 @@ afterwards. Build before invoking E2E independently. Playwright explicitly sets
 `CONFIG_PATH` to the checked-in empty-directory fixture under `e2e/fixtures`, not
 the process's operator path. Tests use no personal configuration, credentials,
 or development server. Unit discovery is separate from browser specs.
+The existing web `check` command also type-checks `playwright.config.ts` and all
+`e2e/**/*.ts` files, including support helpers. Its tsconfig restates Kit's generated
+includes before adding browser tests; keep that block aligned when upgrading Kit.
 Application tests use only their own fixtures and disposable data, never the
 manual `demo/` configuration or images. The demo is not an automated test, build,
 lint, formatting or package input and does not trigger CI.
