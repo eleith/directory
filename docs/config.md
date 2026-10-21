@@ -164,6 +164,14 @@ secrets stay outside its display model. The validator prints neither kind.
 | `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                                                                   |
 | `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `''` and the three advisory booleans default to `false`.                                          |
 
+Appearance colors accent keyboard focus and the Back-link underline in the protected
+directory, following the OS light/dark scheme without JavaScript. They do not change
+page surfaces or sign-in. The protected layout supplies only these two inputs to
+shared semantic theme CSS after the access gate; configured colors are not public
+sign-in data. Refresh the document after configuration reloads to update them.
+Operators should choose colors with sufficient contrast; hex validation does not
+guarantee contrast.
+
 Site copy and optional link `description` are plain strings. Description supports
 multiline guidance; there is no separate `good_to_know` field. Logo and favicon
 are independent optional fields too. Unknown structural fields are errors, not

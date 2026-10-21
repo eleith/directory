@@ -278,6 +278,15 @@ otherwise bundled `/favicon.svg`. Its single head icon link has no fixed MIME ty
 No configured source URI, title, session or private configuration enters that
 layout data; the existing public sign-in title remains unchanged.
 
+The protected server layout allowlists only the captured display's two appearance
+colors after the authentication gate. Its wrapper supplies SSR CSS inputs
+`--directory-primary-light` and `--directory-primary-dark`. Shared `lib/styles/theme.css`
+owns the effective `--color-primary`, `--outline-focus` and OS scheme selection on
+that same `.directory-theme` boundary; page CSS owns layout and consumes the tokens.
+Configured values stay private until sign-in, whose default palette and focus remain
+unchanged. Theme colors follow the existing full-document refresh contract after
+configuration reloads; query-only client navigation can retain the parent layout.
+
 ### Authentication boundary
 
 The running application owns its directory and one boot-created Auth.js instance
@@ -298,6 +307,8 @@ routes/
     signin/
     healthz/
   (protected)/
+    +layout.server.ts
+    +layout.svelte
     +page.server.ts
     +page.svelte
     (endpoints)/
@@ -571,6 +582,14 @@ image checks, axe and PageSpeed remain owner-run manual checks, not
 agent-verified gates.
 
 ## Manual checks
+
+For presentation review, use disposable fixture data with at least nine bookmarks,
+spaced and long unbroken titles, named groups and unassigned links. Check 360, 768
+and 1280px widths in both OS themes, with and without JavaScript: centered 6rem
+tiles, wrapped titles, no horizontal overflow, and distinct group/detail/footer
+spacing. Tab through tiles, Back and Open service to inspect the configured accent
+and visible focus. Capture phone/desktop light/dark screenshots outside the repo.
+Also review flat and empty directories; the empty state should explain how to add links.
 
 1. Follow the clean setup in an isolated export of the staged commit. Check root
    verification, CLI help and validation of both the production starter and demo without

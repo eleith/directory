@@ -41,6 +41,7 @@
 			<Logo source={link.favicon_path} fallback={`/bookmarks/${link.id}/logo`} size={24} />
 		{/if}
 		<span>Open service <span class="new-tab">(opens in a new tab)</span></span>
+		<span aria-hidden="true">↗</span>
 	</a>
 </div>
 
@@ -50,6 +51,12 @@
 		gap: var(--space-4);
 		min-width: 0;
 		overflow-wrap: anywhere;
+	}
+
+	h2,
+	p,
+	ul {
+		margin: 0;
 	}
 
 	h2 {

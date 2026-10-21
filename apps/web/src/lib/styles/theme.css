@@ -12,6 +12,7 @@
 	--space-4: 0.75rem;
 	--space-5: 1rem;
 	--space-8: 2rem;
+	--space-9: 3rem;
 
 	--font-family: system-ui, sans-serif;
 	--font-size-sm: 0.875rem;
@@ -27,6 +28,11 @@
 	--outline-focus: 2px solid var(--color-text);
 }
 
+.directory-theme {
+	--color-primary: var(--directory-primary-light);
+	--outline-focus: 2px solid var(--color-primary);
+}
+
 @media (prefers-color-scheme: dark) {
 	:root {
 		--color-surface-page: #101314;
@@ -35,6 +41,10 @@
 		--color-text: #f5f5f5;
 		--color-text-muted: #b5babb;
 		--color-border-strong: #b5babb;
+	}
+
+	.directory-theme {
+		--color-primary: var(--directory-primary-dark);
 	}
 }
 

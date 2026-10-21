@@ -5,13 +5,18 @@ right link. The dashboard will be driven by one mounted YAML file.
 
 ## Current state
 
-The app includes a server-rendered text directory, a compiled shared config
+The app includes a server-rendered directory, a compiled shared config
 package, a standalone validator, and per-package CI checks. The shared loader reads YAML, applies
 defaults, expands environment values, and validates the TypeBox contract. The
 standalone CLI uses that same loader. The web server loads an immutable directory
 before serving, polls for file changes, and keeps the last good snapshot after
-invalid edits. Groups and bookmark titles render immediately, with plain shareable
-details and real external service links.
+invalid edits. Compact icon-and-title tiles flow into a responsive grid with muted
+group headings, plain shareable details and real external service links.
+The OS light/dark scheme selects the page surfaces. Existing
+`appearance.primary_light_color` and `primary_dark_color` configure keyboard-focus
+and Back-link underline accents on the directory, not sign-in. Choose colors with
+sufficient contrast for your deployment; arbitrary configured colors are not
+guaranteed accessible.
 Authentication is optional: shared credentials or OIDC protect the whole directory,
 including data responses. Bookmark cards and details use server-prepared bookmark
 logos when no logo path is configured. With JavaScript, a failed configured bookmark

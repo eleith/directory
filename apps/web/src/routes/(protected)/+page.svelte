@@ -62,16 +62,18 @@
 					{#each group.links as link (link.id)}
 						<li>
 							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
-							<a class="card" href={`/?link=${link.id}`} data-sveltekit-preload-data="off">
+							<a class="tile" href={`/?link=${link.id}`} data-sveltekit-preload-data="off">
 								<BookmarkLogo {link} loading="lazy" />
-								{link.title}
+								<span>{link.title}</span>
 							</a>
 						</li>
 					{/each}
 				</ul>
 			</section>
 		{:else}
-			<p class="empty">No bookmarks yet.</p>
+			<p class="empty">
+				No bookmarks yet. Add links to the directory configuration to get started.
+			</p>
 		{/each}
 	</div>
 
@@ -94,7 +96,7 @@
 		justify-content: space-between;
 		flex-wrap: wrap;
 		gap: var(--space-5);
-		margin-block-end: var(--space-8);
+		margin-block-end: var(--space-9);
 	}
 
 	.site-brand {
@@ -126,44 +128,48 @@
 
 	.groups {
 		display: grid;
-		gap: var(--space-8);
+		gap: var(--space-9);
 	}
 
 	h2 {
 		margin-block-end: var(--space-5);
-		font-size: var(--font-size-base);
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 	}
 
 	.link-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
-		gap: var(--space-5);
+		grid-template-columns: repeat(auto-fill, 6rem);
+		gap: var(--space-8) var(--space-5);
 		padding: 0;
 		list-style: none;
 	}
 
-	.card {
+	.tile {
 		display: flex;
 		flex-direction: column;
-		align-items: flex-start;
+		align-items: center;
 		gap: var(--space-4);
 		height: 100%;
-		padding: var(--space-5);
-		background: var(--color-surface-card);
-		border: var(--border-width) solid var(--color-border-subtle);
+		padding-block: var(--space-4);
 		border-radius: var(--radius-sm);
 		color: var(--color-text);
+		text-align: center;
 		text-decoration: none;
 		font-weight: 600;
+		line-height: var(--line-height-heading);
 	}
 
-	.card:hover {
-		border-color: var(--color-border-strong);
+	.tile:hover {
+		background: var(--color-surface-card);
 		text-decoration: underline;
 	}
 
 	.details {
-		margin-block-end: var(--space-8);
+		margin-block-end: var(--space-9);
 		padding: var(--space-5);
 		background: var(--color-surface-card);
 		border: var(--border-width) solid var(--color-border-subtle);
@@ -175,6 +181,7 @@
 		margin-block-end: var(--space-8);
 		color: var(--color-text);
 		text-underline-offset: 0.2em;
+		text-decoration-color: var(--color-primary);
 	}
 
 	.empty,
@@ -183,7 +190,7 @@
 	}
 
 	footer {
-		margin-block-start: var(--space-8);
+		margin-block-start: var(--space-9);
 		padding-block-start: var(--space-8);
 		border-block-start: var(--border-width) solid var(--color-border-subtle);
 		white-space: pre-line;
@@ -206,7 +213,11 @@
 
 	@media (min-width: 48rem) {
 		main {
-			padding: var(--space-8);
+			padding: var(--space-9) var(--space-8);
+		}
+
+		.link-grid {
+			column-gap: var(--space-8);
 		}
 
 		.details {
