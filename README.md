@@ -16,8 +16,12 @@ Authentication is optional: shared credentials or OIDC protect the whole directo
 including data responses. Bookmark cards and details use server-prepared bookmark
 logos when no logo path is configured. Configured images are now served only when
 referenced by the captured configuration, with bounded 5 MiB reads and the same
-authentication policy as the directory. Mounted files require Linux procfs;
-SVGs are trusted operator content, not sanitized uploads. Search, modal details
+authentication policy as the directory for mounted source URLs. Selecting
+`site.favicon_path` publishes that image's bytes at the public `/favicon` alias,
+including before sign-in; its source URI stays out of the shared layout. Omission
+uses the bundled `/favicon.svg`; unavailable configured images return 404, not a
+bundled fallback. Mounted files require Linux procfs; SVGs are trusted operator
+content, not sanitized uploads. Search, modal details
 and saved preferences remain later work. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [production starter](apps/web/config/directory.example.yml). For the isolated,

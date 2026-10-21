@@ -158,7 +158,7 @@ secrets stay outside its display model. The validator prints neither kind.
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version`                             | Only `1`; defaults to `1`. This is the file format, not the app release.                                                                                                      |
 | `site`                                | Optional object. Defaults: title `Directory`, description/footer empty, order `configured`.                                                                                   |
-| `site.logo_path`, `site.favicon_path` | Optional independent local images; omission leaves bundled branding to the future UI.                                                                                         |
+| `site.logo_path`, `site.favicon_path` | Optional independent local images. Site favicon selection publishes bytes at `/favicon`; omission uses bundled `/favicon.svg`. Site logo UI is not included yet.              |
 | `site.order`                          | `configured` or `alphabetical`; defaults to `configured`.                                                                                                                     |
 | `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                          |
 | `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                          |
@@ -242,12 +242,15 @@ Auth is all-or-nothing: a valid session opens the same directory for everyone.
 The service hints never become roles or per-link access rules. Sign-in and the
 required OIDC callback, generic health status and bundled resources are public;
 directory HTML, Kit data responses, generated bookmark logos and all mounted
-configured files require a session, including configured site favicons. Image GET
-and HEAD requests return 401 before sign-in even with HTML Accept, rather than
-redirecting to an HTML sign-in page.
-The sign-in page exposes only the site title and sign-in strategy, not links or
-private configuration. Configured site branding is not rendered in this slice;
-the bundled favicon remains unchanged.
+source URLs require a session, including the selected favicon's `/public/...`
+source. Image GET and HEAD requests return 401 before sign-in even with HTML
+Accept, rather than redirecting to an HTML sign-in page.
+The sign-in page exposes the site title, sign-in strategy and a constant favicon
+URI, not links or private configuration. The dedicated public `/favicon` endpoint
+publishes only the selected site favicon's bytes, regardless of session. Selecting
+a bookmark's image as the site favicon deliberately publishes those same bytes
+through this alias; the raw bookmark URL stays protected. Site logo UI is not
+included yet.
 
 When auth is enabled, set these server environment variables:
 
@@ -296,7 +299,16 @@ Unicode/spaces and nested directories are allowed; empty/dot segments, percent
 escapes, backslashes, queries, fragments and control characters are not. This is
 syntactic validation, not filesystem access or MIME inspection.
 
-The web endpoint serves only exact `assets.referencedPaths` from the request's
+`site.favicon_path` selects a source image, not the public alias. The shared layout
+returns only `/favicon` when selected, otherwise the bundled `/favicon.svg`; it
+never sends the configured source URI or private configuration. `/favicon` reads
+exactly that source from the request's captured snapshot using the same bounded
+reader and GET/HEAD response headers below. With no selection the alias returns 404. A missing, invalid or unavailable selected file also returns generic 404,
+without redirecting or falling back to the bundle. Valid configuration reloads
+change the selected bytes without changing the alias; invalid or auth-changing
+candidates retain the last good selection. No auth hook exceptions are involved.
+
+The mounted-file endpoint serves only exact `assets.referencedPaths` from the request's
 captured snapshot: configured site and bookmark logo/favicon paths, not an
 arbitrary directory listing or static file tree. GET and HEAD use private,
 no-store and nosniff headers; HEAD has the same status/headers without a body.

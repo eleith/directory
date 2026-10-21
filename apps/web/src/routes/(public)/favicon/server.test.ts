@@ -1,0 +1,106 @@
+import { validateConfig } from '@directory/config';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readImage } from '../../../lib/server/assets.js';
+import { prepareSnapshot } from '../../../lib/server/config/snapshot.js';
+import { GET, HEAD } from './+server.js';
+
+vi.mock('../../../lib/server/assets.js', () => ({ readImage: vi.fn() }));
+
+const publicDir = '/PRIVATE_MOUNTED_ROOT';
+const image = { bytes: new TextEncoder().encode('<svg/>'), contentType: 'image/svg+xml' };
+
+function snapshot(favicon_path?: string) {
+	const site: Record<string, string> = {};
+	if (favicon_path !== undefined) site.favicon_path = favicon_path;
+	return prepareSnapshot(validateConfig({ site, links: {} }, { env: {} }));
+}
+
+function event(method: 'GET' | 'HEAD', captured = snapshot('/public/café family.svg')) {
+	return {
+		params: {},
+		locals: { snapshot: captured, publicDir, session: null, authentication: undefined },
+		url: new URL('http://localhost/favicon'),
+		request: new Request('http://localhost/favicon', { method })
+	} as Parameters<typeof GET>[0];
+}
+
+function expectHeaders(response: Response, contentType: string, length: number) {
+	expect(response.headers.get('content-type')).toBe(contentType);
+	expect(response.headers.get('content-length')).toBe(String(length));
+	expect(response.headers.get('cache-control')).toBe('private, no-store');
+	expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+}
+
+beforeEach(() => {
+	vi.mocked(readImage).mockReset().mockResolvedValue(image);
+});
+
+describe('public favicon alias', () => {
+	it.each(['GET', 'HEAD'] as const)('reads exactly the selected source for %s', async (method) => {
+		const response = await (method === 'HEAD' ? HEAD : GET)(event(method));
+		expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/café family.svg');
+		expect(response.status).toBe(200);
+		expectHeaders(response, image.contentType, image.bytes.byteLength);
+		expect(await response.text()).toBe(method === 'HEAD' ? '' : '<svg/>');
+		if (method === 'HEAD') expect(response.body).toBeNull();
+	});
+
+	it.each(['GET', 'HEAD'] as const)(
+		'returns 404 before I/O when omitted for %s',
+		async (method) => {
+			const response = await GET(event(method, snapshot()));
+			expect(readImage).not.toHaveBeenCalled();
+			expect(response.status).toBe(404);
+			expectHeaders(response, 'text/plain; charset=utf-8', 9);
+			expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');
+			if (method === 'HEAD') expect(response.body).toBeNull();
+		}
+	);
+
+	it.each(['GET', 'HEAD'] as const)(
+		'maps unavailable reader results to generic %s 404',
+		async (method) => {
+			vi.mocked(readImage).mockResolvedValue(undefined);
+			const response = await GET(event(method));
+			expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/café family.svg');
+			expect(response.status).toBe(404);
+			expectHeaders(response, 'text/plain; charset=utf-8', 9);
+			expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');
+		}
+	);
+
+	it('does not derive a source or filesystem root from URL, query or headers', async () => {
+		for (const path of [
+			'/favicon?file=/public/other.svg&publicDir=/outside',
+			'/favicon?source=%252e%252e%252fsecret.svg',
+			'/favicon/other.svg?favicon_path=/public/other.svg'
+		]) {
+			const request = event('GET');
+			request.url = new URL(path, 'http://localhost');
+			request.request = new Request(request.url, {
+				headers: { 'x-public-dir': '/outside', range: 'bytes=0-1', 'if-none-match': '*' }
+			});
+			expect((await GET(request)).status).toBe(200);
+		}
+		expect(readImage).toHaveBeenCalledTimes(3);
+		for (const args of vi.mocked(readImage).mock.calls) {
+			expect(args).toEqual([publicDir, '/public/café family.svg']);
+		}
+	});
+
+	it('uses captured configuration, not display metadata or an additional reference registry', async () => {
+		const captured = event('GET');
+		captured.locals.snapshot = {
+			...captured.locals.snapshot,
+			display: snapshot('/public/display.svg').display,
+			assets: { referencedPaths: [], brandingPaths: [], bookmarkLogos: {} }
+		};
+		const replacement = event('GET', snapshot('/public/replacement.png'));
+		await GET(captured);
+		await GET(replacement);
+		expect(vi.mocked(readImage).mock.calls).toEqual([
+			[publicDir, '/public/café family.svg'],
+			[publicDir, '/public/replacement.png']
+		]);
+	});
+});

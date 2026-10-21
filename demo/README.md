@@ -6,11 +6,15 @@ Never publish these known credentials. A unique generated `AUTH_SECRET` is still
 required; there is no shared secret fallback.
 
 The nine bookmarks span three groups: four use the original project-authored MIT
-SVGs in `public/demo`, and five use generated bookmark logos. Site logo/favicon
-are omitted. Destinations are reserved example.com placeholders, not live
+SVGs in `public/demo`, and five use generated bookmark logos. A fifth original
+SVG is the site favicon; the site logo is omitted. Destinations are reserved
+example.com placeholders, not live
 integrations. Check all nine cards and plain `?link=<id>` details with JavaScript
 on and off; after sign-out, mounted and generated bookmark images must be private.
-Mounted-image reads require Linux procfs.
+Before sign-in, check the tab icon: `/favicon` publicly serves the selected image's
+bytes, while its raw `/public/demo/favicon.svg` URL still returns 401 (GET/HEAD,
+even with HTML Accept). Bookmark images stay private. Mounted-image reads require
+Linux procfs.
 
 ## Preferred native preview
 
@@ -33,7 +37,8 @@ port, update both `ORIGIN` and `AUTH_URL` to match.
 Without an override, the public directory resolves from the config path's
 grandparent: `demo/config/directory.yaml` selects `demo/public`. The explicit
 `DIRECTORY_PUBLIC_DIR` above also overrides any operator environment value.
-Image URIs stay `/public/demo/*.svg`, matching the runtime public mount.
+Source image URIs stay `/public/demo/*.svg`, matching the runtime public mount;
+the shared head uses only `/favicon`, never the configured source URI.
 
 For a production-server preview after `pnpm build`, from the repository root:
 
@@ -98,9 +103,12 @@ With mise/fnox already configured, the equivalent dev shortcut from `apps/web` i
 `ORIGIN=http://localhost:5173 mise docker up --build --force-recreate`; keep the
 existing valid secret supply. Stop one Compose setup before starting the other.
 See [deployment](../docs/deployment.md) for shutdown, mounts and HTTPS setup.
-`cp -n` preserves existing images; use an isolated checkout if these destination
-names are already occupied. An existing active copy of this nine-bookmark demo
-continues to work unchanged because its image URIs have not changed.
+The copy supplies five assets: four bookmark primary logos and one site favicon;
+the nine bookmarks still use four provided and five generated logos. `cp -n`
+preserves existing images; use an isolated checkout if these destination names
+are already occupied. For an existing active demo copy, manually add
+`site.favicon_path: /public/demo/favicon.svg` and copy the new SVG to opt in;
+otherwise the bundled icon remains. The field reloads without an auth restart.
 
 ## Scope and automated-check exclusion
 

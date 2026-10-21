@@ -6,7 +6,12 @@ images target Linux amd64; there is no worker, database or writable data volume.
 The UI renders bookmark groups and plain details with service links and prepared
 bookmark logos when no logo path is configured. Configured image files are now
 served only for exact snapshot references, with bounded 5 MiB reads and the
-directory's authentication policy, including configured site favicons.
+directory's authentication policy for all mounted source URLs. Selecting
+`site.favicon_path` deliberately publishes that image's bytes at public `/favicon`,
+including before sign-in, even when the source is also a bookmark logo. Its raw
+`/public/...` URL stays protected. The shared layout sends only the constant alias,
+not the source URI. Omission uses bundled `/favicon.svg`; a missing or invalid
+selected file returns 404, without a bundled fallback.
 
 ## Local production review
 
@@ -270,7 +275,11 @@ a Docker pass. Use disposable copies of any real configuration.
    trusted SVG. With JavaScript disabled, check its card and details render after
    sign-in. Without a session, GET/HEAD requests to both mounted files and
    `/bookmarks/<id>/logo` must return 401 even with `Accept: text/html`; configured
-   site favicons are private too. Check private/no-store and nosniff headers,
+   favicon source URLs stay private too. Before sign-in, check the tab uses public
+   `/favicon` for a selected site favicon; only that alias publishes its bytes.
+   Omit the selection to use bundled `/favicon.svg` with a 404 at `/favicon`.
+   Missing or invalid selected files must return 404 rather than a static fallback.
+   Check private/no-store and nosniff headers,
    bodyless HEAD, unreferenced and escaping-symlink 404s, missing-file recovery,
    atomic image replacement, and valid/invalid YAML reference reloads. Omit
    `logo_path` to check the prepared logo remains usable. Verify the actual

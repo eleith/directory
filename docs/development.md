@@ -244,9 +244,18 @@ snapshot renderer is unchanged. GET and HEAD return private/no-store, nosniff an
 byte lengths, with no HEAD body or range/conditional caching. Failures are generic
 404s. Config loads/preparation do not inspect images. References update only with
 accepted snapshots; image bytes update independently on subsequent requests.
-All mounted files, including configured site favicons, remain private when auth
-is enabled. HTML Accept does not turn image requests into sign-in redirects.
-The bundled favicon and existing UI/head remain unchanged.
+All mounted source URLs, including the selected site favicon's source, remain
+private when auth is enabled. HTML Accept does not turn image requests into
+sign-in redirects. The public group's `/favicon` GET/HEAD route reads only
+`locals.snapshot.configuration.site.favicon_path` through the existing reader and
+response helper. Selecting a bookmark image publishes its bytes through this alias
+as well, without making its raw URL public. Missing selection or unavailable bytes
+return generic 404, not a bundled fallback.
+
+The shared server layout returns only `{ faviconPath }`: `/favicon` when configured,
+otherwise bundled `/favicon.svg`. Its single head icon link has no fixed MIME type.
+No configured source URI, title, session or private configuration enters that
+layout data; the existing public sign-in title remains unchanged.
 
 ### Authentication boundary
 
@@ -261,8 +270,10 @@ Route folders declare access ownership; SvelteKit groups do not change URLs:
 
 ```text
 routes/
+  +layout.server.ts
   +layout.svelte
   (public)/
+    favicon/
     signin/
     healthz/
   (protected)/
@@ -590,8 +601,14 @@ agent-verified gates.
    path before starting. Check mounted logos on cards/details without JavaScript,
    generic 404s for unreferenced or missing files, then atomic file replacement
    and recovery. Authenticated mounted GET/HEAD work; unauthenticated requests
-   return 401 even with HTML Accept, including configured site favicons. Verify
-   Linux procfs availability and private/no-store, nosniff and bodyless HEAD.
+   return 401 even with HTML Accept, including the selected favicon's raw source.
+   Before sign-in, check the tab icon and `/favicon` GET/HEAD: only the selected
+   bytes are public, with private/no-store, nosniff and bodyless HEAD. Change the
+   selected source and check the same alias returns new bytes after polling;
+   invalid YAML and auth-changing edits must keep the last good selection. Omit
+   the field to check the head uses `/favicon.svg` and the alias returns 404.
+   Missing or invalid selected files must return 404, not the bundled icon. Verify
+   Linux procfs availability.
    See the [owner Docker checklist](deployment.md#owner-docker-review-checklist)
    for the separate real-image/mount/procfs review. Stop the server when finished.
    For production output, after `pnpm build`, run:
