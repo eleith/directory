@@ -9,8 +9,8 @@ and deterministic editor-schema generation are implemented, along with YAML
 loading, environment interpolation and standalone CLI validation; see
 [configuration](config.md). The web server now loads before serving, polls the
 configuration path, and captures one immutable snapshot per request. The shell
-renders configured groups, bookmark titles and plain details with external service
-links. Cards and details use server-prepared bookmark logos when no logo path is
+renders configured groups, bookmark titles and SSR details with external service
+links. Details progressively enhance into a responsive dialog. Cards and details use server-prepared bookmark logos when no logo path is
 configured. Configured image files now serve through exact captured snapshot
 references, not an arbitrary static directory. Optional credentials or OIDC authentication gates the entire directory;
 no-auth mode stays open and requires no session secret. [Docker and Compose](deployment.md)
@@ -32,6 +32,7 @@ dependencies exactly, including:
 | Prettier / prettier-plugin-svelte | 3.8.3 / 3.5.2   |
 | Vitest / coverage-v8              | 4.1.7 / 4.1.7   |
 | Playwright                        | 1.61.1          |
+| Bits UI                           | 2.18.1          |
 | Changesets CLI                    | 3.0.1           |
 
 Published peer ranges support this combination. `@types/node` 24.12.4 satisfies
@@ -297,6 +298,24 @@ public sign-in. The root records both `data-theme-preference` and the applied
 `data-theme`; OS changes update the latter only in System. There is no theme cookie
 or server-side preference. Without JavaScript, CSS follows the OS and the button
 stays disabled.
+
+### Progressive details
+
+Every tile retains a real `/?link=<id>` URL with speculative preloading disabled.
+Direct entries render plain details and Back alongside the full grid, including
+without JavaScript. After mount, direct entries load Bits UI; grid visits load it
+only on an unmodified primary tile activation. The enhancement replaces, rather
+than duplicates, the plain details with a centered desktop dialog or phone sheet.
+A failed import leaves direct details usable; grid activation falls back to a
+full document navigation.
+
+Kit 2 `pushState`/`replaceState` and typed `page.state` carry only the selected ID
+and a grid-entry marker. Local opens, closes and Back/Forward use the loaded
+snapshot, without a data request. A real navigation or refresh accepts a fresh
+server snapshot. Grid close goes back once; direct close safely replaces the URL
+with `/`. Bits owns trapping, dismissal and scroll lock, with focus returning to
+the connected activating tile or directory heading. Its portal targets the
+protected `.directory-theme` boundary so configured accents stay private.
 
 ### Authentication boundary
 
@@ -651,8 +670,10 @@ or CSP script errors. Disable JavaScript to check OS colors and native navigatio
    readiness, not configuration names or paths. Configured authentication must
    require sign-in before site copy/data are returned; missing secret/origin must
    fail startup. Try a wrong password, sign-out and a direct `__data.json` request.
-   Follow a bookmark to its plain `?link=<id>` details and return with Back to
-   directory. Omit a bookmark's `logo_path` in the disposable copy and check that its
+   Follow a bookmark to its `?link=<id>` details and close the dialog. Without
+   JavaScript, return with Back to directory. Check Tab/Shift-Tab trapping, Escape,
+   outside dismissal and return focus, then browser Back/Forward and a direct URL.
+   Throttle or block the dialog chunk to review the usable plain-details fallback. Omit a bookmark's `logo_path` in the disposable copy and check that its
    prepared logo renders without JavaScript and remains protected before sign-in,
    including HEAD and `/bookmarks/<id>/logo` opened as HTML. For a configured logo,
    use a disposable public directory and set `DIRECTORY_PUBLIC_DIR` to its absolute
@@ -694,7 +715,7 @@ or CSP script errors. Disable JavaScript to check OS colors and native navigatio
    **demo / directory-demo**, then stop the server when finished. This production
    preview also generates a demo-only secret per run. The
    directory uses prepared bookmark logos for omitted logo paths and serves exact
-   configured image references. Search and modal details are not implemented. Run
+   configured image references. Search is not implemented. Run
    manual axe/PageSpeed on this visible baseline when available; this slice is not
    final UI acceptance.
 

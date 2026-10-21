@@ -10,6 +10,10 @@ declare global {
 	}
 
 	namespace App {
+		interface PageState {
+			directoryDetail?: { id: string; fromGrid: boolean } | null;
+		}
+
 		interface Locals {
 			snapshot: PreparedSnapshot;
 			publicDir: string;

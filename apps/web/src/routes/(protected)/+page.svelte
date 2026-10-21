@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { afterNavigate, beforeNavigate, pushState, replaceState } from '$app/navigation';
+	import { page } from '$app/state';
 	import BookmarkLogo from '$lib/components/BookmarkLogo.svelte';
 	import DetailContent from '$lib/components/DetailContent.svelte';
 	import Logo from '$lib/components/Logo.svelte';
@@ -7,14 +10,109 @@
 
 	let { data }: { data: PageData } = $props();
 
+	let DetailDialog = $state<typeof import('$lib/components/DetailDialog.svelte').default>();
+	let dialogImport: Promise<typeof import('$lib/components/DetailDialog.svelte')> | undefined;
+	let mounted = false;
+	let openRequestVersion = 0;
+	let closing = false;
+	let returnTile: HTMLAnchorElement | undefined;
+	let directoryHeading: HTMLHeadingElement | undefined = $state();
+
+	const selectedId = $derived.by(() => {
+		if (page.state.directoryDetail === null) return null;
+		if (page.state.directoryDetail) return page.state.directoryDetail.id;
+		return data.selectedLinkId;
+	});
 	const selectedGroup = $derived(
-		data.directory.groups.find((group) =>
-			group.links.some((link) => link.id === data.selectedLinkId)
-		)
+		data.directory.groups.find((group) => group.links.some((link) => link.id === selectedId))
 	);
-	const selectedLink = $derived(
-		selectedGroup?.links.find((link) => link.id === data.selectedLinkId)
-	);
+	const selectedLink = $derived(selectedGroup?.links.find((link) => link.id === selectedId));
+
+	function cancelPendingOpen() {
+		openRequestVersion++;
+		closing = false;
+	}
+
+	function loadDialog() {
+		dialogImport ??= import('$lib/components/DetailDialog.svelte').catch((error: unknown) => {
+			dialogImport = undefined;
+			throw error;
+		});
+		return dialogImport;
+	}
+
+	async function enhanceDirectDetails() {
+		if (!selectedLink || DetailDialog) return;
+		const requestVersion = ++openRequestVersion;
+		const snapshot = data.directory;
+		try {
+			const module = await loadDialog();
+			if (!mounted || openRequestVersion !== requestVersion || data.directory !== snapshot) return;
+			DetailDialog = module.default;
+		} catch {
+			// Keep the usable server-rendered section on a failed direct-entry enhancement.
+		}
+	}
+
+	async function openDetails(event: MouseEvent, id: string) {
+		if (event.defaultPrevented || event.button !== 0) return;
+		if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		const tile = event.currentTarget as HTMLAnchorElement;
+		const href = tile.href;
+		event.preventDefault();
+		const requestVersion = ++openRequestVersion;
+		const snapshot = data.directory;
+		try {
+			const module = await loadDialog();
+			if (!mounted || openRequestVersion !== requestVersion || data.directory !== snapshot) return;
+			returnTile = tile;
+			closing = false;
+			DetailDialog = module.default;
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- This absolute href comes from the real tile anchor.
+			pushState(href, { ...page.state, directoryDetail: { id, fromGrid: true } });
+		} catch {
+			if (!mounted || openRequestVersion !== requestVersion || data.directory !== snapshot) return;
+			location.assign(href);
+		}
+	}
+
+	function closeDetails() {
+		if (closing) return;
+		openRequestVersion++;
+		closing = true;
+		if (page.state.directoryDetail?.fromGrid) {
+			history.back();
+			return;
+		}
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute.
+		replaceState('/', { ...page.state, directoryDetail: null });
+	}
+
+	function returnFocus() {
+		if (returnTile?.isConnected) {
+			returnTile.focus({ preventScroll: true });
+			return;
+		}
+		directoryHeading?.focus({ preventScroll: true });
+	}
+
+	beforeNavigate(() => {
+		cancelPendingOpen();
+		returnTile = undefined;
+	});
+	afterNavigate((navigation) => {
+		if (navigation.type !== 'enter') void enhanceDirectDetails();
+	});
+	onMount(() => {
+		mounted = true;
+		void enhanceDirectDetails();
+		window.addEventListener('popstate', cancelPendingOpen);
+		return () => {
+			mounted = false;
+			openRequestVersion++;
+			window.removeEventListener('popstate', cancelPendingOpen);
+		};
+	});
 </script>
 
 <svelte:head>
@@ -32,7 +130,7 @@
 				loading="eager"
 			/>
 			<div class="site-copy">
-				<h1>{data.directory.site.title}</h1>
+				<h1 bind:this={directoryHeading} tabindex="-1">{data.directory.site.title}</h1>
 				{#if data.directory.site.description}
 					<p class="description">{data.directory.site.description}</p>
 				{/if}
@@ -48,7 +146,14 @@
 		</div>
 	</header>
 
-	{#if selectedLink}
+	{#if selectedLink && DetailDialog}
+		<DetailDialog
+			link={selectedLink}
+			groupLabel={selectedGroup?.label}
+			onClose={closeDetails}
+			onReturnFocus={returnFocus}
+		/>
+	{:else if selectedLink}
 		<section class="details" aria-labelledby="link-details-title">
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 			<a class="back" href="/" data-sveltekit-preload-data="off">Back to directory</a>
@@ -65,11 +170,17 @@
 				<ul class="link-grid">
 					{#each group.links as link (link.id)}
 						<li>
-							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
-							<a class="tile" href={`/?link=${link.id}`} data-sveltekit-preload-data="off">
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
+							<a
+								class="tile"
+								href={`/?link=${link.id}`}
+								data-sveltekit-preload-data="off"
+								onclick={(event) => openDetails(event, link.id)}
+							>
 								<BookmarkLogo {link} loading="lazy" />
 								<span>{link.title}</span>
 							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						</li>
 					{/each}
 				</ul>

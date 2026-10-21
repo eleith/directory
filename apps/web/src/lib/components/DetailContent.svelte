@@ -1,14 +1,27 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import BookmarkLogo from './BookmarkLogo.svelte';
 	import Logo from './Logo.svelte';
 
-	let { link, groupLabel }: { link: DisplayLink; groupLabel?: string | undefined } = $props();
+	let {
+		link,
+		groupLabel,
+		title
+	}: {
+		link: DisplayLink;
+		groupLabel?: string | undefined;
+		title?: Snippet<[string]>;
+	} = $props();
 </script>
 
 <div class="details">
 	<BookmarkLogo {link} />
-	<h2 id="link-details-title">{link.title}</h2>
+	{#if title}
+		{@render title(link.title)}
+	{:else}
+		<h2 id="link-details-title">{link.title}</h2>
+	{/if}
 	{#if groupLabel}
 		<p class="group">{groupLabel}</p>
 	{/if}
@@ -53,13 +66,13 @@
 		overflow-wrap: anywhere;
 	}
 
-	h2,
+	.details :global(h2),
 	p,
 	ul {
 		margin: 0;
 	}
 
-	h2 {
+	.details :global(h2) {
 		font-size: var(--font-size-heading);
 		line-height: var(--line-height-heading);
 	}

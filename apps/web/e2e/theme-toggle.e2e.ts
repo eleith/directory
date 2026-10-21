@@ -96,9 +96,12 @@ test('keyboard cycle, next-action icons, focus, persistence and Kit navigation',
 	await page.getByRole('link', { name: 'Household calendar', exact: true }).click();
 	await expect(page).toHaveURL(`${server.url}/?link=calendar`);
 	await expectTheme(page, 'dark', 'dark');
-	const back = page.getByRole('link', { name: 'Back to directory', exact: true });
-	await expect(back).toHaveCSS('text-decoration-color', accents.dark);
-	await back.click();
+	const close = page.getByRole('button', { name: 'Close', exact: true });
+	await expect(page.getByRole('dialog')).toBeVisible();
+	await page.keyboard.press('Tab');
+	await page.keyboard.press('Shift+Tab');
+	await expect(close).toHaveCSS('outline-color', accents.dark);
+	await close.click();
 	await expect(page).toHaveURL(`${server.url}/`);
 	await expectTheme(page, 'dark', 'dark');
 	await expect(page.locator('body')).toHaveAttribute('data-navigation-marker', 'same-document');
@@ -109,7 +112,7 @@ test('System alone follows OS changes; manual palettes and private accents overr
 	page
 }) => {
 	await page.emulateMedia({ colorScheme: 'light' });
-	await page.goto(`${server.url}/?link=calendar`);
+	await page.goto(server.url);
 	const toggle = page.locator('.header-actions button');
 	await expect(toggle).toBeEnabled();
 	await page.emulateMedia({ colorScheme: 'dark' });
@@ -118,15 +121,27 @@ test('System alone follows OS changes; manual palettes and private accents overr
 	await expectTheme(page, 'system', 'light');
 	await toggle.click();
 	await expectTheme(page, 'dark', 'dark');
-	const back = page.getByRole('link', { name: 'Back to directory', exact: true });
-	await expect(back).toHaveCSS('text-decoration-color', accents.dark);
+	const tile = page.locator('a[href="/?link=calendar"]');
+	const close = page.getByRole('button', { name: 'Close', exact: true });
+	await tile.click();
+	await expect(close).toBeFocused();
+	await page.keyboard.press('Tab');
+	await page.keyboard.press('Shift+Tab');
+	await expect(close).toHaveCSS('outline-color', accents.dark);
+	await close.click();
 	await page.emulateMedia({ colorScheme: 'dark' });
 	await page.emulateMedia({ colorScheme: 'light' });
 	await expectTheme(page, 'dark', 'dark');
 	await toggle.click();
 	await page.emulateMedia({ colorScheme: 'dark' });
 	await expectTheme(page, 'light', 'light');
-	await expect(back).toHaveCSS('text-decoration-color', accents.light);
+	await tile.click();
+	await expect(close).toBeFocused();
+	await page.keyboard.press('Tab');
+	await page.keyboard.press('Shift+Tab');
+	await expect(close).toHaveCSS('outline-color', accents.light);
+	await close.click();
+	await toggle.focus();
 	await page.keyboard.press('Tab');
 	await page.keyboard.press('Shift+Tab');
 	await expect(toggle).toBeFocused();

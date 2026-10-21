@@ -19,6 +19,7 @@
 	"dependencies": {
 		"@dicebear/core": "10.4.0",
 		"@directory/config": "workspace:*",
+		"bits-ui": "catalog:",
 		"tslog": "5.2.0"
 	},
 	"devDependencies": {

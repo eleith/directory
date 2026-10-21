@@ -42,7 +42,7 @@ authentication policy as the directory for mounted source URLs. Selecting
 including before sign-in; its source URI stays out of the shared layout. Omission
 uses the bundled `/favicon.svg`; unavailable configured images return 404, not a
 bundled fallback. Mounted files require Linux procfs; SVGs are trusted operator
-content, not sanitized uploads. Search and modal details remain later work. See [authentication setup](docs/config.md#authentication-shapes).
+content, not sanitized uploads. Search remains later work. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [production starter](apps/web/config/directory.example.yml). For the isolated,
 local-only nine-bookmark review, see [the demo](demo/README.md).
@@ -70,6 +70,8 @@ Run from the repository root and open `http://localhost:5173`. This starter is
 empty and has no authentication. For the populated, authenticated preview that
 leaves operator configuration and media untouched, use [demo/README.md](demo/README.md).
 Groups, bookmark titles and `?link=<id>` details also render without JavaScript.
+With JavaScript, details enhance on demand into a desktop dialog or phone sheet,
+with browser history and keyboard focus preserved.
 `/healthz` returns generic readiness. Invalid auth environment settings stop startup
 with `auth_failed` and a fixed, value-free setting hint. Linux prerequisites,
 reload checks and shutdown are documented in [development](docs/development.md).

@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { dialogScript, navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const sourceA = '/public/service-a.svg';
@@ -104,12 +105,14 @@ for (const javaScriptEnabled of [true, false]) {
 		try {
 			const page = await context.newPage();
 			await page.goto(`${app.url}/?link=provided`);
+			if (javaScriptEnabled) await expect(page.getByRole('dialog')).toBeVisible();
 			for (const [id, source] of [
 				['provided', sourceA],
 				['other', sourceB],
 				['omitted', undefined]
 			] as const) {
-				await page.locator(`a[href="/?link=${id}"]`).click();
+				if (javaScriptEnabled) await navigateQuery(page, `/?link=${id}`);
+				else await page.locator(`a[href="/?link=${id}"]`).click();
 				const external = control(page);
 				await expect(external).toHaveAccessibleName(accessibleName);
 				await expect(external).toHaveAttribute('href', `https://${id}.example.test`);
@@ -144,13 +147,18 @@ for (const abortFallback of [false, true]) {
 		});
 		if (abortFallback) await page.route('**/bookmarks/provided/logo', (route) => route.abort());
 		const scripts = Promise.withResolvers<void>();
+		const dialog = Promise.withResolvers<void>();
+		await page.route(`**${dialogScript}`, async (route) => {
+			await dialog.promise;
+			await route.continue();
+		});
 		let heldScripts = 0;
 		await page.route('**/_app/immutable/**', async (route) => {
 			if (route.request().resourceType() === 'script') {
 				heldScripts++;
 				await scripts.promise;
 			}
-			await route.continue();
+			await route.fallback();
 		});
 		try {
 			await page.goto(`${app.url}/?link=provided`, { waitUntil: 'commit' });
@@ -165,15 +173,20 @@ for (const abortFallback of [false, true]) {
 			else await expectDecoded(image, '/bookmarks/provided/logo', 64);
 			expect(await image.evaluate((node, previous) => node === previous, original)).toBe(true);
 			await original?.dispose();
+			dialog.resolve();
+			await expect(page.getByRole('dialog')).toBeVisible();
+			if (abortFallback) await expectBroken(image);
+			else await expectDecoded(image, '/bookmarks/provided/logo', 64);
 			await page.evaluate(
 				() =>
 					new Promise<void>((resolve) =>
 						requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
 					)
 			);
-			expect(fallbackRequests).toBe(1);
+			expect(fallbackRequests).toBe(2);
 		} finally {
 			scripts.resolve();
+			dialog.resolve();
 			await page.unrouteAll({ behavior: 'wait' });
 		}
 	});
@@ -185,24 +198,25 @@ test('source and selected identity changes recover in place through native Kit q
 	await writeFile(join(publicDir, 'service-a.svg'), 'not an image');
 	const app = await boot(sourceA, sourceA);
 	await page.goto(`${app.url}/?link=provided`);
+	await expect(page.getByRole('dialog')).toBeVisible();
 	const image = control(page).locator('img');
 	await expectDecoded(image, '/bookmarks/provided/logo', 64);
 	const original = await image.elementHandle();
 	await page.evaluate(() => Reflect.set(window, 'serviceIconNavigationMarker', true));
 	try {
-		await page.locator('a[href="/?link=other"]').click();
+		await navigateQuery(page, '/?link=other');
 		await expectDecoded(image, '/bookmarks/other/logo', 64);
 		await app.replace(configuration(sourceB, sourceA));
 		await expect.poll(async () => (await app.fetch('/__data.json')).text()).toContain(sourceB);
-		await page.locator('a[href="/?link=provided"]').click();
+		await navigateQuery(page, '/?link=provided');
 		await expectDecoded(image, sourceB);
 		await writeFile(join(publicDir, 'service-a.svg'), icon);
 		const previousData = await (await app.fetch('/__data.json')).text();
 		await app.replace(configuration());
 		await expect.poll(async () => (await app.fetch('/__data.json')).text()).not.toBe(previousData);
-		await page.locator('a[href="/?link=other"]').click();
+		await navigateQuery(page, '/?link=other');
 		await expectDecoded(image, sourceB);
-		await page.locator('a[href="/?link=provided"]').click();
+		await navigateQuery(page, '/?link=provided');
 		await expectDecoded(image, sourceA);
 		expect(await page.evaluate(() => Reflect.get(window, 'serviceIconNavigationMarker'))).toBe(
 			true
@@ -257,11 +271,12 @@ test('service source and default API remain private across real credentials sign
 	await page.getByLabel('Username').fill('icon-user');
 	await page.getByLabel('Password').fill('icon-password');
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-	await page.locator('a[href="/?link=provided"]').click();
+	await expect(page.getByRole('dialog')).toBeVisible();
 	await expectDecoded(control(page).locator('img'), sourceA);
 	for (const path of [sourceA, '/bookmarks/provided/logo']) {
 		expect((await page.request.get(`${app.url}${path}`)).status()).toBe(200);
 	}
+	await page.getByRole('button', { name: 'Close', exact: true }).click();
 	await page.getByRole('button', { name: 'Sign out' }).click();
 	for (const path of [sourceA, '/bookmarks/provided/logo']) {
 		expect((await page.request.get(`${app.url}${path}`)).status()).toBe(401);

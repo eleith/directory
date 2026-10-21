@@ -128,10 +128,16 @@ for (const javaScriptEnabled of [true, false]) {
 					await expect(first).toHaveCSS('outline-color', accent);
 					await first.click();
 					await expect(page).toHaveURL(`${server.url}/?link=entry-0`);
-					const back = page.getByRole('link', { name: 'Back to directory', exact: true });
-					await expect(back).toHaveAttribute('href', '/');
-					await expect(back).toHaveAttribute('data-sveltekit-preload-data', 'off');
-					await expect(back).toHaveCSS('text-decoration-color', accent);
+					let dismiss = page.getByRole('link', { name: 'Back to directory', exact: true });
+					if (javaScriptEnabled) {
+						await expect(page.getByRole('dialog')).toBeVisible();
+						dismiss = page.getByRole('button', { name: 'Close', exact: true });
+						await expect(dismiss).toBeFocused();
+					} else {
+						await expect(dismiss).toHaveAttribute('href', '/');
+						await expect(dismiss).toHaveAttribute('data-sveltekit-preload-data', 'off');
+						await expect(dismiss).toHaveCSS('text-decoration-color', accent);
+					}
 					const external = page.getByRole('link', {
 						name: 'Open service (opens in a new tab)',
 						exact: true
@@ -147,12 +153,10 @@ for (const javaScriptEnabled of [true, false]) {
 						'24px'
 					);
 					if (javaScriptEnabled) {
-						await page.keyboard.press('Tab');
-						await expect(
-							page.getByRole('button', { name: 'Switch to dark theme', exact: true })
-						).toBeFocused();
+						await page.keyboard.press('Shift+Tab');
+						await expect(external).toBeFocused();
 					}
-					for (const link of [back, external]) {
+					for (const link of [dismiss, external]) {
 						await page.keyboard.press('Tab');
 						await expect(link).toBeFocused();
 						await expect(link).toHaveCSS('outline-style', 'solid');
@@ -161,7 +165,7 @@ for (const javaScriptEnabled of [true, false]) {
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
 					).toBe(true);
-					await back.click();
+					await dismiss.click();
 					await expect(page).toHaveURL(`${server.url}/`);
 				}
 			} finally {
@@ -226,13 +230,23 @@ test('configured theme inputs stay private and leave sign-in on the default pale
 			await expect(boundary).toHaveCSS('--directory-primary-light', light);
 			await expect(boundary).toHaveCSS('--directory-primary-dark', dark);
 			const accent = colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)';
-			const back = page.getByRole('link', { name: 'Back to directory', exact: true });
-			await expect(back).toHaveCSS('text-decoration-color', accent);
+			await expect(page.getByRole('dialog')).toBeVisible();
+			const close = page.getByRole('button', { name: 'Close', exact: true });
+			await expect(close).toBeFocused();
+			for (const control of [
+				close,
+				page.getByRole('link', { name: 'Open service (opens in a new tab)', exact: true })
+			]) {
+				await control.focus();
+				await expect(control).toBeFocused();
+				await expect(control).toHaveCSS('outline-style', 'solid');
+				await expect(control).toHaveCSS('outline-color', accent);
+			}
+			await close.click();
+			await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
 			for (const control of [
 				page.getByRole('button', { name: 'Switch to dark theme', exact: true }),
-				page.getByRole('button', { name: 'Sign out' }),
-				back,
-				page.getByRole('link', { name: 'Open service (opens in a new tab)', exact: true })
+				page.getByRole('button', { name: 'Sign out' })
 			]) {
 				await page.keyboard.press('Tab');
 				await expect(control).toBeFocused();

@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator } from '@playwright/test';
+import { dialogScript, navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 let directory: string;
@@ -88,13 +89,18 @@ for (const view of ['card', 'details'] as const) {
 		page
 	}) => {
 		const scripts = Promise.withResolvers<void>();
+		const dialog = Promise.withResolvers<void>();
+		await page.route(`**${dialogScript}`, async (route) => {
+			await dialog.promise;
+			await route.continue();
+		});
 		let heldScripts = 0;
 		await page.route('**/_app/immutable/**', async (route) => {
 			if (route.request().resourceType() === 'script') {
 				heldScripts++;
 				await scripts.promise;
 			}
-			await route.continue();
+			await route.fallback();
 		});
 		try {
 			await page.goto(`${server.url}/${view === 'details' ? '?link=broken' : ''}`, {
@@ -112,8 +118,14 @@ for (const view of ['card', 'details'] as const) {
 			await expectDecoded(image, '/bookmarks/broken/logo');
 			expect(await image.evaluate((node, previous) => node === previous, ssrImage)).toBe(true);
 			await ssrImage?.dispose();
+			dialog.resolve();
+			if (view === 'details') {
+				await expect(page.getByRole('dialog')).toBeVisible();
+				await expectDecoded(page.locator('section.details img'), '/bookmarks/broken/logo');
+			}
 		} finally {
 			scripts.resolve();
+			dialog.resolve();
 			await page.unrouteAll({ behavior: 'wait' });
 		}
 	});
@@ -141,7 +153,8 @@ test('source changes retry primary URLs in place, including a repaired previousl
 		await expect
 			.poll(async () => (await server.fetch('/__data.json')).text())
 			.toContain('/public/primary-b.svg');
-		await page.locator('a[href="/?link=valid"]').click();
+		await navigateQuery(page, '/?link=valid');
+		await expect(page.getByRole('dialog')).toBeVisible();
 		await expect(page).toHaveURL(`${server.url}/?link=valid`);
 		await expectDecoded(image, '/public/primary-b.svg');
 
@@ -150,7 +163,7 @@ test('source changes retry primary URLs in place, including a repaired previousl
 		await expect
 			.poll(async () => (await server.fetch('/__data.json')).text())
 			.toContain('/public/primary-a.svg');
-		await page.getByRole('link', { name: 'Back to directory' }).click();
+		await navigateQuery(page, '/');
 		await expect(page).toHaveURL(`${server.url}/`);
 		await expectDecoded(image, '/public/primary-a.svg');
 		expect(primaryARequests).toBe(2);
@@ -163,7 +176,7 @@ test('source changes retry primary URLs in place, including a repaired previousl
 		const failedPrimary = page.waitForResponse(
 			(response) => new URL(response.url()).pathname === '/public/primary-c.svg'
 		);
-		await page.locator('a[href="/?link=valid"]').click();
+		await navigateQuery(page, '/?link=valid');
 		expect((await failedPrimary).status()).toBe(404);
 		await expectDecoded(image, '/bookmarks/broken/logo');
 		expect(await page.evaluate(() => Reflect.get(window, 'bookmarkNavigationMarker'))).toBe(true);
@@ -177,17 +190,18 @@ test('source changes retry primary URLs in place, including a repaired previousl
 
 test('reused details try each link primary and use that link’s own fallback', async ({ page }) => {
 	await page.goto(`${server.url}/?link=broken`);
+	await expect(page.getByRole('dialog')).toBeVisible();
 	const detailsImage = page.locator('section.details img');
 	await expectDecoded(detailsImage, '/bookmarks/broken/logo');
 	await expect(detailsImage).not.toHaveAttribute('loading', 'lazy');
 	await page.evaluate(() => Reflect.set(window, 'bookmarkNavigationMarker', true));
 	const originalImage = await detailsImage.elementHandle();
 	try {
-		await page.locator('a[href="/?link=valid"]').click();
+		await navigateQuery(page, '/?link=valid');
 		await expectDecoded(detailsImage, '/public/valid.svg');
-		await page.locator('a[href="/?link=other"]').click();
+		await navigateQuery(page, '/?link=other');
 		await expectDecoded(detailsImage, '/bookmarks/other/logo');
-		await page.locator('a[href="/?link=default"]').click();
+		await navigateQuery(page, '/?link=default');
 		await expectDecoded(detailsImage, '/bookmarks/default/logo');
 		expect(await page.evaluate(() => Reflect.get(window, 'bookmarkNavigationMarker'))).toBe(true);
 		expect(

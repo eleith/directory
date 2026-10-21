@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator } from '@playwright/test';
+import { navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const title = 'A household directory with a very long unbroken title HouseholdDirectoryForEveryone';
@@ -236,14 +237,14 @@ test('source changes retry A to B to repaired A in place, and hydrated errors us
 	try {
 		await app.replace(configuration(sourceB));
 		await expect.poll(async () => (await app.fetch('/__data.json')).text()).toContain(sourceB);
-		await page.locator('a[href="/?link=book"]').click();
+		await navigateQuery(page, '/?link=book');
 		await expect(page).toHaveURL(`${app.url}/?link=book`);
 		await expectDecoded(image, sourceB);
 
 		await writeFile(join(publicDir, 'private-brand-a.svg'), icon);
 		await app.replace(configuration(sourceA));
 		await expect.poll(async () => (await app.fetch('/__data.json')).text()).toContain(sourceA);
-		await page.getByRole('link', { name: 'Back to directory' }).click();
+		await navigateQuery(page, '/');
 		await expect(page).toHaveURL(`${app.url}/`);
 		await expectDecoded(image, sourceA);
 		expect(primaryARequests).toBe(2);
@@ -255,7 +256,7 @@ test('source changes retry A to B to repaired A in place, and hydrated errors us
 		const failedPrimary = page.waitForResponse(
 			(response) => new URL(response.url()).pathname === '/public/missing-brand.svg'
 		);
-		await page.locator('a[href="/?link=book"]').click();
+		await navigateQuery(page, '/?link=book');
 		expect((await failedPrimary).status()).toBe(404);
 		await expectDecoded(image, '/favicon.svg');
 		expect(await page.evaluate(() => Reflect.get(window, 'headerNavigationMarker'))).toBe(true);
