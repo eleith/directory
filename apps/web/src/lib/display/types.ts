@@ -10,8 +10,8 @@ export interface DisplaySite {
 	readonly title: string;
 	readonly description: string;
 	readonly footer: string;
-	readonly logo_path?: string;
-	readonly favicon_path?: string;
+	readonly logo_path: string;
+	readonly favicon_path: string;
 }
 
 export interface DisplayAppearance {

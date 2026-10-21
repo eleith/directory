@@ -1,5 +1,6 @@
 import { validateConfig } from '@directory/config';
 import type { Handle, RequestEvent } from '@sveltejs/kit';
+import { themeStyleTag } from './lib/server/appearance.js';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Authentication } from './lib/server/auth/index.js';
 import { requireSignIn } from './lib/server/auth/access.js';
@@ -29,6 +30,26 @@ vi.mock('$app/environment', () => ({
 		return mocks.dev;
 	}
 }));
+// Supply request tracing context while exercising Kit's real sequence/options composition.
+vi.mock('@sveltejs/kit/hooks', async (importOriginal) => {
+	const { sequence } = await importOriginal<typeof import('@sveltejs/kit/hooks')>();
+	const { with_request_store } = await vi.importActual<{
+		with_request_store: (store: unknown, run: () => ReturnType<Handle>) => ReturnType<Handle>;
+	}>('@sveltejs/kit/internal/server');
+	return {
+		sequence: (...handlers: Handle[]): Handle => {
+			const handle = sequence(...handlers);
+			return (input) =>
+				with_request_store(
+					{
+						event: input.event,
+						state: { tracing: { record_span: ({ fn }: { fn: () => unknown }) => fn() } }
+					},
+					() => handle(input)
+				);
+		}
+	};
+});
 vi.mock('./lib/server/assets.js', () => ({ readImage: vi.fn() }));
 vi.mock('./lib/server/boot.js', () => ({ bootApp: mocks.boot }));
 vi.mock('./lib/server/logger.js', () => ({ reportStartupFailure: mocks.report }));
@@ -45,11 +66,12 @@ const realSnapshot = await vi.importActual<typeof import('./lib/server/config/sn
 const sentinel = 'PRIVATE-config-password-not-for-browser';
 type Resolve = Parameters<Handle>[0]['resolve'];
 
-function snapshot(title: string) {
+function snapshot(title: string, light = '#13579b', dark = '#c4d6e8') {
 	return realSnapshot.prepareSnapshot(
 		validateConfig(
 			{
 				site: { title, description: `${title} description`, favicon_path: '/public/site.svg' },
+				appearance: { primary_light_color: light, primary_dark_color: dark },
 				auth: { credentials: { username: 'family', password: sentinel } },
 				links: {
 					photos: {
@@ -202,7 +224,10 @@ describe('server hooks', () => {
 			const request = event();
 			const resolve = vi.fn<Resolve>();
 			expect(await hooks.handle({ event: request, resolve })).toBe(response);
-			expect(authentication.handle).toHaveBeenCalledExactlyOnceWith({ event: request, resolve });
+			expect(authentication.handle).toHaveBeenCalledExactlyOnceWith({
+				event: expect.objectContaining({ locals: request.locals }),
+				resolve: expect.any(Function)
+			});
 			expect(ready.directory.currentSnapshot).toHaveBeenCalledOnce();
 			expect(resolve).not.toHaveBeenCalled();
 			expect(authentication.signIn).not.toHaveBeenCalled();
@@ -298,6 +323,79 @@ describe('server hooks', () => {
 		}
 	);
 
+	it.each(['none', 'credentials', 'oidc'] as const)(
+		'inserts the captured theme once in streamed HTML via native resolve composition (%s)',
+		async (strategy) => {
+			const authTransform = vi.fn(({ html }: { html: string }) => html);
+			const filterSerializedResponseHeaders = vi.fn(() => false);
+			const preload = vi.fn(() => false);
+			let authentication: Authentication | undefined;
+			if (strategy !== 'none') {
+				authentication = {
+					strategy,
+					handle: ({ event, resolve }) =>
+						resolve(event, {
+							transformPageChunk: authTransform,
+							filterSerializedResponseHeaders,
+							preload
+						}),
+					signIn: vi.fn<Authentication['signIn']>(),
+					signOut: vi.fn<Authentication['signOut']>()
+				};
+			}
+			const ready = application('Initial', authentication);
+			const captured = ready.directory.currentSnapshot();
+			ready.directory.currentSnapshot.mockClear();
+			const before = JSON.stringify(captured);
+			const replacement = snapshot('Replacement', '#abc', '#def');
+			mocks.boot.mockResolvedValueOnce(ready);
+			const hooks = await import('./hooks.server.js');
+			await hooks.init();
+			const request = event();
+			const resolve = vi.fn<Resolve>().mockImplementation(async (event, options) => {
+				expect(event.locals).toBe(request.locals);
+				expect(event.locals.snapshot).toBe(captured);
+				ready.directory.currentSnapshot.mockReturnValue(replacement);
+				const transform = options?.transformPageChunk;
+				if (transform === undefined) throw new Error('Missing theme transform');
+				if (strategy !== 'none') {
+					expect(options?.filterSerializedResponseHeaders).toBe(filterSerializedResponseHeaders);
+					expect(options?.preload).toBe(preload);
+				}
+				const opening = '<!doctype html><html><head><title>Sign in</title>';
+				const head = '</head><body>Sign in';
+				const ending = '</body></html>';
+				expect(await transform({ html: opening, done: false })).toBe(opening);
+				const themedHead = await transform({ html: head, done: false });
+				expect(themedHead).toBe(`\t${themeStyleTag(captured.display.appearance)}\n${head}`);
+				expect(await transform({ html: ending, done: true })).toBe(ending);
+				return new Response(opening + themedHead + ending, {
+					headers: { 'content-type': 'text/html' }
+				});
+			});
+			const response = await hooks.handle({ event: request, resolve });
+			const html = await response.text();
+			expect(html.match(/<style>/g)).toHaveLength(1);
+			expect(html).not.toContain(sentinel);
+			expect(html).not.toContain('/public/site.svg');
+			expect(html).not.toContain('Replacement');
+			expect(html).not.toContain('#abc');
+			expect(html).not.toContain('--directory-');
+			expect(ready.directory.currentSnapshot).toHaveBeenCalledOnce();
+			expect(request.locals.snapshot).toBe(captured);
+			expect(JSON.stringify(captured)).toBe(before);
+			expect(mocks.load).not.toHaveBeenCalled();
+			expect(mocks.prepare).not.toHaveBeenCalled();
+			expect(mocks.path).not.toHaveBeenCalled();
+			if (strategy !== 'none') {
+				expect(authTransform).toHaveBeenCalledTimes(3);
+				expect(authTransform.mock.calls[1]?.[0].html).toContain(
+					themeStyleTag(captured.display.appearance)
+				);
+			}
+		}
+	);
+
 	it('captures exactly once per request so nested loaders keep the original snapshot after publication', async () => {
 		const initial = snapshot('Initial');
 		const replacement = snapshot('Replacement');
@@ -336,7 +434,7 @@ describe('server hooks', () => {
 		expect(firstEvent.locals.authentication).toBeUndefined();
 		expect(firstEvent.locals.session).toBeNull();
 		expect(await firstEvent.locals.auth()).toBeNull();
-		expect(resolve.mock.calls[0]?.[0]).toBe(firstEvent);
+		expect(resolve.mock.calls[0]?.[0].locals).toBe(firstEvent.locals);
 		const body = await first.text();
 		expect(JSON.parse(body)).toEqual({ first: 'Initial', second: 'Initial' });
 		expect(body).not.toContain(sentinel);

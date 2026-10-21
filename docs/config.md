@@ -154,23 +154,24 @@ secrets stay outside its display model. The validator prints neither kind.
 
 ## Fields and defaults
 
-| Field                                 | Contract                                                                                                                                                                                                               |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`                             | Only `1`; defaults to `1`. This is the file format, not the app release.                                                                                                                                               |
-| `site`                                | Optional object. Defaults: title `Directory`, description/footer empty, order `configured`.                                                                                                                            |
-| `site.logo_path`, `site.favicon_path` | Optional independent local images. The directory header shows the site logo at 48px, defaulting to bundled `/favicon.svg`. Site favicon selection publishes bytes at `/favicon`; omission uses bundled `/favicon.svg`. |
-| `site.order`                          | `configured` or `alphabetical`; defaults to `configured`.                                                                                                                                                              |
-| `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                                                                   |
-| `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                                                                   |
-| `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `''` and the three advisory booleans default to `false`.                                          |
+| Field                                 | Contract                                                                                                                                                                                                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                             | Only `1`; defaults to `1`. This is the file format, not the app release.                                                                                                                                                                                    |
+| `site`                                | Optional object. Defaults: title `Directory`, description/footer empty, order `configured`.                                                                                                                                                                 |
+| `site.logo_path`, `site.favicon_path` | Independent site images, normalized by the shared loader to bundled `/favicon.svg` when omitted. Explicit `/favicon.svg` is also valid. Header and sign-in show the logo at 48px. Mounted selections publish bytes at `/logo` and `/favicon` independently. |
+| `site.order`                          | `configured` or `alphabetical`; defaults to `configured`.                                                                                                                                                                                                   |
+| `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                                                                                                        |
+| `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                                                                                                        |
+| `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `''` and the three advisory booleans default to `false`.                                                                               |
 
-Appearance colors accent keyboard focus and the Back-link underline in the protected
-directory, following the OS light/dark scheme without JavaScript. They do not change
-page surfaces or sign-in. The protected layout supplies only these two inputs to
-shared semantic theme CSS after the access gate; configured colors are not public
-sign-in data. Refresh the document after configuration reloads to update them.
-Operators should choose colors with sufficient contrast; hex validation does not
-guarantee contrast.
+Appearance colors are public branding: they accent keyboard focus, the directory's
+Back-link underline and the filled sign-in action. Server-owned appearance emits
+only these validated colors and derived readable foregrounds as semantic CSS in
+the document head. The root layout sends only constant logo/favicon URIs. Page
+surfaces stay unchanged. Sign-in foregrounds meet 4.5:1 contrast against
+the configured primary; operators should still choose accessible focus accents.
+Without JavaScript, colors follow the OS scheme. Refresh the document after
+configuration reloads to update branding inputs.
 
 Site copy and optional link `description` are plain strings. Description supports
 multiline guidance; there is no separate `good_to_know` field. Logo and favicon
@@ -253,13 +254,13 @@ directory HTML, Kit data responses, generated bookmark logos and all mounted
 source URLs require a session, including the selected favicon's `/public/...`
 source. Image GET and HEAD requests return 401 before sign-in even with HTML
 Accept, rather than redirecting to an HTML sign-in page.
-The sign-in page exposes the site title, sign-in strategy and a constant favicon
-URI, not links or private configuration. The dedicated public `/favicon` endpoint
-publishes only the selected site favicon's bytes, regardless of session. Selecting
-a bookmark or site logo image as the site favicon deliberately publishes those same
-bytes through this alias; its raw source URL stays protected. The sign-in mark
-always uses bundled `/favicon.svg`, never `site.logo_path`. No configured site
-logo URI is sent in public HTML or shared layout data.
+The sign-in page exposes the site title, sign-in strategy, two primary colors,
+derived button foregrounds and constant logo/favicon URIs, not links, descriptions,
+sessions or private configuration. Dedicated public `/logo` and `/favicon` GET/HEAD
+endpoints publish only the selected site's logo and favicon bytes respectively,
+regardless of session. Selecting a bookmark/service image deliberately publishes
+those same bytes through the selected alias; its raw source URL stays protected.
+No configured source URI, filesystem path or image bytes enter public layout data.
 
 When auth is enabled, set these server environment variables:
 
@@ -303,10 +304,14 @@ Destinations and OIDC issuer URLs must be absolute HTTP(S), including local HTTP
 hosts/ports when appropriate. Relative, protocol-relative, executable, malformed
 or whitespace-containing URLs are rejected by the runtime schema.
 
-Images are decoded `/public/...` paths with SVG/PNG/JPEG/GIF/WebP extensions.
+Mounted images are decoded `/public/...` paths with SVG/PNG/JPEG/GIF/WebP extensions.
 Unicode/spaces and nested directories are allowed; empty/dot segments, percent
 escapes, backslashes, queries, fragments and control characters are not. This is
-syntactic validation, not filesystem access or MIME inspection.
+syntactic validation, not filesystem access or MIME inspection. Site logo and favicon
+fields also accept the exact bundled `/favicon.svg` URI. The shared loader supplies
+that URI independently for omitted site fields; normalized site paths are required
+strings for both web and CLI consumers. Bookmark image fields stay optional and
+mounted-only, with no bundled URI selection.
 
 `links.*.favicon_path` optionally renders a decorative 24×24 icon inside the details'
 Open service link. Omission renders no service icon. It is independent of the 64px
@@ -314,9 +319,10 @@ primary `links.*.logo_path`: with JavaScript, a failed service icon switches onc
 to `/bookmarks/<id>/logo`, not to the configured primary logo. A failed fallback
 stops. Source or selected-link changes reset the attempt in place; repairing bytes
 at an unchanged URL requires refresh. Without JavaScript, a broken icon stays
-broken but the service link remains usable. Both the mounted source and prepared
-fallback require a session when auth is enabled. This field does not publish bytes
-through the separate `site.favicon_path` public `/favicon` alias.
+broken but the service link remains usable. Mounted source URLs and prepared
+fallback endpoints require a session when auth is enabled. This field does not
+select public branding; only `site.logo_path` and `site.favicon_path` publish
+selected bytes through their separate public aliases.
 
 `site.logo_path` renders a decorative, eager 48×48 image beside the directory title
 and description. Omission uses bundled `/favicon.svg` directly in server-rendered
@@ -326,18 +332,25 @@ bundle stops without retrying. Without JavaScript, a broken configured image sta
 broken while the title and navigation remain usable. Changing the source URL
 allows a fresh primary attempt; repairing bytes at an unchanged URL requires a
 refresh. With auth enabled, the configured source URL requires a session.
+Sign-in uses public `/logo` for the same selection, with the same 48px/default/
+fallback behavior. The bundled mark is 🗂️ (card index dividers). `/logo` reads only
+the captured mounted `site.logo_path`, ignoring query selectors. A bundled selection
+(default or explicit) returns 404 before image I/O; missing or invalid mounted
+bytes return generic 404. A full document
+refresh accepts new selection/bytes. Raw sources and nonselected assets stay private.
 
 `site.favicon_path` selects a source image, not the public alias. The shared layout
-returns only `/favicon` when selected, otherwise the bundled `/favicon.svg`; it
-never sends the configured source URI or private configuration. `/favicon` reads
-exactly that source from the request's captured snapshot using the same bounded
-reader and GET/HEAD response headers below. With no selection the alias returns 404. A missing, invalid or unavailable selected file also returns generic 404,
+maps validated mounted paths to `/favicon` and passes the resolved bundled URI
+through unchanged; it does not choose defaults or send mounted source URIs or
+private configuration. `/favicon` reads exactly the mounted source from the
+request's captured snapshot using the same bounded reader and GET/HEAD response
+headers below. A bundled selection (default or explicit) returns 404 before I/O. A missing, invalid or unavailable selected file also returns generic 404,
 without redirecting or falling back to the bundle. Valid configuration reloads
 change the selected bytes without changing the alias; invalid or auth-changing
 candidates retain the last good selection. No auth hook exceptions are involved.
 
 The mounted-file endpoint serves only exact `assets.referencedPaths` from the request's
-captured snapshot: configured site and bookmark logo/favicon paths, not an
+captured snapshot: mounted site and bookmark logo/favicon paths, not bundled URIs or an
 arbitrary directory listing or static file tree. GET and HEAD use private,
 no-store and nosniff headers; HEAD has the same status/headers without a body.
 There are no range or conditional-cache responses. Missing, unreferenced,

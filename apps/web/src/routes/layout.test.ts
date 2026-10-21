@@ -3,18 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { prepareSnapshot } from '../lib/server/config/snapshot.js';
 import { load } from './+layout.server.js';
 
-function event(favicon_path?: string) {
-	const site: Record<string, string> = {
-		title: 'PRIVATE_LAYOUT_TITLE',
-		logo_path: '/public/private-logo.svg'
-	};
-	if (favicon_path !== undefined) site.favicon_path = favicon_path;
+function event(site: Record<string, string> = {}) {
 	const snapshot = prepareSnapshot(
 		validateConfig(
 			{
-				site,
+				site: { title: 'PRIVATE_LAYOUT_TITLE', description: 'PRIVATE_DESCRIPTION', ...site },
+				appearance: { primary_light_color: '#13579b', primary_dark_color: '#c4d6e8' },
 				auth: { credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' } },
-				links: {}
+				links: { private: { title: 'PRIVATE_LINK', url: 'https://private.example.test' } }
 			},
 			{ env: {} }
 		)
@@ -23,35 +19,71 @@ function event(favicon_path?: string) {
 		locals: {
 			snapshot,
 			publicDir: '/PRIVATE_PUBLIC_ROOT',
+			configPath: '/PRIVATE_CONFIG_ROOT/directory.yaml',
 			session: { user: { name: 'PRIVATE_IDENTITY' }, expires: '2099-01-01' },
 			authentication: undefined
 		}
-	} as Parameters<typeof load>[0];
+	} as unknown as Parameters<typeof load>[0];
 }
 
-describe('shared favicon layout data', () => {
-	it('returns only the bundled URI when the source is omitted', () => {
-		expect(load(event())).toEqual({ faviconPath: '/favicon.svg' });
+describe('public branding layout data', () => {
+	it('returns only constant aliases, with no appearance or private payload', () => {
+		const captured = event();
+		const before = JSON.stringify(captured.locals);
+		const data = load(captured);
+		expect(data).toEqual({ faviconPath: '/favicon.svg', logoPath: '/favicon.svg' });
+		expect(JSON.stringify(data)).not.toContain('PRIVATE_');
+		expect(JSON.stringify(data)).not.toContain('private.example.test');
+		expect(JSON.stringify(data)).not.toContain('2099-01-01');
+		expect(JSON.stringify(captured.locals)).toBe(before);
+	});
+
+	it('passes explicit resolved bundled selections through without mounted aliases', () => {
+		const captured = event({ logo_path: '/favicon.svg', favicon_path: '/favicon.svg' });
+		expect(load(captured)).toEqual({ faviconPath: '/favicon.svg', logoPath: '/favicon.svg' });
 	});
 
 	it.each(['/public/PRIVATE_SOURCE.png', '/public/café family.svg'])(
-		'returns only the constant alias for configured source %s',
+		'publishes constant aliases, never configured source %s or image bytes',
 		(source) => {
-			const data = load(event(source));
-			expect(data).toEqual({ faviconPath: '/favicon' });
+			const captured = event({ logo_path: source, favicon_path: source });
+			captured.locals.snapshot = {
+				...captured.locals.snapshot,
+				assets: {
+					referencedPaths: [source],
+					brandingPaths: [source],
+					bookmarkLogos: { private: 'PRIVATE_SVG_BYTES' }
+				}
+			};
+			const data = load(captured);
+			expect(data).toEqual({ faviconPath: '/favicon', logoPath: '/logo' });
 			expect(JSON.stringify(data)).not.toContain(source);
 			expect(JSON.stringify(data)).not.toContain('PRIVATE_');
 		}
 	);
 
-	it('uses each request capture rather than a replacement or display metadata', () => {
-		const captured = event('/public/PRIVATE_SOURCE.svg');
-		const replacement = event();
+	it('selects aliases only from captured configuration without reading display data', () => {
+		const captured = event({ logo_path: '/public/PRIVATE_LOGO.svg' });
 		captured.locals.snapshot = {
 			...captured.locals.snapshot,
-			display: replacement.locals.snapshot.display
+			get display(): never {
+				throw new Error('Root layout must not read display data');
+			}
 		};
-		expect(load(replacement)).toEqual({ faviconPath: '/favicon.svg' });
-		expect(load(captured)).toEqual({ faviconPath: '/favicon' });
+		expect(load(captured)).toEqual({ faviconPath: '/favicon.svg', logoPath: '/logo' });
+	});
+
+	it('preserves the immutable request capture when a later request gets a replacement', () => {
+		const captured = event({ favicon_path: '/public/PRIVATE_ICON.svg' });
+		const snapshot = captured.locals.snapshot;
+		const before = JSON.stringify(snapshot);
+		const data = load(captured);
+		const replacement = event();
+		expect(load(replacement)).not.toEqual(data);
+		expect(load(captured)).toEqual(data);
+		expect(data).toEqual({ faviconPath: '/favicon', logoPath: '/favicon.svg' });
+		expect(captured.locals.snapshot).toBe(snapshot);
+		expect(Object.isFrozen(snapshot)).toBe(true);
+		expect(JSON.stringify(snapshot)).toBe(before);
 	});
 });

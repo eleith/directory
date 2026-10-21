@@ -110,7 +110,7 @@ test('keyboard cycle, next-action icons, focus, persistence and Kit navigation',
 	expect(errors).toEqual([]);
 });
 
-test('System alone follows OS changes; manual palettes and private accents override the OS', async ({
+test('System alone follows OS changes; manual palettes and configured accents override the OS', async ({
 	page
 }) => {
 	await page.emulateMedia({ colorScheme: 'light' });
@@ -260,7 +260,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 	});
 }
 
-test('saved theme on public sign-in and sign-out uses only the default palette', async ({
+test('saved theme on public sign-in and sign-out retains the public configured accents', async ({
 	page
 }) => {
 	const protectedServer = await startServer({
@@ -279,9 +279,12 @@ test('saved theme on public sign-in and sign-out uses only the default palette',
 			const response = await protectedServer.fetch(path);
 			expect(response.status).toBe(path === '/__data.json' ? 401 : 200);
 			const text = await response.text();
+			if (path === '/signin') {
+				expect(text).toContain('--color-primary:light-dark(#13579b,#e2c4a6)');
+			} else {
+				expect(text).not.toContain('--color-primary');
+			}
 			for (const value of [
-				'#13579b',
-				'#e2c4a6',
 				'Private theme description',
 				'/public/private-theme-logo.svg',
 				username,
@@ -294,16 +297,16 @@ test('saved theme on public sign-in and sign-out uses only the default palette',
 		await page.goto(protectedServer.url);
 		await expect(page).toHaveURL(`${protectedServer.url}/signin?callbackUrl=%2F`);
 		await expectTheme(page, 'dark', 'dark');
-		await expect(page.locator('.directory-theme')).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Switch to light theme' })).toHaveCount(0);
-		await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.svg');
+		await expect(page.locator('header img')).toHaveAttribute('src', '/logo');
 		await page.unroute('**/_app/**/*.js');
 		await page.reload();
 		page.on('pageerror', (error) => errors.push(error.message));
 		await expectTheme(page, 'dark', 'dark');
-		await page.keyboard.press('Tab');
 		await expect(page.getByLabel('Username')).toBeFocused();
-		await expect(page.getByLabel('Username')).toHaveCSS('outline-color', 'rgb(245, 245, 245)');
+		await page.keyboard.press('Tab');
+		await expect(page.getByLabel('Password')).toBeFocused();
+		await expect(page.getByLabel('Password')).toHaveCSS('outline-color', accents.dark);
 		await page.getByLabel('Username').fill(username);
 		await page.getByLabel('Password').fill(password);
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -323,9 +326,8 @@ test('saved theme on public sign-in and sign-out uses only the default palette',
 		await signout.click();
 		await expect(page).toHaveURL(`${protectedServer.url}/signin?callbackUrl=%2F`);
 		await expectTheme(page, 'dark', 'dark');
-		await expect(page.locator('.directory-theme')).toHaveCount(0);
 		await page.getByLabel('Username').focus();
-		await expect(page.getByLabel('Username')).toHaveCSS('outline-color', 'rgb(245, 245, 245)');
+		await expect(page.getByLabel('Username')).toHaveCSS('outline-color', accents.dark);
 		await page.getByLabel('Username').fill(username);
 		await page.getByLabel('Password').fill(password);
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -343,7 +345,6 @@ test('saved theme on public sign-in and sign-out uses only the default palette',
 		await page.emulateMedia({ colorScheme: 'light' });
 		await expectTheme(page, 'system', 'light');
 		await expect(page.locator('body')).toHaveAttribute('data-navigation-marker', 'signed-out');
-		await expect(page.locator('.directory-theme')).toHaveCount(0);
 		expect(errors).toEqual([]);
 	} finally {
 		expect(await protectedServer.stop()).toEqual({ code: 0, signal: null });

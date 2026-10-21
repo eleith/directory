@@ -26,7 +26,7 @@
 		}
 	}
 >
-	<Dialog.Portal to=".directory-theme">
+	<Dialog.Portal>
 		<Dialog.Overlay>
 			{#snippet child({ props })}
 				<div {...props} class="overlay"></div>

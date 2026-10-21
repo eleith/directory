@@ -158,16 +158,21 @@ This logo API remains available for every bookmark. `BookmarkLogo.svelte` is a
 thin domain wrapper: it passes the resolved primary and derives the same private
 API fallback for the shared `Logo.svelte`, at 64px on cards and details. The
 protected header also uses `Logo`, at 48px with eager loading, `site.logo_path`
-and bundled `/favicon.svg` as fallback. Omitted sources use the fallback in SSR.
-Sign-in keeps its bundled mark; no configured site logo URI enters public HTML or
-shared layout data. The site favicon remains independent.
+and bundled `/favicon.svg` as fallback. The shared config loader resolves omitted
+site logo/favicon paths to `/favicon.svg` for both web and CLI; normalized site and
+display paths are required strings. `getSite` selects them directly, without
+choosing defaults. Bundled paths are excluded from mounted asset references.
+Sign-in uses the selected bytes through public `/logo` at 48px, with bundled 🗂️ as
+default and one-time JavaScript fallback. No configured source URI enters public
+HTML or shared layout data. The site favicon remains independent.
 
 Details optionally pass `links.*.favicon_path` to the same `Logo` at 24px inside
 Open service, with `/bookmarks/<id>/logo` as its one-time JavaScript fallback.
 Omission renders no service icon. This instance is independent of the 64px primary
 `logo_path`; without JavaScript, a broken icon leaves the service link usable.
-Mounted service sources and prepared fallbacks remain private with auth, unlike
-bytes explicitly selected by `site.favicon_path` for the public `/favicon` alias.
+Mounted service source URLs and prepared fallback endpoints remain private with
+auth. Selecting those mounted bytes via `site.logo_path` or `site.favicon_path`
+deliberately publishes them through the corresponding public alias only.
 
 `Logo` makes one JavaScript fallback attempt. Its mount check catches image failures
 before hydration; fallback failures stop, including when primary and fallback
@@ -177,9 +182,10 @@ link identity, so switching links also resets the attempt. Repairing bytes at an
 unchanged URL requires a document refresh, not automatic polling. Without
 JavaScript, broken configured images stay broken; text and links remain usable.
 Configured paths still reach the mounted-image endpoint.
-Only the snapshot's `display` member may be sent to the browser. The client-facing
-interfaces in `src/lib/display/types.ts` contain no server imports. Snapshot IDs are fresh random UUIDs, not hashes of
-configuration or credentials.
+The directory page sends only the snapshot's `display` member; the root separately
+publishes allowlisted branding inputs described below. The client-facing interfaces
+in `src/lib/display/types.ts` contain no server imports. Snapshot IDs are fresh
+random UUIDs, not hashes of configuration or credentials.
 
 `prepareDirectory` builds the browser data through `getSite(config)` and
 `getGroups(config)`. These helpers select public fields, prepare comma-split tag
@@ -272,23 +278,31 @@ private when auth is enabled. HTML Accept does not turn image requests into
 sign-in redirects. The public group's `/favicon` GET/HEAD route reads only
 `locals.snapshot.configuration.site.favicon_path` through the existing reader and
 response helper. Selecting a bookmark image publishes its bytes through this alias
-as well, without making its raw URL public. Missing selection or unavailable bytes
-return generic 404, not a bundled fallback.
+as well, without making its raw URL public. A bundled selection (default or
+explicit) returns 404 before I/O; unavailable mounted bytes return generic 404,
+not a bundled fallback.
 
-The shared server layout returns only `{ faviconPath }`: `/favicon` when configured,
-otherwise bundled `/favicon.svg`. Its single head icon link has no fixed MIME type.
-No configured source URI, title, session or private configuration enters that
-layout data; the existing public sign-in title remains unchanged.
+The public group's `/logo` GET/HEAD route likewise reads only the captured
+`site.logo_path`, with the same reader, headers, generic 404s and no query selectors.
+A bundled selection (default or explicit) returns 404 before I/O. Selecting an image also referenced by a bookmark
+publishes those bytes only through the alias, not its raw source URL.
 
-The protected server layout allowlists only the captured display's two appearance
-colors after the authentication gate. Its wrapper supplies SSR CSS inputs
-`--directory-primary-light` and `--directory-primary-dark`. Shared `lib/styles/theme.css`
-owns the palettes, effective `--color-primary` and `--outline-focus`; page CSS
-owns layout and consumes those tokens. Native `light-dark()` uses the OS scheme
-unless the root's `data-theme` selects light or dark (modern browser support is
-required). Configured values stay private until sign-in, whose palette and focus
-use only defaults. Theme colors follow the existing full-document refresh contract
-after configuration reloads; query-only client navigation can retain the parent layout.
+The shared server layout maps resolved `/public/` site paths to constant
+`faviconPath` and `logoPath` aliases (`/favicon` and `/logo`), passing bundled
+`/favicon.svg` selections through unchanged. Defaults belong to shared config
+loading, not the layout. Its single head
+icon link has no fixed MIME type. No configured source URI, title, description,
+image bytes, session or private configuration enters root data; the existing public
+sign-in title remains page-owned. The server `themeStyleTag` helper selects the
+captured display's two validated primary colors and derives readable button
+foregrounds. A native Kit `transformPageChunk` inserts these as `--color-primary`
+and `--color-on-primary` on `:root` in the HTML head, not a layout data payload or
+wrapper. Shared `lib/styles/theme.css` owns static palettes, spacing, error colors,
+radii, `--outline-focus` and manual color schemes; page CSS owns geometry. Native `light-dark()` uses the OS scheme unless the root's
+`data-theme` selects light or dark (modern browser support required). Body palettes
+stay unchanged; the two primary colors and selected branding bytes are deliberately
+public before login. Theme inputs follow the existing full-document refresh
+contract after configuration reloads; query-only navigation retains the document theme.
 
 With JavaScript, the protected header theme button cycles System → Dark → Light
 → System. `directory.theme` in localStorage accepts only `system`, `dark` or
@@ -315,8 +329,8 @@ and a grid-entry marker. Local opens, closes and Back/Forward use the loaded
 snapshot, without a data request. A real navigation or refresh accepts a fresh
 server snapshot. Grid close goes back once; direct close safely replaces the URL
 with `/`. Bits owns trapping, dismissal and scroll lock, with focus returning to
-the connected activating tile or directory heading. Its portal targets the
-protected `.directory-theme` boundary so configured accents stay private.
+the connected activating tile or directory heading. Its default body portal
+inherits the configured accents naturally from the document root.
 
 ### Local search
 
@@ -360,11 +374,10 @@ routes/
   +layout.svelte
   (public)/
     favicon/
+    logo/
     signin/
     healthz/
   (protected)/
-    +layout.server.ts
-    +layout.svelte
     +page.server.ts
     +page.svelte
     (endpoints)/
@@ -386,7 +399,11 @@ No-auth mode, origin/CSRF checks and the native Auth.js sequence are unchanged.
 Sign-in uses native SvelteKit form actions, as in When, with a server-selected
 provider and an allowlist of submitted fields. Return URLs are reduced to safe
 local paths. Sign-out is the root page's named POST action. Login forms work
-without JavaScript. Auth.js owns session encryption/cookies and OIDC callbacks;
+without JavaScript. Desktop fine-pointer devices at least 48rem wide focus the
+username or SSO button on mount; phones and no-JavaScript pages do not autofocus.
+Sign-in uses a centered desktop card and a cardless phone layout with 48px controls,
+fixed generic error banners and reduced-motion-aware states. Auth.js owns session
+encryption/cookies and OIDC callbacks;
 Directory owns default-deny routing, safe diagnostics and fixed-origin policy.
 Auth.js is bundled server-side; its build-time dependency classification keeps
 framework/compiler peers out of the pruned container runtime.
@@ -654,7 +671,7 @@ Check the next-action label and visible focus, cycle all three modes, change the
 OS scheme in System and manual modes, then refresh and navigate details/Back.
 Throttle hydration to check restoration before paint; block localStorage to check
 usable in-memory toggling. Sign out with a saved manual theme and confirm public
-sign-in keeps that scheme but uses only default colors, with no private site data
+sign-in keeps that scheme and approved public branding, with no private site data
 or CSP script errors. Disable JavaScript to check OS colors and native navigation.
 Tab first to Search, then Theme and Sign out; check search focus and Clear at
 360/1280px in both schemes. Try typos, reversed multiword queries, tags and deep
@@ -726,8 +743,12 @@ dialog actions keep their loaded snapshot.
    set `site.logo_path` to check a 48px header logo beside wrapped title/description
    at 360px, with Sign out still visible. Omit it to check the bundled default;
    break it to check the one-time JavaScript fallback and no-JavaScript limitation.
-   Before sign-in, the mark must stay bundled and the configured site logo URI
-   must not appear in HTML or public data. Leave the curated demo files untouched.
+   Before sign-in, check selected logo bytes through `/logo`, independent of the
+   tab's `/favicon`; configured source URIs must not appear in public HTML/data.
+   Check configured primary/button foreground contrast, the centered desktop card,
+   cardless phone, generic error banner and native POST. Desktop fine-pointer
+   autofocus must not open a phone keyboard; no-JavaScript first Tab is Username.
+   Leave the curated demo files untouched.
    Authenticated mounted GET/HEAD work; unauthenticated requests
    return 401 even with HTML Accept, including the selected favicon's raw source.
    Before sign-in, check the tab icon and `/favicon` GET/HEAD: only the selected

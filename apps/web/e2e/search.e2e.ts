@@ -477,7 +477,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 	}
 }
 
-test('search stays behind authentication; sign-out removes private search and palette', async ({
+test('search stays behind authentication; sign-out retains only public branding', async ({
 	page
 }) => {
 	const app = await startServer({ configuration: configuration + credentialsAuth });
@@ -500,16 +500,18 @@ test('search stays behind authentication; sign-out removes private search and pa
 		await signout.click();
 		await expect(page).toHaveURL(/\/signin\?callbackUrl=%2F$/);
 		await expect(searchInput(page)).toHaveCount(0);
-		await expect(page.locator('.directory-theme')).toHaveCount(0);
 		for (const path of ['/signin', '/signin/__data.json', '/__data.json']) {
 			const response = await page.request.get(app.url + path);
 			expect(response.status()).toBe(path === '/__data.json' ? 401 : 200);
 			const payload = await response.text();
+			if (path === '/signin') {
+				expect(payload).toContain('--color-primary:light-dark(#13579b,#e2c4a6)');
+			} else {
+				expect(payload).not.toContain('--color-primary');
+			}
 			for (const value of [
 				'Private household directory',
 				'photos.example.test',
-				'#13579b',
-				'#e2c4a6',
 				username,
 				password,
 				app.secret!,

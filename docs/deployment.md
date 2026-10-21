@@ -12,13 +12,18 @@ the same URL, refresh the document to retry the primary image.
 Optional `links.*.favicon_path` shows a 24px icon in the details' Open service
 link; omission shows none. Its one-time JavaScript fallback uses the private
 prepared bookmark logo, independently of the 64px primary `logo_path`. Without
-JavaScript, a broken icon leaves the link usable. Mounted service icons and their
-fallback stay private with auth; this does not select the public site favicon.
+JavaScript, a broken icon leaves the link usable. Mounted service source URLs and
+fallback endpoints stay private with auth; service icon fields do not select public branding.
 The directory header renders `site.logo_path` at 48px, or bundled `/favicon.svg`
 when omitted. JavaScript switches a failed configured header image to the bundle
-once; without JavaScript, a broken configured image stays broken. Sign-in always
-uses the bundled mark. With auth enabled, the configured site logo URL stays
-private and is absent from public HTML and shared layout data.
+once; without JavaScript, a broken configured image stays broken. Sign-in shows
+that selection through public `/logo`, with bundled 🗂️ as default/JavaScript
+fallback. Selecting `site.logo_path` deliberately publishes its bytes before login,
+even if also used by a bookmark. Its raw source URL stays private and is absent
+from public HTML and shared layout data. Server-generated head CSS uses only the
+two configured primary colors and derived readable button foregrounds. Root data
+contains only constant logo/favicon URIs; descriptions, links, auth/session data
+and filesystem paths stay out.
 Configured image files are now
 served only for exact snapshot references, with bounded 5 MiB reads and the
 directory's authentication policy for all mounted source URLs. Selecting
@@ -291,7 +296,10 @@ a Docker pass. Use disposable copies of any real configuration.
    sign-in. Without a session, GET/HEAD requests to both mounted files and
    `/bookmarks/<id>/logo` must return 401 even with `Accept: text/html`; configured
    favicon source URLs stay private too. Before sign-in, check the tab uses public
-   `/favicon` for a selected site favicon; only that alias publishes its bytes.
+   `/favicon` for a selected site favicon. Selected `site.logo_path` bytes are also
+   deliberately public through `/logo`, never through the raw source URL. Check
+   sign-in's 48px logo/default 🗂️ and one-time JavaScript fallback; omission or
+   unavailable selections return generic 404 from `/logo`.
    Omit the selection to use bundled `/favicon.svg` with a 404 at `/favicon`.
    Missing or invalid selected files must return 404 rather than a static fallback.
    Check private/no-store and nosniff headers,

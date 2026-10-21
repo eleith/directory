@@ -54,6 +54,26 @@ describe('default-aware editor schema', () => {
 		expect(object((definition(editor, 'HttpUrl').anyOf as unknown[])[0]).format).toBe('uri');
 	});
 
+	it('keeps site image defaults on references without broadening bookmark image choices', () => {
+		const editor = createEditorSchema();
+		for (const field of ['logo_path', 'favicon_path']) {
+			expect(property(definition(editor, 'Site'), field)).toEqual({
+				$ref: '#/$defs/SiteImagePath',
+				default: '/favicon.svg'
+			});
+			expect(property(definition(editor, 'Link'), field)).toEqual({
+				$ref: '#/$defs/LocalImagePath'
+			});
+		}
+		const choices = definition(editor, 'SiteImagePath').anyOf as ObjectSchema[];
+		expect(choices[0]).toEqual({ $ref: '#/$defs/LocalImagePath' });
+		expect((choices[1]!.anyOf as ObjectSchema[])[0]).toEqual({
+			type: 'string',
+			const: '/favicon.svg'
+		});
+		expect(interpolationPattern(choices[1]!).test('${SITE_IMAGE}')).toBe(true);
+	});
+
 	it('produces only resolvable local references, with no invented publication URL', () => {
 		const editor = createEditorSchema();
 		expect(editor.$id).toBeUndefined();

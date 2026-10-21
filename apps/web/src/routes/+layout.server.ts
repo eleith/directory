@@ -1,7 +1,10 @@
 import type { LayoutServerLoad } from './$types';
 
 export const load = (({ locals }) => {
-	let faviconPath = '/favicon.svg';
-	if (locals.snapshot.configuration.site.favicon_path !== undefined) faviconPath = '/favicon';
-	return { faviconPath };
+	const { site } = locals.snapshot.configuration;
+	let faviconPath = site.favicon_path;
+	if (faviconPath.startsWith('/public/')) faviconPath = '/favicon';
+	let logoPath = site.logo_path;
+	if (logoPath.startsWith('/public/')) logoPath = '/logo';
+	return { faviconPath, logoPath };
 }) satisfies LayoutServerLoad;

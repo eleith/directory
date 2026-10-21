@@ -42,6 +42,11 @@ export const LocalImagePathSchema = Type.String({
 		'A decoded image path under /public/. Use SVG, PNG, JPEG, GIF or WebP; no dot segments, percent escapes, backslashes, queries or fragments.'
 });
 
+export const SiteImagePathSchema = Type.Union(
+	[ref(LocalImagePathSchema), Type.Literal('/favicon.svg')],
+	{ $id: 'SiteImagePath', description: 'A mounted image path or the bundled /favicon.svg mark.' }
+);
+
 export const HexColorSchema = Type.String({
 	$id: 'HexColor',
 	pattern: `^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})${end}`,
@@ -86,8 +91,8 @@ export const SiteSchema = Type.Object(
 	{
 		title: Type.String({ ...nonEmptyText, default: 'Directory' }),
 		description: Type.String({ default: '' }),
-		logo_path: Type.Optional(ref(LocalImagePathSchema)),
-		favicon_path: Type.Optional(ref(LocalImagePathSchema)),
+		logo_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
+		favicon_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
 		footer: Type.String({ default: '' }),
 		order: Type.Union([Type.Literal('configured'), Type.Literal('alphabetical')], {
 			default: 'configured',
@@ -153,6 +158,7 @@ export const DirectoryConfigurationSchema = Type.Object(
 export const configurationReferences: TSchema[] = [
 	HttpUrlSchema,
 	LocalImagePathSchema,
+	SiteImagePathSchema,
 	HexColorSchema,
 	TagsSchema,
 	LinkSchema,

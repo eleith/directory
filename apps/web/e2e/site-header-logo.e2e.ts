@@ -268,7 +268,7 @@ test('source changes retry A to B to repaired A in place, and hydrated errors us
 	}
 });
 
-test('branding stays private before native sign-in, then fits a narrow header beside wrapped copy', async ({
+test('logo source and metadata stay private while selected bytes brand sign-in and the narrow header', async ({
 	browser
 }) => {
 	const app = await boot(sourceA, true);
@@ -303,7 +303,7 @@ test('branding stays private before native sign-in, then fits a narrow header be
 	try {
 		const page = await context.newPage();
 		await page.goto(app.url);
-		await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.svg');
+		await expect(page.locator('header img')).toHaveAttribute('src', '/logo');
 		await expect
 			.poll(() =>
 				page.locator('header img').evaluate((node) => (node as HTMLImageElement).naturalWidth)
@@ -334,7 +334,7 @@ test('branding stays private before native sign-in, then fits a narrow header be
 			expect(await response.text()).toBe(method === 'HEAD' ? '' : icon);
 		}
 		await signout.click();
-		await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.svg');
+		await expect(page.locator('header img')).toHaveAttribute('src', '/logo');
 		expectNoPrivateData(await page.content());
 	} finally {
 		await context.close();

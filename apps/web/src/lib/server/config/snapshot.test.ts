@@ -122,11 +122,34 @@ describe('private prepared snapshots', () => {
 		expect(generate).toHaveBeenCalledTimes(2);
 	});
 
-	it('handles omitted branding, no images and an explicitly empty directory', () => {
-		const snapshot = prepareSnapshot(validateConfig({ links: {} }, { env: {} }));
-		expect(snapshot.assets).toEqual({ referencedPaths: [], brandingPaths: [], bookmarkLogos: {} });
-		expect(snapshot.display.site).not.toHaveProperty('logo_path');
-		expect(snapshot.display.site).not.toHaveProperty('favicon_path');
-		expect(snapshot.display.groups.flatMap((group) => group.links)).toEqual([]);
+	it.each([{}, { logo_path: '/favicon.svg', favicon_path: '/favicon.svg' }])(
+		'excludes default and explicit bundled site images from mounted assets: %j',
+		(site) => {
+			const snapshot = prepareSnapshot(validateConfig({ site, links: {} }, { env: {} }));
+			expect(snapshot.assets).toEqual({
+				referencedPaths: [],
+				brandingPaths: [],
+				bookmarkLogos: {}
+			});
+			expect(snapshot.display.site.logo_path).toBe('/favicon.svg');
+			expect(snapshot.display.site.favicon_path).toBe('/favicon.svg');
+			expect(Object.isFrozen(snapshot.display.site)).toBe(true);
+			expect(snapshot.display.groups.flatMap((group) => group.links)).toEqual([]);
+		}
+	);
+
+	it('captures only mounted references when site selections mix bundled and mounted images', () => {
+		const snapshot = prepareSnapshot(
+			validateConfig(
+				{
+					site: { logo_path: '/favicon.svg', favicon_path: '/public/site.png' },
+					links: { photos: { ...service, favicon_path: '/public/photos.png' } }
+				},
+				{ env: {} }
+			)
+		);
+		expect(snapshot.assets.brandingPaths).toEqual(['/public/site.png']);
+		expect(snapshot.assets.referencedPaths).toEqual(['/public/site.png', '/public/photos.png']);
+		expect(snapshot.display.groups[0]?.links[0]?.logo_path).toBe('/bookmarks/photos/logo');
 	});
 });

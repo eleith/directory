@@ -11,7 +11,11 @@ const config = await loadConfigFile('config/directory.yaml', { env: process.env 
 
 `loadConfigFile(path?, { env }?)` reads YAML and calls
 `validateConfig(raw, { env }?)`. Both apply defaults, interpolate string values,
-and check the canonical TypeBox schema. Omitting `env` uses `process.env`; an
+and check the canonical TypeBox schema. Loaded `site.logo_path` and
+`site.favicon_path` are required strings, defaulting independently to bundled
+`/favicon.svg`. Site images accept that explicit bundle or a strict mounted
+`/public/` image path; bookmark image fields stay optional and mounted-only.
+Omitting `env` uses `process.env`; an
 injected map is used on its own. Neither function watches files or publishes
 state. The loader returns a fresh private configuration without changing the
 input. Preparing the browser's directory data and immutable snapshots belongs

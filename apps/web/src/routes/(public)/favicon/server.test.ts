@@ -45,17 +45,19 @@ describe('public favicon alias', () => {
 		if (method === 'HEAD') expect(response.body).toBeNull();
 	});
 
-	it.each(['GET', 'HEAD'] as const)(
-		'returns 404 before I/O when omitted for %s',
-		async (method) => {
-			const response = await GET(event(method, snapshot()));
-			expect(readImage).not.toHaveBeenCalled();
-			expect(response.status).toBe(404);
-			expectHeaders(response, 'text/plain; charset=utf-8', 9);
-			expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');
-			if (method === 'HEAD') expect(response.body).toBeNull();
-		}
-	);
+	it.each([
+		['GET', undefined],
+		['HEAD', undefined],
+		['GET', '/favicon.svg'],
+		['HEAD', '/favicon.svg']
+	] as const)('returns 404 before I/O for %s with bundled selection %s', async (method, source) => {
+		const response = await GET(event(method, snapshot(source)));
+		expect(readImage).not.toHaveBeenCalled();
+		expect(response.status).toBe(404);
+		expectHeaders(response, 'text/plain; charset=utf-8', 9);
+		expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');
+		if (method === 'HEAD') expect(response.body).toBeNull();
+	});
 
 	it.each(['GET', 'HEAD'] as const)(
 		'maps unavailable reader results to generic %s 404',

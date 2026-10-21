@@ -19,7 +19,13 @@ function link(id: string, fields: Partial<DisplayLink> = {}): DisplayLink {
 function directory(groups: readonly DisplayGroup[]): DirectoryDisplay {
 	return Object.freeze({
 		snapshotId: 'unit-snapshot',
-		site: Object.freeze({ title: 'Common site masthead', description: '', footer: '' }),
+		site: Object.freeze({
+			title: 'Common site masthead',
+			description: '',
+			footer: '',
+			logo_path: '/favicon.svg',
+			favicon_path: '/favicon.svg'
+		}),
 		appearance: Object.freeze({ primary_light_color: '#111', primary_dark_color: '#eee' }),
 		grouped: true,
 		groups: Object.freeze(groups)

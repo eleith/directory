@@ -33,6 +33,28 @@ interface ValidationCase {
 const validationCases: ValidationCase[] = [
 	{ name: 'minimal YAML', yaml: 'links: {}\n', valid: true },
 	{
+		name: 'explicit bundled site logo and favicon',
+		yaml: 'site: {logo_path: /favicon.svg, favicon_path: /favicon.svg}\nlinks: {}\n',
+		valid: true
+	},
+	...['logo_path', 'favicon_path'].flatMap((field): ValidationCase[] => [
+		{
+			name: `invalid mounted site ${field}`,
+			yaml: `site: {${field}: /public/../DO_NOT_PRINT.svg}\nlinks: {}\n`,
+			valid: false
+		},
+		{
+			name: `invalid bundled site ${field}`,
+			yaml: `site: {${field}: /favicon.svg/DO_NOT_PRINT.svg}\nlinks: {}\n`,
+			valid: false
+		},
+		{
+			name: `bundled path is not a bookmark ${field}`,
+			yaml: `links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, ${field}: /favicon.svg}\n`,
+			valid: false
+		}
+	]),
+	{
 		name: 'configured data and credentials expanded after YAML parsing',
 		yaml: `site:
   title: DO_NOT_PRINT_SITE

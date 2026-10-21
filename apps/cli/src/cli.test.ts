@@ -11,7 +11,14 @@ vi.mock('@directory/config', async (importOriginal) => ({
 
 const configuration: DirectoryConfiguration = {
 	version: 1,
-	site: { title: 'DO_NOT_PRINT_SITE', description: '', footer: '', order: 'configured' },
+	site: {
+		title: 'DO_NOT_PRINT_SITE',
+		description: '',
+		footer: '',
+		order: 'configured',
+		logo_path: '/favicon.svg',
+		favicon_path: '/favicon.svg'
+	},
 	appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 	links: {}
 };

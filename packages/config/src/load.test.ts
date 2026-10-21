@@ -65,7 +65,9 @@ describe('default, interpolate, then validate', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			order: 'configured'
+			order: 'configured',
+			logo_path: '/favicon.svg',
+			favicon_path: '/favicon.svg'
 		});
 		expect(config.appearance).toEqual({
 			primary_light_color: '#0f766e',
@@ -90,6 +92,47 @@ describe('default, interpolate, then validate', () => {
 		expect(config).not.toHaveProperty('auth');
 		expect(config.links.alpha).not.toHaveProperty('group');
 		expect(raw).toEqual(before);
+	});
+
+	it.each([
+		{},
+		{ title: 'Home' },
+		{ logo_path: '/public/home.svg' },
+		{ favicon_path: '/public/site.png' },
+		{ logo_path: '/favicon.svg' },
+		{ favicon_path: '/favicon.svg' },
+		{ logo_path: '/favicon.svg', favicon_path: '/favicon.svg' }
+	])('normalizes independent site image selections without mutating input: %j', (site) => {
+		const raw = { site, links: { photos: link } };
+		const before = structuredClone(raw);
+		const config = validateConfig(raw, { env: {} });
+		expect(config.site).toEqual({
+			title: 'Directory',
+			description: '',
+			footer: '',
+			order: 'configured',
+			logo_path: '/favicon.svg',
+			favicon_path: '/favicon.svg',
+			...site
+		});
+		expect(config.links.photos).not.toHaveProperty('logo_path');
+		expect(config.links.photos).not.toHaveProperty('favicon_path');
+		config.site.logo_path = '/public/changed.svg';
+		expect(validateConfig(raw, { env: {} }).site.favicon_path).toBe(
+			site.favicon_path ?? '/favicon.svg'
+		);
+		expect(raw).toEqual(before);
+	});
+
+	it('interpolates site image selections before applying the strict image boundary', () => {
+		const raw = { site: { logo_path: '${LOGO}', favicon_path: '${ICON}' }, links: {} };
+		const config = validateConfig(raw, { env: { LOGO: '/favicon.svg', ICON: '/public/icon.png' } });
+		expect(config.site.logo_path).toBe('/favicon.svg');
+		expect(config.site.favicon_path).toBe('/public/icon.png');
+		expect(() =>
+			validateConfig(raw, { env: { LOGO: '/favicon.svg?x', ICON: '/public/icon.png' } })
+		).toThrow(ConfigError);
+		expect(() => validateConfig(raw, { env: {} })).toThrow(ConfigError);
 	});
 
 	it('leaves canonical references intact for later validation and editor generation', () => {
@@ -180,6 +223,10 @@ describe('default, interpolate, then validate', () => {
 		{ links: {}, site: true },
 		{ links: {}, appearance: 0 },
 		{ links: {}, site: { title: null } },
+		{ links: {}, site: { logo_path: null } },
+		{ links: {}, site: { favicon_path: null } },
+		{ links: {}, site: { logo_path: '' } },
+		{ links: {}, site: { favicon_path: false } },
 		{ links: {}, auth: {} },
 		{ links: {}, auth: null },
 		{ links: {}, auth: { credentials: {} } },
@@ -255,7 +302,9 @@ describe('YAML file loader', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			order: 'configured'
+			order: 'configured',
+			logo_path: '/favicon.svg',
+			favicon_path: '/favicon.svg'
 		});
 		expect(config.appearance).toEqual({
 			primary_light_color: '#0f766e',

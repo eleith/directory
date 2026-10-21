@@ -8,6 +8,7 @@ import {
 	HexColorSchema,
 	HttpUrlSchema,
 	LocalImagePathSchema,
+	SiteImagePathSchema,
 	LinkSchema,
 	DirectoryConfigurationSchema
 } from './schema.js';
@@ -34,7 +35,14 @@ describe('configuration defaults and inferred types', () => {
 		expect(Value.Check(DirectoryConfigurationSchema, configurationReferences, value)).toBe(true);
 		expect(value).toEqual({
 			version: 1,
-			site: { title: 'Directory', description: '', footer: '', order: 'configured' },
+			site: {
+				title: 'Directory',
+				description: '',
+				footer: '',
+				order: 'configured',
+				logo_path: '/favicon.svg',
+				favicon_path: '/favicon.svg'
+			},
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 			links: {
 				photos: { ...link, ...linkDefaults },
@@ -80,6 +88,8 @@ describe('configuration defaults and inferred types', () => {
 		if (!Value.Check(DirectoryConfigurationSchema, configurationReferences, first))
 			throw new Error('Invalid fixture');
 		first.site.title = 'Changed';
+		first.site.logo_path = '/public/changed.svg';
+		expect(defaultFixture(raw)).toHaveProperty('site.logo_path', '/favicon.svg');
 		first.links['photos']!.requires_auth = true;
 		expect(defaultFixture(raw)).toHaveProperty('site.title', 'Directory');
 		expect(defaultFixture(raw)).toHaveProperty('links.photos.requires_auth', false);
@@ -89,6 +99,10 @@ describe('configuration defaults and inferred types', () => {
 	it('keeps loaded defaults required and genuinely optional metadata optional in TypeScript', () => {
 		expectTypeOf<DirectoryConfiguration['version']>().toEqualTypeOf<1>();
 		expectTypeOf<DirectoryConfiguration['site']['title']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectoryConfiguration['site']['logo_path']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectoryConfiguration['site']['favicon_path']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectoryLink['logo_path']>().toEqualTypeOf<string | undefined>();
+		expectTypeOf<DirectoryLink['favicon_path']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryConfiguration['site']['order']>().toEqualTypeOf<
 			'configured' | 'alphabetical'
 		>();
@@ -276,6 +290,18 @@ describe('URL, image and color constraints', () => {
 		'https://example.com/logo.svg',
 		'//example.com/logo.svg',
 		'/favicon.svg',
+		'/favicon.svg/',
+		'/favicon.svg?x',
+		'/favicon.svg#x',
+		'/favicon%2esvg',
+		'/Favicon.svg',
+		'/favicon.svg\n',
+		'data:image/svg+xml,test',
+		'file:///favicon.svg',
+		'favicon.svg',
+		'/public/logo\u0000.svg',
+		'/public/logo\t.svg',
+		'/public/logo\u007f.svg',
 		'/public/../logo.svg',
 		'/public/a/../logo.svg',
 		'/public/./logo.svg',
@@ -289,6 +315,18 @@ describe('URL, image and color constraints', () => {
 		'/public/logo.svg\n'
 	])('rejects unsafe/non-image path %j', (path) => {
 		expect(Value.Check(LocalImagePathSchema, path)).toBe(false);
+		if (path !== '/favicon.svg') {
+			expect(Value.Check(SiteImagePathSchema, configurationReferences, path)).toBe(false);
+			for (const field of ['logo_path', 'favicon_path']) {
+				expect(accepts({ ...raw, site: { [field]: path } })).toBe(false);
+			}
+		}
+	});
+	it('accepts the bundled mark only for site images, not bookmark images', () => {
+		for (const field of ['logo_path', 'favicon_path']) {
+			expect(accepts({ ...raw, site: { [field]: '/favicon.svg' } })).toBe(true);
+			expect(accepts({ links: { photos: { ...link, [field]: '/favicon.svg' } } })).toBe(false);
+		}
 	});
 	it.each(['#fff', '#0f766e', '#ABCDEF'])('accepts hex color %s', (color) => {
 		expect(Value.Check(HexColorSchema, color)).toBe(true);

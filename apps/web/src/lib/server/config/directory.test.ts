@@ -12,7 +12,7 @@ function expectDeeplyFrozen(value: unknown): void {
 }
 
 describe('prepareDirectory', () => {
-	it('copies only public fields and preserves independent optional images and multiline text', () => {
+	it('copies only public fields and preserves independent images and multiline text', () => {
 		const config = validateConfig(
 			{
 				site: {
@@ -74,12 +74,18 @@ describe('prepareDirectory', () => {
 		});
 	});
 
-	it('preserves absence rather than adding undefined optional fields', () => {
+	it('selects resolved site defaults and preserves optional bookmark absence', () => {
 		const config = validateConfig({ links: { photos: destination } }, { env: {} });
 		const display = prepareDirectory(config, 'minimal');
 		expect(display).toEqual({
 			snapshotId: 'minimal',
-			site: { title: 'Directory', description: '', footer: '' },
+			site: {
+				title: 'Directory',
+				description: '',
+				footer: '',
+				logo_path: '/favicon.svg',
+				favicon_path: '/favicon.svg'
+			},
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 			grouped: false,
 			groups: [
@@ -99,7 +105,13 @@ describe('prepareDirectory', () => {
 				}
 			]
 		});
-		expect(Object.keys(display.site).sort()).toEqual(['description', 'footer', 'title']);
+		expect(Object.keys(display.site).sort()).toEqual([
+			'description',
+			'favicon_path',
+			'footer',
+			'logo_path',
+			'title'
+		]);
 		expect(Object.keys(display.groups[0]!.links[0]!).sort()).toEqual([
 			'admin_only',
 			'id',
@@ -122,7 +134,7 @@ describe('prepareDirectory', () => {
 		);
 		const display = prepareDirectory(config, 'independent');
 		expect(display.site).toHaveProperty('favicon_path', '/public/site.png');
-		expect(display.site).not.toHaveProperty('logo_path');
+		expect(display.site).toHaveProperty('logo_path', '/favicon.svg');
 		const link = display.groups[0]!.links[0]!;
 		expect(link).toHaveProperty('description', '');
 		expect(link).toHaveProperty('logo_path', '/public/photo.svg');

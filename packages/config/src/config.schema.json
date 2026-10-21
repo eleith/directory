@@ -47,6 +47,22 @@
 				}
 			]
 		},
+		"SiteImagePath": {
+			"description": "A mounted image path or the bundled /favicon.svg mark.",
+			"anyOf": [
+				{ "$ref": "#/$defs/LocalImagePath" },
+				{
+					"type": "string",
+					"anyOf": [
+						{ "type": "string", "const": "/favicon.svg" },
+						{
+							"type": "string",
+							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+						}
+					]
+				}
+			]
+		},
 		"HexColor": {
 			"description": "A three- or six-digit hexadecimal color.",
 			"type": "string",
@@ -134,8 +150,8 @@
 					]
 				},
 				"description": { "default": "", "type": "string" },
-				"logo_path": { "$ref": "#/$defs/LocalImagePath" },
-				"favicon_path": { "$ref": "#/$defs/LocalImagePath" },
+				"logo_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
+				"favicon_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
 				"footer": { "default": "", "type": "string" },
 				"order": {
 					"default": "configured",

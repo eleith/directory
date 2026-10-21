@@ -270,7 +270,7 @@ test('native SSR credentials and named root signout work without JavaScript', as
 		const jwt = await readSession(server.secret!, cookie!.name, cookie!.value);
 		expect(jwt!.exp - jwt!.iat).toBe(7 * 86_400);
 
-		const data = await context.request.get(`${server.url}/__data.json?x-sveltekit-invalidated=111`);
+		const data = await context.request.get(`${server.url}/__data.json?x-sveltekit-invalidated=11`);
 		expect(data.status()).toBe(200);
 		const payload = await data.text();
 		expect(payload).toContain(privateDescription);

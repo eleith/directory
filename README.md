@@ -1,4 +1,4 @@
-# 📍 Directory
+# 🗂️ Directory
 
 A minimal homelab directory for the family: learn what is available and open the
 right link. The dashboard will be driven by one mounted YAML file.
@@ -8,7 +8,10 @@ right link. The dashboard will be driven by one mounted YAML file.
 The app includes a server-rendered directory, a compiled shared config
 package, a standalone validator, and per-package CI checks. The shared loader reads YAML, applies
 defaults, expands environment values, and validates the TypeBox contract. The
-standalone CLI uses that same loader. The web server loads an immutable directory
+standalone CLI uses that same loader. It normalizes omitted site logo and favicon
+paths to bundled `/favicon.svg`; explicit bundled selections are also valid.
+The web server routes mounted site selections through public branding aliases.
+The web server loads an immutable directory
 before serving, polls for file changes, and keeps the last good snapshot after
 invalid edits. Compact icon-and-title tiles flow into a responsive grid with muted
 group headings, plain shareable details and real external service links.
@@ -21,9 +24,9 @@ The header theme button cycles System → Dark → Light → System and saves th
 choice in this browser. System follows OS changes; without JavaScript the OS
 scheme applies and the button stays disabled. Existing
 `appearance.primary_light_color` and `primary_dark_color` configure keyboard-focus
-and Back-link underline accents on the directory, not sign-in. Choose colors with
-sufficient contrast for your deployment; arbitrary configured colors are not
-guaranteed accessible.
+and Back-link underline accents on the directory, plus the filled sign-in action.
+These two colors are public branding inputs. Sign-in automatically chooses a
+readable foreground; choose colors with sufficient contrast for focus accents too.
 Authentication is optional: shared credentials or OIDC protect the whole directory,
 including data responses. Bookmark cards and details use server-prepared bookmark
 logos when no logo path is configured. With JavaScript, a failed configured bookmark
@@ -34,12 +37,13 @@ Optional `links.*.favicon_path` adds a decorative 24px icon to the details' Open
 service link; omission shows no small icon. With JavaScript, failure switches once
 to the same private prepared bookmark logo, independently of the 64px primary
 `logo_path`; without JavaScript, a broken icon leaves the link usable. Service
-icons stay private with auth and do not select the public site favicon.
+source URLs stay private with auth; service icon fields do not select public branding.
 The directory header shows `site.logo_path` at 48px beside its title and description,
 using bundled `/favicon.svg` when omitted or once after a JavaScript image error.
-Without JavaScript, a broken configured header image stays broken. With auth enabled,
-the header image's source URL stays private; sign-in always uses the bundled mark
-and exposes no configured site logo URI.
+Without JavaScript, a broken configured image stays broken. Sign-in shows the same
+selected logo through public `/logo`, with the bundled 🗂️ mark as its default and
+one-time JavaScript fallback. Selecting `site.logo_path` deliberately publishes
+those bytes before login; the configured source URL stays private.
 Configured images are now served only when
 referenced by the captured configuration, with bounded 5 MiB reads and the same
 authentication policy as the directory for mounted source URLs. Selecting

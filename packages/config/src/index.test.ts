@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { configurationVersion, DirectoryConfigurationSchema } from '@directory/config';
-import type { DirectoryConfiguration } from '@directory/config/types';
+import type { DirectoryConfiguration, DirectorySite } from '@directory/config/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 describe('@directory/config compiled public module', () => {
@@ -19,6 +19,8 @@ describe('@directory/config compiled public module', () => {
 			new URL('./config.schema.json', import.meta.url).href
 		);
 		expectTypeOf<DirectoryConfiguration['version']>().toEqualTypeOf<1>();
+		expectTypeOf<DirectorySite['logo_path']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectorySite['favicon_path']>().toEqualTypeOf<string>();
 	});
 
 	it('keeps the types entry free of runtime schema, format registration and loader imports', () => {

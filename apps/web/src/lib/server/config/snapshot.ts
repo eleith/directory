@@ -30,7 +30,7 @@ function collectAssetPaths(
 ): Pick<PreparedSnapshot['assets'], 'referencedPaths' | 'brandingPaths'> {
 	const brandingPaths = new Set<string>();
 	for (const path of [config.site.logo_path, config.site.favicon_path]) {
-		if (path !== undefined) brandingPaths.add(path);
+		if (path.startsWith('/public/')) brandingPaths.add(path);
 	}
 	const referencedPaths = new Set(brandingPaths);
 	for (const link of Object.values(config.links)) {

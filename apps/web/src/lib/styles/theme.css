@@ -24,8 +24,15 @@
 	--content-max-width: 42rem;
 	--size-icon: 2rem;
 	--radius-sm: 0.25rem;
+	--radius-control: 0.5rem;
+	--radius-card: 0.75rem;
+	--shadow-card: 0 1px 6px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 40%));
+	--color-danger: light-dark(#991b1b, #ffb4b4);
+	--color-danger-bg: light-dark(#fef2f2, #450a0a);
+	--color-danger-border: light-dark(#fca5a5, #a34242);
+	--transition-control: 150ms ease;
 	--border-width: 1px;
-	--outline-focus: 2px solid var(--color-text);
+	--outline-focus: 2px solid var(--color-primary);
 }
 
 :root[data-theme='light'] {
@@ -34,11 +41,6 @@
 
 :root[data-theme='dark'] {
 	color-scheme: dark;
-}
-
-.directory-theme {
-	--color-primary: light-dark(var(--directory-primary-light), var(--directory-primary-dark));
-	--outline-focus: 2px solid var(--color-primary);
 }
 
 html,

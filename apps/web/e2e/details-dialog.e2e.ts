@@ -310,7 +310,7 @@ for (const width of [360, 1280]) {
 				'outline-color',
 				colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)'
 			);
-			expect(await dialog.evaluate((node) => node.closest('.directory-theme') !== null)).toBe(true);
+			expect(await dialog.evaluate((node) => node.parentElement === document.body)).toBe(true);
 			const box = (await dialog.boundingBox())!;
 			expect(box.x).toBeGreaterThanOrEqual(0);
 			expect(box.x + box.width).toBeLessThanOrEqual(width);

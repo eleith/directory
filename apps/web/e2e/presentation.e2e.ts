@@ -181,7 +181,7 @@ for (const javaScriptEnabled of [true, false]) {
 	}
 }
 
-test('configured theme inputs stay private and leave sign-in on the default palette', async ({
+test('public configured accents preserve the body palette and private directory boundary', async ({
 	page
 }) => {
 	const light = '#13579b';
@@ -195,23 +195,35 @@ test('configured theme inputs stay private and leave sign-in on the default pale
 			const response = await server.fetch(path);
 			expect(response.status).toBe(path === '/__data.json' ? 401 : 200);
 			const text = await response.text();
-			for (const value of [light, dark, username, password]) expect(text).not.toContain(value);
+			for (const value of [
+				username,
+				password,
+				'/public/header.svg',
+				'/public/bookmark.svg',
+				'/public/service.svg'
+			])
+				expect(text).not.toContain(value);
+			if (path === '/signin') {
+				expect(text).toContain(`--color-primary:light-dark(${light},${dark})`);
+			} else {
+				expect(text).not.toContain('--color-primary');
+			}
 		}
 		for (const colorScheme of ['light', 'dark'] as const) {
 			await page.emulateMedia({ colorScheme });
 			await page.goto(`${server.url}/signin`);
-			await expect(page.locator('.directory-theme')).toHaveCount(0);
 			await expect(page.locator('body')).toHaveCSS(
 				'background-color',
 				colorScheme === 'light' ? 'rgb(245, 245, 245)' : 'rgb(16, 19, 20)'
 			);
+			await expect(page.getByLabel('Username')).toBeFocused();
 			await page.keyboard.press('Tab');
-			const input = page.getByLabel('Username');
+			const input = page.getByLabel('Password');
 			await expect(input).toBeFocused();
 			await expect(input).toHaveCSS('outline-style', 'solid');
 			await expect(input).toHaveCSS(
 				'outline-color',
-				colorScheme === 'light' ? 'rgb(23, 23, 23)' : 'rgb(245, 245, 245)'
+				colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)'
 			);
 		}
 		await page.getByLabel('Username').fill(username);
@@ -229,10 +241,7 @@ test('configured theme inputs stay private and leave sign-in on the default pale
 			await page.emulateMedia({ colorScheme });
 			const document = await page.goto(`${server.url}/?link=entry-0`);
 			const html = await document!.text();
-			for (const value of [light, dark]) expect(html).toContain(value);
-			const boundary = page.locator('.directory-theme');
-			await expect(boundary).toHaveCSS('--directory-primary-light', light);
-			await expect(boundary).toHaveCSS('--directory-primary-dark', dark);
+			expect(html).toContain(`--color-primary:light-dark(${light},${dark})`);
 			const accent = colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)';
 			await expect(page.getByRole('dialog')).toBeVisible();
 			const close = page.getByRole('button', { name: 'Close', exact: true });
