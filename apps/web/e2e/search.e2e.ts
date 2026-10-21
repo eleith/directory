@@ -10,6 +10,8 @@ import {
 import { credentialsAuth, password, username } from './support/configuration.js';
 import { startServer, type TestServer } from './support/server.js';
 
+import { watchSearchStability } from './support/search-stability.js';
+
 const engineKey = 'src/lib/search/engine.ts';
 const engineScript = '/' + clientManifest[engineKey]!.file;
 const engineFiles = staticClientFiles([engineKey]);
@@ -95,21 +97,25 @@ async function expectTitles(page: Page, titles: string[]) {
 	await expect(page.locator('.tile > span')).toHaveText(titles);
 }
 
-async function holdEngine(page: Page) {
+async function holdChunk(page: Page, script: string) {
 	const requested = Promise.withResolvers<void>();
 	const release = Promise.withResolvers<void>();
 	const settled = Promise.withResolvers<void>();
 	function markSettled(request: Request) {
-		if (request.url().endsWith(engineScript)) settled.resolve();
+		if (request.url().endsWith(script)) settled.resolve();
 	}
 	page.on('requestfinished', markSettled);
 	page.on('requestfailed', markSettled);
-	await page.route(`**${engineScript}`, async (route) => {
+	await page.route(`**${script}`, async (route) => {
 		requested.resolve();
 		await release.promise;
 		await route.continue();
 	});
 	return { requested: requested.promise, release: release.resolve, settled: settled.promise };
+}
+
+function holdEngine(page: Page) {
+	return holdChunk(page, engineScript);
 }
 
 async function finishRendering(page: Page) {
@@ -162,6 +168,85 @@ test('full Fuse engine is outside eager and dialog graphs; only search focus loa
 	await expectTitles(page, ['Navidrome']);
 	expect(requested.filter((path) => path === engineScript)).toHaveLength(1);
 	expect(requested.filter((path) => path === dialogScript)).toHaveLength(dialogRequests);
+});
+
+test('empty focus quietly warms search without moving or reloading the full directory', async ({
+	page
+}) => {
+	const delayed = await holdEngine(page);
+	try {
+		await openGrid(page);
+		await expect(page.locator('.tile img').last()).toBeVisible();
+		await page.waitForLoadState('networkidle');
+		const watch = await watchSearchStability(page);
+		const before = await watch.read();
+		await searchInput(page).focus();
+		await delayed.requested;
+		await finishRendering(page);
+		const during = await watch.expectStable();
+		delayed.release();
+		await delayed.settled;
+		await finishRendering(page);
+		console.log('empty focus stability', { before, during, after: await watch.read() });
+		await watch.expectStable();
+		expect(during.status).toBe('');
+		expect((await watch.read()).statuses).not.toContain('Loading search…');
+		await expect(page.getByRole('status')).toBeEmpty();
+		await watch.stop();
+	} finally {
+		delayed.release();
+		await page.unrouteAll({ behavior: 'wait' });
+	}
+});
+
+test('refocusing a completed filter preserves result nodes, images, order and positions', async ({
+	page
+}) => {
+	await openGrid(page);
+	await searchInput(page).fill('amberquartz');
+	await expectTitles(page, ['amberquartz', 'Documents', 'Notes', 'Weather']);
+	await finishRendering(page);
+	await page.waitForLoadState('networkidle');
+	const watch = await watchSearchStability(page);
+	for (const source of ['utility', 'grid']) {
+		if (source === 'utility') {
+			await page.getByRole('button', { name: 'Switch to dark theme', exact: true }).focus();
+			await searchInput(page).focus();
+		} else {
+			await searchInput(page).press('ArrowDown');
+			await expect(page.getByRole('grid').getByRole('link').first()).toBeFocused();
+			await page.keyboard.press('Escape');
+		}
+		await finishRendering(page);
+		await expect(searchInput(page)).toBeFocused();
+		console.log('filtered refocus stability', source, await watch.read());
+		const state = await watch.expectStable();
+		expect(state.groupedIntervals).toBe(0);
+		await expectTitles(page, ['amberquartz', 'Documents', 'Notes', 'Weather']);
+	}
+	await watch.stop();
+});
+
+test('nonempty query replacements never publish an intervening grouped directory', async ({
+	page
+}) => {
+	await openGrid(page);
+	await searchInput(page).fill('amberquartz');
+	await expectTitles(page, ['amberquartz', 'Documents', 'Notes', 'Weather']);
+	const watch = await watchSearchStability(page);
+	for (const [query, titles] of [
+		['backup', ['Immich']],
+		['drome', ['Navidrome']],
+		['amberquartz', ['amberquartz', 'Documents', 'Notes', 'Weather']]
+	] as [string, string[]][]) {
+		await searchInput(page).fill(query);
+		await expectTitles(page, titles);
+	}
+	expect((await watch.read()).groupedIntervals).toBe(0);
+	await watch.stop();
+	await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+	await expectTitles(page, originalTitles);
+	await expect(page.locator('.groups h2')).toHaveText(groupLabels);
 });
 
 test('a native input event can activate search without a preceding focus', async ({ page }) => {
@@ -239,6 +324,145 @@ test('keyboard order, no results, whitespace and clear restore configured groupi
 	await expect(page.getByRole('status')).toHaveText('1 bookmark found.');
 });
 
+test('Enter opens the sole ready result through its real detail URL and retains it after Escape', async ({
+	page
+}) => {
+	await openGrid(page);
+	await searchInput(page).fill('backup');
+	await expectTitles(page, ['Immich']);
+	const tile = page.getByRole('grid', { name: 'Search results' }).getByRole('link');
+	const originalTile = await tile.elementHandle();
+	await searchInput(page).press('Enter');
+	await expect(page).toHaveURL(`${server.url}/?link=immich`);
+	await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
+	await expect(
+		page.getByRole('link', { name: 'Open service (opens in a new tab)', exact: true })
+	).toHaveAttribute('href', 'https://photos.example.test/');
+	await page.keyboard.press('Escape');
+	await expect(tile).toBeFocused();
+	await expect(searchInput(page)).toHaveValue('backup');
+	expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
+	await page.goForward();
+	await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
+	await page.goBack();
+	await expect(tile).toBeFocused();
+});
+
+for (const change of ['type', 'clear'] as const) {
+	test(`query ${change} cancels a sole-result Enter waiting for the dialog chunk`, async ({
+		page
+	}) => {
+		const delayed = await holdChunk(page, dialogScript);
+		try {
+			await openGrid(page);
+			await searchInput(page).fill('backup');
+			await expectTitles(page, ['Immich']);
+			await searchInput(page).press('Enter');
+			await delayed.requested;
+			await expect(searchInput(page)).toBeFocused();
+			if (change === 'type') {
+				await searchInput(page).fill('drome');
+				await expectTitles(page, ['Navidrome']);
+			} else {
+				await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+				await expectTitles(page, originalTitles);
+			}
+			delayed.release();
+			await delayed.settled;
+			await finishRendering(page);
+			await expect(page.getByRole('dialog')).toHaveCount(0);
+			await expect(page).toHaveURL(`${server.url}/`);
+			await expect(searchInput(page)).toBeFocused();
+		} finally {
+			delayed.release();
+			await page.unrouteAll({ behavior: 'wait' });
+		}
+	});
+}
+
+test('Enter with pending, zero or several results never imports details or activates stale results', async ({
+	page
+}) => {
+	const delayed = await holdEngine(page);
+	const requested: string[] = [];
+	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
+	try {
+		await openGrid(page);
+		await searchInput(page).fill('backup');
+		await delayed.requested;
+		await searchInput(page).press('Enter');
+		await searchInput(page).press('ArrowDown');
+		await expect(searchInput(page)).toBeFocused();
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+		delayed.release();
+		await delayed.settled;
+		await expectTitles(page, ['Immich']);
+		await searchInput(page).evaluate((input: HTMLInputElement) => {
+			input.value = 'zzzxxyyqqq';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			input.dispatchEvent(
+				new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+			);
+		});
+		await expect(page.getByRole('status')).toHaveText('No bookmarks found.');
+		await searchInput(page).press('Enter');
+		await searchInput(page).press('ArrowDown');
+		await expect(searchInput(page)).toBeFocused();
+		await expect(page.getByRole('grid')).toHaveCount(0);
+		await searchInput(page).fill('amberquartz');
+		await expectTitles(page, ['amberquartz', 'Documents', 'Notes', 'Weather']);
+		await searchInput(page).press('Enter');
+		await expect(page.getByRole('grid').getByRole('link').first()).toBeFocused();
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+		expect(requested).not.toContain(dialogScript);
+	} finally {
+		delayed.release();
+		await page.unrouteAll({ behavior: 'wait' });
+	}
+});
+
+test('IME and modified input keys leave activation, editing and clearing alone', async ({
+	page
+}) => {
+	const requested: string[] = [];
+	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
+	await openGrid(page);
+	await searchInput(page).fill('backup');
+	await expectTitles(page, ['Immich']);
+	for (const key of ['Enter', 'ArrowDown', 'Escape']) {
+		for (const options of [
+			{ isComposing: true },
+			{ keyCode: 229 },
+			{ ctrlKey: true },
+			{ metaKey: true },
+			{ shiftKey: true },
+			{ altKey: true }
+		]) {
+			const prevented = await searchInput(page).evaluate(
+				(input, { key, options }) => {
+					return !input.dispatchEvent(
+						new KeyboardEvent('keydown', { key, ...options, bubbles: true, cancelable: true })
+					);
+				},
+				{ key, options }
+			);
+			expect(prevented).toBe(false);
+			await expect(searchInput(page)).toBeFocused();
+			await expect(searchInput(page)).toHaveValue('backup');
+		}
+	}
+	await searchInput(page).press('Home');
+	await searchInput(page).press('ArrowRight');
+	expect(await searchInput(page).evaluate((input: HTMLInputElement) => input.selectionStart)).toBe(
+		1
+	);
+	expect(requested).not.toContain(dialogScript);
+	await searchInput(page).press('Escape');
+	await expectTitles(page, originalTitles);
+	await expect(searchInput(page)).toHaveValue('');
+	await expect(page.getByRole('grid')).toHaveCount(0);
+});
+
 test('search and dialog history retain query, ranked results and connected return tile without fetching data', async ({
 	page
 }) => {
@@ -281,9 +505,13 @@ for (const ending of ['latest query', 'clear']) {
 			await openGrid(page);
 			await searchInput(page).focus();
 			await delayed.requested;
-			await expect(page.getByRole('status')).toHaveText('Loading search…');
+			await expect(page.getByRole('status')).toBeEmpty();
 			await searchInput(page).fill('jelyfin');
+			await expect(page.getByRole('status')).toHaveText('Loading search…');
+			const watch = await watchSearchStability(page);
 			await searchInput(page).fill('drome');
+			await watch.expectStable();
+			await watch.stop();
 			if (ending === 'clear')
 				await page.getByRole('button', { name: 'Clear search', exact: true }).click();
 			delayed.release();
@@ -384,6 +612,8 @@ for (const entry of ['grid', 'direct']) {
 		await openGrid(page, `${server.url}/${entry === 'direct' ? '?link=navidrome' : ''}`);
 		await searchInput(page).fill('backup');
 		await expect(page.getByRole('status')).toHaveText('Search unavailable. Reload to try again.');
+		await expect(page.getByRole('grid')).toHaveCount(0);
+		await expect(page.locator('.groups').getByRole('list')).toHaveCount(4);
 		await expectTitles(page, originalTitles);
 		await expect(page.locator('.groups h2')).toHaveText(groupLabels);
 		await finishRendering(page);
@@ -493,7 +723,23 @@ test('search stays behind authentication; sign-out retains only public branding'
 		await searchInput(page).fill('family photos');
 		await expectTitles(page, ['Immich']);
 		const signout = page.getByRole('button', { name: 'Sign out', exact: true });
-		await expect(signout).toBeInViewport();
+		for (const width of [360, 1280]) {
+			await page.setViewportSize({ width, height: 900 });
+			await expect(signout).toBeInViewport();
+			const fieldBox = (await searchInput(page).boundingBox())!;
+			const themeBox = (await page
+				.getByRole('button', { name: 'Switch to dark theme', exact: true })
+				.boundingBox())!;
+			const signoutBox = (await signout.boundingBox())!;
+			expect(themeBox.y + themeBox.height / 2).toBe(signoutBox.y + signoutBox.height / 2);
+			if (width === 360) {
+				expect(fieldBox.width).toBe(328);
+				expect(fieldBox.y + fieldBox.height).toBeLessThanOrEqual(themeBox.y);
+			} else {
+				expect(fieldBox.y + fieldBox.height / 2).toBe(themeBox.y + themeBox.height / 2);
+			}
+		}
+		await page.setViewportSize({ width: 360, height: 900 });
 		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 			true
 		);

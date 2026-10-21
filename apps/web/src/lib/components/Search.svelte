@@ -12,24 +12,33 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import IconMagnifyingGlass from 'virtual:icons/ph/magnifying-glass';
+	import IconX from 'virtual:icons/ph/x';
 	import { beforeNavigate, afterNavigate } from '$app/navigation';
 	import type { DirectoryDisplay } from '$lib/display/types.js';
 	import type { SearchResult } from '$lib/search/engine.js';
 
 	let {
 		directory,
-		results = $bindable(null)
+		results = $bindable(null),
+		status = $bindable('idle'),
+		input = $bindable(),
+		onQueryChange,
+		onEnterResults
 	}: {
 		directory: DirectoryDisplay;
 		results: SearchResult[] | null;
+		status: 'idle' | 'loading' | 'ready' | 'failed';
+		input: HTMLInputElement | undefined;
+		onQueryChange: () => void;
+		onEnterResults: (activateSingle: boolean) => void;
 	} = $props();
 
 	let query = $state('');
 	let mounted = $state(false);
 	let navigating = $state(false);
-	let activationRequestVersion = $state(0);
-	let status = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
-	let input: HTMLInputElement;
+	let activated = $state(false);
+	let completedQuery: string | undefined;
 	let search: ReturnType<typeof import('$lib/search/engine.js').createSearch> | undefined;
 	let indexedSnapshotId: string | undefined;
 	let searchRequestVersion = 0;
@@ -38,15 +47,15 @@
 	async function updateSearch(snapshot: DirectoryDisplay, currentQuery: string) {
 		const requestVersion = ++searchRequestVersion;
 		const trimmedQuery = currentQuery.trim();
-		results = null;
 		if (searchUnavailable) return;
+		if (!trimmedQuery) results = null;
 		if (indexedSnapshotId !== snapshot.snapshotId) {
 			search = undefined;
 			indexedSnapshotId = undefined;
 		}
 		try {
 			if (!search) {
-				status = 'loading';
+				status = trimmedQuery ? 'loading' : 'idle';
 				const engine = await loadEngine();
 				if (!mounted || navigating || requestVersion !== searchRequestVersion) return;
 				if (directory.snapshotId !== snapshot.snapshotId) return;
@@ -54,6 +63,7 @@
 				indexedSnapshotId = snapshot.snapshotId;
 			}
 			if (trimmedQuery) results = search(trimmedQuery);
+			completedQuery = currentQuery;
 			status = 'ready';
 		} catch {
 			if (!mounted || navigating || requestVersion !== searchRequestVersion) return;
@@ -65,12 +75,28 @@
 	}
 
 	function clearSearch() {
+		onQueryChange();
 		query = '';
-		input.focus();
+		input?.focus();
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.isComposing || event.keyCode === 229) return;
+		if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			clearSearch();
+			return;
+		}
+		if (event.key !== 'Enter' && event.key !== 'ArrowDown') return;
+		event.preventDefault();
+		if (status !== 'ready' || completedQuery !== query || results === null) return;
+		if (indexedSnapshotId !== directory.snapshotId || results.length === 0) return;
+		onEnterResults(event.key === 'Enter' && results.length === 1);
 	}
 
 	$effect(() => {
-		if (!mounted || navigating || activationRequestVersion === 0) return;
+		if (!mounted || navigating || !activated) return;
 		void updateSearch(directory, query);
 		return () => {
 			searchRequestVersion++;
@@ -94,85 +120,111 @@
 </script>
 
 <div class="search">
-	<label for="directory-search">Search</label>
+	<label class="visually-hidden" for="directory-search">Search</label>
 	<div class="search-controls">
+		<IconMagnifyingGlass class="icon magnifier" aria-hidden="true" focusable="false" />
 		<input
 			bind:this={input}
 			bind:value={query}
 			id="directory-search"
 			type="search"
-			placeholder="Search bookmarks"
+			placeholder="Search"
 			disabled={!mounted}
-			onfocus={() => activationRequestVersion++}
-			oninput={() => activationRequestVersion++}
+			onfocus={() => (activated = true)}
+			oninput={() => {
+				onQueryChange();
+				activated = true;
+			}}
+			onkeydown={handleKeydown}
 		/>
 		{#if query}
-			<button type="button" aria-label="Clear search" onclick={clearSearch}>Clear</button>
-		{/if}
-	</div>
-	<div class="status" role="status" aria-atomic="true">
-		{#if status === 'failed'}
-			<p>Search unavailable. Reload to try again.</p>
-		{:else if status === 'loading'}
-			<p>Loading search…</p>
-		{:else if results !== null}
-			{#if results.length === 0}
-				<p>No bookmarks found.</p>
-			{:else if results.length === 1}
-				<p>1 bookmark found.</p>
-			{:else}
-				<p>{results.length} bookmarks found.</p>
-			{/if}
+			<button type="button" aria-label="Clear search" onclick={clearSearch}>
+				<IconX class="icon" aria-hidden="true" focusable="false" />
+			</button>
 		{/if}
 	</div>
 </div>
 
 <style>
 	.search {
-		flex: 1 1 12rem;
-		max-width: 22rem;
+		flex: 1 1 18rem;
 		min-width: 0;
 	}
 
-	label {
-		display: block;
-		font-size: var(--font-size-sm);
-		margin-block-end: var(--space-1);
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.search-controls {
-		display: flex;
-		gap: var(--space-1);
+		position: relative;
 	}
 
 	input {
+		box-sizing: border-box;
 		min-width: 0;
 		width: 100%;
-	}
-
-	input,
-	button {
+		min-height: 48px;
+		padding: var(--space-4) 48px var(--space-4) 44px;
 		font: inherit;
 		color: var(--color-text);
-		background: var(--color-surface-page);
-		border: var(--border-width) solid var(--color-border-strong);
-		border-radius: var(--radius-sm);
-		padding: var(--space-4);
+		background: var(--color-surface-muted);
+		border: 0;
+		border-radius: var(--radius-card);
+	}
+
+	input::placeholder {
+		color: var(--color-text-muted);
+		opacity: 1;
+	}
+
+	input::-webkit-search-cancel-button {
+		-webkit-appearance: none;
+	}
+
+	.search-controls :global(.icon) {
+		width: 1.25rem;
+		height: 1.25rem;
+	}
+
+	.search-controls :global(.magnifier) {
+		position: absolute;
+		inset-inline-start: var(--space-5);
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--color-text-muted);
+		pointer-events: none;
 	}
 
 	button {
-		flex-shrink: 0;
+		position: absolute;
+		inset-inline-end: var(--space-1);
+		top: 50%;
+		transform: translateY(-50%);
+		display: grid;
+		place-items: center;
+		width: 44px;
+		height: 44px;
+		padding: 0;
+		font-size: inherit;
+		color: var(--color-text-muted);
+		background: transparent;
+		border: 0;
+		border-radius: var(--radius-control);
 		cursor: pointer;
+	}
+
+	button:hover {
+		background: var(--color-surface-muted);
 	}
 
 	input:focus-visible,
 	button:focus-visible {
 		outline: var(--outline-focus);
 		outline-offset: var(--space-1);
-	}
-
-	.status {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
 	}
 </style>

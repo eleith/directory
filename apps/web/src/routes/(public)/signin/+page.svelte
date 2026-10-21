@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import IconWarningCircle from 'virtual:icons/ph/warning-circle';
+	import IconLock from 'virtual:icons/ph/lock';
+	import IconSignIn from 'virtual:icons/ph/sign-in';
 	import Logo from '$lib/components/Logo.svelte';
 	import type { PageData } from './$types.js';
 
@@ -27,9 +30,15 @@
 		</header>
 
 		{#if data.error === 'credentials'}
-			<p class="error-banner" role="alert">Invalid username or password. Please try again.</p>
+			<p class="error-banner" role="alert">
+				<span class="icon"><IconWarningCircle aria-hidden="true" focusable="false" /></span>
+				<span>Invalid username or password. Please try again.</span>
+			</p>
 		{:else if data.error === 'authentication'}
-			<p class="error-banner" role="alert">Unable to sign in. Please try again.</p>
+			<p class="error-banner" role="alert">
+				<span class="icon"><IconWarningCircle aria-hidden="true" focusable="false" /></span>
+				<span>Unable to sign in. Please try again.</span>
+			</p>
 		{/if}
 
 		<form method="POST">
@@ -57,10 +66,16 @@
 						required
 					/>
 				</div>
-				<button type="submit">Sign in</button>
+				<button type="submit">
+					<span class="icon"><IconLock aria-hidden="true" focusable="false" /></span>
+					Sign in
+				</button>
 			{:else}
 				<p class="sso-description">Use your single sign-on account to access the directory.</p>
-				<button bind:this={ssoButton} type="submit">Sign in with single sign-on</button>
+				<button bind:this={ssoButton} type="submit">
+					<span class="icon"><IconSignIn aria-hidden="true" focusable="false" /></span>
+					Sign in with single sign-on
+				</button>
 			{/if}
 		</form>
 	</main>
@@ -108,6 +123,9 @@
 	}
 
 	.error-banner {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-4);
 		padding: var(--space-4) var(--space-5);
 		color: var(--color-danger);
 		background: var(--color-danger-bg);
@@ -149,7 +167,17 @@
 		border-color: var(--color-primary);
 	}
 
+	.icon {
+		display: inline-flex;
+		flex-shrink: 0;
+		font-size: 1.25rem;
+	}
+
 	button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-4);
 		color: var(--color-on-primary);
 		background: var(--color-primary);
 		border: var(--border-width) solid transparent;

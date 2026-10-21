@@ -17,7 +17,10 @@ invalid edits. Compact icon-and-title tiles flow into a responsive grid with mut
 group headings, plain shareable details and real external service links.
 Header search loads on first focus/input and finds bookmarks with typo-tolerant,
 word-order-independent matching across public bookmark metadata. Results rank by
-relevance; clearing restores the configured groups and order. Search stays local
+relevance; clearing restores the configured groups and order. Enter opens details
+for one ready result, or focuses the first when several match. Down enters results;
+arrow keys move between tiles, and Escape returns to Search without losing the
+query. Escape in Search clears it. Search stays local
 to the loaded directory and is disabled without JavaScript; the full directory
 and real detail URLs still work.
 The header theme button cycles System → Dark → Light → System and saves the

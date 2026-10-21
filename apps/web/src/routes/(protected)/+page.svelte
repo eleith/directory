@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
+	import IconSignOut from 'virtual:icons/ph/sign-out';
 	import { afterNavigate, beforeNavigate, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import BookmarkLogo from '$lib/components/BookmarkLogo.svelte';
@@ -7,6 +8,7 @@
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import Search from '$lib/components/Search.svelte';
+	import { nextResultIndex } from '$lib/search/result-navigation.js';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import type { SearchResult } from '$lib/search/engine.js';
 	import type { PageData } from './$types.js';
@@ -14,6 +16,23 @@
 	let { data }: { data: PageData } = $props();
 
 	let searchResults = $state<SearchResult[] | null>(null);
+	let searchStatus = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+	let searchInput = $state<HTMLInputElement>();
+	let resultGrid = $state<HTMLDivElement>();
+	let focusedResultId = $state<string>();
+	let resultColumnCount = $state(1);
+	const resultRows = $derived.by(() => {
+		const results = searchResults ?? [];
+		const rows: SearchResult[][] = [];
+		for (let index = 0; index < results.length; index += resultColumnCount) {
+			rows.push(results.slice(index, index + resultColumnCount));
+		}
+		return rows;
+	});
+	const tabStopResultId = $derived(
+		searchResults?.find((result) => result.link.id === focusedResultId)?.link.id ??
+			searchResults?.[0]?.link.id
+	);
 	let DetailDialog = $state<typeof import('$lib/components/DetailDialog.svelte').default>();
 	let dialogImport: Promise<typeof import('$lib/components/DetailDialog.svelte')> | undefined;
 	let mounted = false;
@@ -31,6 +50,74 @@
 		data.directory.groups.find((group) => group.links.some((link) => link.id === selectedId))
 	);
 	const selectedLink = $derived(selectedGroup?.links.find((link) => link.id === selectedId));
+
+	function findResultLink(id: string) {
+		const links = resultGrid?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? [];
+		return Array.from(links).find((link) => link.getAttribute('href') === `/?link=${id}`);
+	}
+
+	function observeResultColumns(node: HTMLDivElement) {
+		async function updateColumns() {
+			const columns = getComputedStyle(node).gridTemplateColumns.split(' ').length;
+			if (columns === resultColumnCount) return;
+			const activeLink = node.contains(document.activeElement) ? document.activeElement : null;
+			const activeId = focusedResultId;
+			resultColumnCount = columns;
+			await tick();
+			if (!node.isConnected || !activeLink || activeLink.isConnected || !activeId) return;
+			if (document.activeElement === document.body) {
+				findResultLink(activeId)?.focus({ preventScroll: true });
+			}
+		}
+		let animationFrame: number | undefined;
+		function scheduleUpdate() {
+			if (animationFrame !== undefined) return;
+			animationFrame = requestAnimationFrame(() => {
+				animationFrame = undefined;
+				void updateColumns();
+			});
+		}
+		scheduleUpdate();
+		const observer = new ResizeObserver(scheduleUpdate);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+				if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+			}
+		};
+	}
+
+	function tileTabIndex(id: string, filtered: boolean) {
+		if (!filtered) return undefined;
+		return id === tabStopResultId ? 0 : -1;
+	}
+
+	function enterResults(activateSingle: boolean) {
+		const firstResult = resultGrid?.querySelector<HTMLAnchorElement>('a.tile');
+		if (!firstResult) return;
+		if (activateSingle) firstResult.click();
+		else firstResult.focus();
+	}
+
+	function navigateResults(event: KeyboardEvent) {
+		if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
+		if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			searchInput?.focus();
+			return;
+		}
+		if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
+			return;
+		const links = Array.from(resultGrid?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? []);
+		const currentIndex = links.indexOf(event.target as HTMLAnchorElement);
+		if (currentIndex === -1) return;
+		event.preventDefault();
+		const positions = links.map((link) => link.getBoundingClientRect());
+		const nextIndex = nextResultIndex(positions, currentIndex, event.key);
+		links[nextIndex]?.focus();
+	}
 
 	function cancelPendingOpen() {
 		openRequestVersion++;
@@ -93,6 +180,10 @@
 	}
 
 	function returnFocus() {
+		if (returnTile && !returnTile.isConnected) {
+			const id = new URL(returnTile.href).searchParams.get('link');
+			if (id) returnTile = findResultLink(id);
+		}
 		if (returnTile?.isConnected) {
 			returnTile.focus({ preventScroll: true });
 			return;
@@ -141,11 +232,21 @@
 			</div>
 		</div>
 		<div class="header-actions">
-			<Search directory={data.directory} bind:results={searchResults} />
+			<Search
+				directory={data.directory}
+				bind:results={searchResults}
+				bind:status={searchStatus}
+				bind:input={searchInput}
+				onQueryChange={cancelPendingOpen}
+				onEnterResults={enterResults}
+			/>
 			<ThemeToggle />
 			{#if data.signedIn}
 				<form method="POST" action="?/signout">
-					<button type="submit">Sign out</button>
+					<button type="submit">
+						<span class="icon"><IconSignOut aria-hidden="true" focusable="false" /></span>
+						Sign out
+					</button>
 				</form>
 			{/if}
 		</div>
@@ -166,12 +267,16 @@
 		</section>
 	{/if}
 
-	{#snippet tile(link: DisplayLink, groupLabel: string | undefined)}
+	{#snippet tile(link: DisplayLink, groupLabel: string | undefined, filtered = false)}
 		<!-- eslint-disable svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 		<a
 			class="tile"
 			href={`/?link=${link.id}`}
 			data-sveltekit-preload-data="off"
+			tabindex={tileTabIndex(link.id, filtered)}
+			onfocus={() => {
+				if (filtered) focusedResultId = link.id;
+			}}
 			onclick={(event) => openDetails(event, link.id)}
 		>
 			<BookmarkLogo {link} loading="lazy" />
@@ -183,15 +288,51 @@
 		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 	{/snippet}
 
+	<div class="search-feedback">
+		<div role="status" aria-atomic="true">
+			{#if searchStatus === 'failed'}
+				<p>Search unavailable. Reload to try again.</p>
+			{:else if searchStatus === 'loading'}
+				<p>Loading search…</p>
+			{:else if searchResults !== null}
+				{#if searchResults.length === 0}
+					<p>No bookmarks found.</p>
+				{:else if searchResults.length === 1}
+					<p>1 bookmark found.</p>
+				{:else}
+					<p>{searchResults.length} bookmarks found.</p>
+				{/if}
+			{/if}
+		</div>
+		{#if searchResults?.length}
+			<p id="search-keyboard-hint">
+				Use arrow keys to move, Enter for details, Escape to return to Search.
+			</p>
+		{/if}
+	</div>
+
 	<div class="groups">
 		{#if searchResults !== null}
-			<section aria-label="Search results">
-				<ul class="link-grid">
-					{#each searchResults as result (result.link.id)}
-						<li>{@render tile(result.link, result.groupLabel)}</li>
+			{#if searchResults.length > 0}
+				<!-- svelte-ignore a11y_interactive_supports_focus (Focus roves between the real links inside grid cells.) -->
+				<div
+					bind:this={resultGrid}
+					use:observeResultColumns
+					class="link-grid"
+					role="grid"
+					aria-label="Search results"
+					aria-describedby="search-keyboard-hint"
+					onkeydown={navigateResults}
+				>
+					{#each resultRows as row, rowIndex (rowIndex)}
+						<div role="row" class="result-row">
+							{#each row as result (result.link.id)}
+								<div role="gridcell">{@render tile(result.link, result.groupLabel, true)}</div>
+							{/each}
+						</div>
 					{/each}
-				</ul>
-			</section>
+				</div>
+			{/if}
 		{:else}
 			{#each data.directory.groups as group (group.id)}
 				<section aria-label={group.label ?? 'Directory links'}>
@@ -241,10 +382,18 @@
 		align-items: center;
 		justify-content: flex-end;
 		flex-wrap: wrap;
-		gap: var(--space-4);
-		margin-inline-start: auto;
+		gap: var(--space-1);
 		max-width: 100%;
-		flex: 1 1 22rem;
+		flex: 1 1 100%;
+	}
+
+	.header-actions form {
+		margin: 0;
+	}
+
+	.header-actions :global(.search) {
+		flex-basis: 100%;
+		margin-block-end: var(--space-1);
 	}
 
 	.site-brand {
@@ -264,14 +413,23 @@
 	}
 
 	h1 {
-		font-size: var(--font-size-heading);
+		font-size: 1.5rem;
 		line-height: var(--line-height-heading);
 	}
 
 	.description {
-		margin-block-start: var(--space-4);
+		margin-block-start: var(--space-1);
 		color: var(--color-text-muted);
 		white-space: pre-line;
+	}
+
+	.search-feedback {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+	}
+
+	.search-feedback:has(p) {
+		margin-block-end: var(--space-5);
 	}
 
 	.groups {
@@ -294,6 +452,12 @@
 		gap: var(--space-8) var(--space-5);
 		padding: 0;
 		list-style: none;
+	}
+
+	.result-row {
+		display: grid;
+		grid-template-columns: subgrid;
+		grid-column: 1 / -1;
 	}
 
 	.tile {
@@ -350,13 +514,27 @@
 		white-space: pre-line;
 	}
 
+	.icon {
+		display: inline-flex;
+		font-size: 1.25rem;
+	}
+
 	button {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-4);
 		color: var(--color-text);
-		background: var(--color-surface-page);
-		border: var(--border-width) solid var(--color-border-strong);
-		border-radius: var(--radius-sm);
-		padding: var(--space-4) var(--space-5);
+		background: transparent;
+		border: 0;
+		border-radius: var(--radius-control);
+		min-height: 44px;
+		padding: var(--space-4);
+		font: inherit;
 		cursor: pointer;
+	}
+
+	button:hover {
+		background: var(--color-surface-muted);
 	}
 
 	a:focus-visible,
@@ -366,6 +544,22 @@
 	}
 
 	@media (min-width: 48rem) {
+		.header-actions {
+			flex: 1 1 28rem;
+			flex-wrap: nowrap;
+			gap: var(--space-4);
+		}
+
+		.header-actions :global(.search) {
+			flex-basis: 18rem;
+			max-width: 22rem;
+			margin-block-end: 0;
+		}
+
+		.header-actions form {
+			flex-shrink: 0;
+		}
+
 		main {
 			padding: var(--space-9) var(--space-8);
 		}

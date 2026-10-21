@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Dialog } from 'bits-ui';
+	import IconX from 'virtual:icons/ph/x';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import DetailContent from './DetailContent.svelte';
 
@@ -46,7 +47,9 @@
 				<section {...props} class="details">
 					<Dialog.Close>
 						{#snippet child({ props: closeProps })}
-							<button {...closeProps} bind:this={closeButton} class="close">Close</button>
+							<button {...closeProps} bind:this={closeButton} class="close" aria-label="Close">
+								<IconX aria-hidden="true" focusable="false" />
+							</button>
 						{/snippet}
 					</Dialog.Close>
 					<div class="scroll-content">
@@ -104,12 +107,19 @@
 		flex-shrink: 0;
 		min-width: 44px;
 		min-height: 44px;
-		padding: var(--space-4) var(--space-5);
-		color: var(--color-text);
-		background: var(--color-surface-page);
-		border: var(--border-width) solid var(--color-border-strong);
-		border-radius: var(--radius-sm);
+		display: grid;
+		place-items: center;
+		padding: var(--space-4);
+		font-size: 1.25rem;
+		color: var(--color-text-muted);
+		background: transparent;
+		border: 0;
+		border-radius: var(--radius-control);
 		cursor: pointer;
+	}
+
+	.close:hover {
+		background: var(--color-surface-muted);
 	}
 
 	.close:focus-visible {

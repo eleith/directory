@@ -34,12 +34,16 @@ dependencies exactly, including:
 | Playwright                        | 1.61.1          |
 | Bits UI                           | 2.18.1          |
 | Fuse.js (full build)              | 7.5.0           |
+| unplugin-icons / Phosphor JSON    | 23.0.1 / 1.2.2  |
 | Changesets CLI                    | 3.0.1           |
 
 Published peer ranges support this combination. `@types/node` 24.12.4 satisfies
 Vite/Vitest's peer ranges; it does not describe every Node 26 API. The base ESLint
 configuration now loads Svelte template rules and the actual web configuration.
 Do not use SvelteKit 3 configuration APIs with this pinned Kit 2 stack.
+UI glyphs use When's `virtual:icons/ph/*` imports with unplugin-icons' Svelte
+compiler. Only selected SVGs are compiled into the app; there is no browser icon
+API, font or runtime collection. Branding and bookmark/service images remain separate.
 
 ## Setup and commands
 
@@ -336,7 +340,10 @@ inherits the configured accents naturally from the document root.
 
 The header search shell is server-rendered but disabled until hydration. Its first
 focus or input dynamically imports `lib/search/engine.ts`, the only runtime Fuse
-import. Tile-only visits do not load search. Fuse.js 7.5.0's full build uses token
+import. Empty focus quietly warms the engine without moving the full directory;
+refocusing an unchanged query retains its results and images. Nonempty query
+replacements publish results without an intervening grouped directory. Tile-only
+visits do not load search. Fuse.js 7.5.0's full build uses token
 search with all query words required, independent of word order or field. The
 fixed threshold is 0.35 with location ignored; weights are title 4, prepared tags
 3, description 2 and remaining link-local public text 1. Unit fixtures cover
@@ -353,9 +360,20 @@ queries restore the original groups and order. Clear returns focus to the input;
 result counts, loading, no-results and failure messages are announced. A failed
 import leaves the full grid usable and suggests reloading, without an automatic
 retry or reload loop. Without JavaScript the full HTML and detail URLs still work.
+Search remains a labelled native search field, not a selection popup. Enter opens
+details when exactly one result is ready, focuses the first of several, and does
+nothing while loading or with no matches. Down focuses the first ready result.
+Filtered results form a layout grid of real detail links with one Tab stop.
+Semantic rows follow the CSS columns as the grid resizes; arrows follow those
+visual rows without wrapping at boundaries. Home/End move to the first/last
+result in the current row. Tab and Shift-Tab leave the grid normally. Escape
+from a result focuses Search and preserves the query; Escape in Search or Clear
+restores grouped browsing. IME composition and modified keys do not trigger these
+commands. Changing or clearing a query cancels a pending detail activation.
 Search is discovery, not access control: details always resolve against the full
 loaded directory. Shallow dialog history preserves query/results and returns
-focus to the connected activating tile or directory heading.
+focus to the activating tile (or its replacement after resize), falling back to
+the directory heading when that result is no longer present.
 
 ### Authentication boundary
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import IconArrowSquareOut from 'virtual:icons/ph/arrow-square-out';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import BookmarkLogo from './BookmarkLogo.svelte';
 	import Logo from './Logo.svelte';
@@ -54,7 +55,7 @@
 			<Logo source={link.favicon_path} fallback={`/bookmarks/${link.id}/logo`} size={24} />
 		{/if}
 		<span>Open service <span class="new-tab">(opens in a new tab)</span></span>
-		<span aria-hidden="true">↗</span>
+		<IconArrowSquareOut aria-hidden="true" focusable="false" />
 	</a>
 </div>
 

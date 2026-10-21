@@ -61,7 +61,9 @@ test('keyboard cycle, next-action icons, focus, persistence and Kit navigation',
 	await expect(toggle).toBeEnabled();
 	await expectTheme(page, 'system', 'light');
 	await expect(toggle).toHaveAccessibleName('Switch to dark theme');
-	await expect(toggle.locator('svg path')).toHaveCount(1);
+	await expect(toggle.locator('svg.icon-moon')).toBeVisible();
+	await expect(toggle.locator('svg')).toHaveAttribute('aria-hidden', 'true');
+	await expect(toggle.locator('svg')).toHaveAttribute('focusable', 'false');
 	const box = await toggle.boundingBox();
 	expect(box!.width).toBeGreaterThanOrEqual(44);
 	expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -75,13 +77,13 @@ test('keyboard cycle, next-action icons, focus, persistence and Kit navigation',
 	await page.keyboard.press('Enter');
 	await expectTheme(page, 'dark', 'dark');
 	await expect(toggle).toHaveAccessibleName('Switch to light theme');
-	await expect(toggle.locator('svg circle')).toHaveCount(1);
+	await expect(toggle.locator('svg.icon-sun-dim')).toBeVisible();
 	await expect(toggle).toBeFocused();
 	await expect(toggle).toHaveCSS('outline-color', accents.dark);
 	await page.keyboard.press('Space');
 	await expectTheme(page, 'light', 'light');
 	await expect(toggle).toHaveAccessibleName('Use system theme');
-	await expect(toggle.locator('svg path')).toHaveAttribute('d', /M6 3v4/);
+	await expect(toggle.locator('svg.icon-faders')).toBeVisible();
 	await page.keyboard.press('Enter');
 	await expectTheme(page, 'system', 'light');
 	await toggle.click();

@@ -8,6 +8,7 @@ allowBuilds:
 catalog:
   '@changesets/cli': 3.0.1
   '@eslint/js': 10.0.1
+  '@iconify-json/ph': 1.2.2
   '@playwright/test': 1.61.1
   '@sveltejs/adapter-node': 5.5.4
   '@sveltejs/kit': 2.70.1
@@ -27,5 +28,6 @@ catalog:
   svelte-check: 4.4.8
   typescript: 6.0.3
   typescript-eslint: 8.60.0
+  unplugin-icons: 23.0.1
   vite: 8.0.16
   vitest: 4.1.7

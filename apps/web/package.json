@@ -25,6 +25,7 @@
 	},
 	"devDependencies": {
 		"@auth/sveltekit": "1.11.3",
+		"@iconify-json/ph": "catalog:",
 		"@playwright/test": "catalog:",
 		"@sveltejs/adapter-node": "catalog:",
 		"@sveltejs/kit": "catalog:",
@@ -34,6 +35,7 @@
 		"svelte": "catalog:",
 		"svelte-check": "catalog:",
 		"typescript": "catalog:",
+		"unplugin-icons": "catalog:",
 		"vite": "catalog:",
 		"vitest": "catalog:"
 	}
