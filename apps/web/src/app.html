@@ -3,6 +3,25 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script nonce="%sveltekit.nonce%">
+			(function () {
+				let preference = 'system';
+				try {
+					const stored = localStorage.getItem('directory.theme');
+					if (stored === 'dark' || stored === 'light' || stored === 'system') {
+						preference = stored;
+					}
+				} catch {
+					// Storage can be unavailable in private or restricted browsers.
+				}
+				let appliedTheme = preference;
+				if (preference === 'system') {
+					appliedTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+				}
+				document.documentElement.dataset.themePreference = preference;
+				document.documentElement.dataset.theme = appliedTheme;
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

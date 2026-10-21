@@ -12,7 +12,9 @@ standalone CLI uses that same loader. The web server loads an immutable director
 before serving, polls for file changes, and keeps the last good snapshot after
 invalid edits. Compact icon-and-title tiles flow into a responsive grid with muted
 group headings, plain shareable details and real external service links.
-The OS light/dark scheme selects the page surfaces. Existing
+The header theme button cycles System → Dark → Light → System and saves the
+choice in this browser. System follows OS changes; without JavaScript the OS
+scheme applies and the button stays disabled. Existing
 `appearance.primary_light_color` and `primary_dark_color` configure keyboard-focus
 and Back-link underline accents on the directory, not sign-in. Choose colors with
 sufficient contrast for your deployment; arbitrary configured colors are not
@@ -40,8 +42,7 @@ authentication policy as the directory for mounted source URLs. Selecting
 including before sign-in; its source URI stays out of the shared layout. Omission
 uses the bundled `/favicon.svg`; unavailable configured images return 404, not a
 bundled fallback. Mounted files require Linux procfs; SVGs are trusted operator
-content, not sanitized uploads. Search, modal details
-and saved preferences remain later work. See [authentication setup](docs/config.md#authentication-shapes).
+content, not sanitized uploads. Search and modal details remain later work. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [production starter](apps/web/config/directory.example.yml). For the isolated,
 local-only nine-bookmark review, see [the demo](demo/README.md).

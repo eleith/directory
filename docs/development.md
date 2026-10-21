@@ -281,11 +281,22 @@ layout data; the existing public sign-in title remains unchanged.
 The protected server layout allowlists only the captured display's two appearance
 colors after the authentication gate. Its wrapper supplies SSR CSS inputs
 `--directory-primary-light` and `--directory-primary-dark`. Shared `lib/styles/theme.css`
-owns the effective `--color-primary`, `--outline-focus` and OS scheme selection on
-that same `.directory-theme` boundary; page CSS owns layout and consumes the tokens.
-Configured values stay private until sign-in, whose default palette and focus remain
-unchanged. Theme colors follow the existing full-document refresh contract after
-configuration reloads; query-only client navigation can retain the parent layout.
+owns the palettes, effective `--color-primary` and `--outline-focus`; page CSS
+owns layout and consumes those tokens. Native `light-dark()` uses the OS scheme
+unless the root's `data-theme` selects light or dark (modern browser support is
+required). Configured values stay private until sign-in, whose palette and focus
+use only defaults. Theme colors follow the existing full-document refresh contract
+after configuration reloads; query-only client navigation can retain the parent layout.
+
+With JavaScript, the protected header theme button cycles System → Dark → Light
+→ System. `directory.theme` in localStorage accepts only `system`, `dark` or
+`light`; invalid or unreadable values start in System. Blocked writes do not
+prevent toggling for the current document. The static nonce-bearing script in
+`app.html` restores the preference before head styles and hydration, including on
+public sign-in. The root records both `data-theme-preference` and the applied
+`data-theme`; OS changes update the latter only in System. There is no theme cookie
+or server-side preference. Without JavaScript, CSS follows the OS and the button
+stays disabled.
 
 ### Authentication boundary
 
@@ -590,6 +601,13 @@ tiles, wrapped titles, no horizontal overflow, and distinct group/detail/footer
 spacing. Tab through tiles, Back and Open service to inspect the configured accent
 and visible focus. Capture phone/desktop light/dark screenshots outside the repo.
 Also review flat and empty directories; the empty state should explain how to add links.
+Use Tab, Enter and Space on the theme button, including at 360px beside Sign out.
+Check the next-action label and visible focus, cycle all three modes, change the
+OS scheme in System and manual modes, then refresh and navigate details/Back.
+Throttle hydration to check restoration before paint; block localStorage to check
+usable in-memory toggling. Sign out with a saved manual theme and confirm public
+sign-in keeps that scheme but uses only default colors, with no private site data
+or CSP script errors. Disable JavaScript to check OS colors and native navigation.
 
 1. Follow the clean setup in an isolated export of the staged commit. Check root
    verification, CLI help and validation of both the production starter and demo without
@@ -676,8 +694,7 @@ Also review flat and empty directories; the empty state should explain how to ad
    **demo / directory-demo**, then stop the server when finished. This production
    preview also generates a demo-only secret per run. The
    directory uses prepared bookmark logos for omitted logo paths and serves exact
-   configured image references. Search, modal details and saved preferences are
-   not implemented. Run
+   configured image references. Search and modal details are not implemented. Run
    manual axe/PageSpeed on this visible baseline when available; this slice is not
    final UI acceptance.
 

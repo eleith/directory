@@ -118,6 +118,12 @@ for (const javaScriptEnabled of [true, false]) {
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
 					).toBe(true);
 					await page.keyboard.press('Tab');
+					if (javaScriptEnabled) {
+						const toggle = page.getByRole('button', { name: 'Switch to dark theme', exact: true });
+						await expect(toggle).toBeFocused();
+						await expect(toggle).toHaveCSS('outline-color', accent);
+						await page.keyboard.press('Tab');
+					}
 					await expect(first).toBeFocused();
 					await expect(first).toHaveCSS('outline-color', accent);
 					await first.click();
@@ -140,6 +146,12 @@ for (const javaScriptEnabled of [true, false]) {
 						'width',
 						'24px'
 					);
+					if (javaScriptEnabled) {
+						await page.keyboard.press('Tab');
+						await expect(
+							page.getByRole('button', { name: 'Switch to dark theme', exact: true })
+						).toBeFocused();
+					}
 					for (const link of [back, external]) {
 						await page.keyboard.press('Tab');
 						await expect(link).toBeFocused();
@@ -217,6 +229,7 @@ test('configured theme inputs stay private and leave sign-in on the default pale
 			const back = page.getByRole('link', { name: 'Back to directory', exact: true });
 			await expect(back).toHaveCSS('text-decoration-color', accent);
 			for (const control of [
+				page.getByRole('button', { name: 'Switch to dark theme', exact: true }),
 				page.getByRole('button', { name: 'Sign out' }),
 				back,
 				page.getByRole('link', { name: 'Open service (opens in a new tab)', exact: true })

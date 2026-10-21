@@ -2,6 +2,7 @@
 	import BookmarkLogo from '$lib/components/BookmarkLogo.svelte';
 	import DetailContent from '$lib/components/DetailContent.svelte';
 	import Logo from '$lib/components/Logo.svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import type { PageData } from './$types.js';
 
 	let { data }: { data: PageData } = $props();
@@ -37,11 +38,14 @@
 				{/if}
 			</div>
 		</div>
-		{#if data.signedIn}
-			<form method="POST" action="?/signout">
-				<button type="submit">Sign out</button>
-			</form>
-		{/if}
+		<div class="header-actions">
+			<ThemeToggle />
+			{#if data.signedIn}
+				<form method="POST" action="?/signout">
+					<button type="submit">Sign out</button>
+				</form>
+			{/if}
+		</div>
 	</header>
 
 	{#if selectedLink}
@@ -97,6 +101,14 @@
 		flex-wrap: wrap;
 		gap: var(--space-5);
 		margin-block-end: var(--space-9);
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: var(--space-4);
+		margin-inline-start: auto;
 	}
 
 	.site-brand {

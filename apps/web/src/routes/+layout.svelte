@@ -1,10 +1,22 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 	import '../lib/styles/reset.css';
 	import '../lib/styles/theme.css';
 
 	let { children, data }: { children: Snippet; data: LayoutData } = $props();
+
+	onMount(() => {
+		const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+		function followSystem() {
+			if (document.documentElement.dataset.themePreference === 'system') {
+				document.documentElement.dataset.theme = mediaQuery.matches ? 'dark' : 'light';
+			}
+		}
+		followSystem();
+		mediaQuery.addEventListener('change', followSystem);
+		return () => mediaQuery.removeEventListener('change', followSystem);
+	});
 </script>
 
 <svelte:head>
