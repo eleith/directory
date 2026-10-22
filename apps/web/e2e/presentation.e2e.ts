@@ -88,16 +88,20 @@ for (const javaScriptEnabled of [true, false]) {
 							.toBeGreaterThan(0);
 						const geometry = await tile.evaluate((node) => {
 							const box = node.getBoundingClientRect();
+							const style = getComputedStyle(node);
 							const image = node.querySelector('img')!.getBoundingClientRect();
 							const title = node.querySelector('span')!.getBoundingClientRect();
 							return {
 								width: box.width,
+								contentWidth:
+									box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
 								rem: parseFloat(getComputedStyle(document.documentElement).fontSize),
 								imageOffset: image.x + image.width / 2 - (box.x + box.width / 2),
 								titleOffset: title.x + title.width / 2 - (box.x + box.width / 2)
 							};
 						});
-						expect(geometry.width).toBeCloseTo(6 * geometry.rem, 1);
+						expect(geometry.contentWidth).toBeCloseTo((width < 768 ? 6 : 7) * geometry.rem, 1);
+						expect(geometry.width).toBeCloseTo((width < 768 ? 7 : 9) * geometry.rem, 1);
 						expect(Math.abs(geometry.imageOffset)).toBeLessThan(1);
 						expect(Math.abs(geometry.titleOffset)).toBeLessThan(1);
 					}

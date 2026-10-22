@@ -57,7 +57,7 @@ bundled fallback. Mounted files require Linux procfs; SVGs are trusted operator
 content, not sanitized uploads. See [authentication setup](docs/config.md#authentication-shapes).
 See the [configuration contract](docs/config.md) and
 [production starter](apps/web/config/directory.example.yml). For the isolated,
-local-only nine-bookmark review, see [the demo](demo/README.md).
+local-only 32-bookmark review, see [the demo](demo/README.md).
 
 ## Run with Docker
 

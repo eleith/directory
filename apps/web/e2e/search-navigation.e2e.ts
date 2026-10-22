@@ -97,7 +97,7 @@ for (const width of [360, 1280]) {
 		await openResults(page, width);
 		const results = grid(page);
 		const links = results.getByRole('link');
-		const expectedColumns = width === 360 ? 3 : 9;
+		const expectedColumns = width === 360 ? 3 : 8;
 		await expectSemanticRows(page, expectedColumns);
 		await expect(results.getByRole('gridcell')).toHaveCount(13);
 		await expect(page.getByRole('combobox')).toHaveCount(0);
@@ -177,7 +177,7 @@ test('resizing aligns semantic rows and arrows, preserving stable links and rest
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await openResults(page, 1280);
-	await expectSemanticRows(page, 9);
+	await expectSemanticRows(page, 8);
 	const links = grid(page).getByRole('link');
 	const firstLink = await links.first().elementHandle();
 	await input(page).press('Enter');
@@ -190,12 +190,12 @@ test('resizing aligns semantic rows and arrows, preserving stable links and rest
 	await expect(links.nth(3)).toBeFocused();
 	const relocatedLink = await links.nth(3).elementHandle();
 	await page.setViewportSize({ width: 1280, height: 900 });
-	await expectSemanticRows(page, 9);
-	await expect.poll(() => columnCount(page)).toBe(9);
+	await expectSemanticRows(page, 8);
+	await expect.poll(() => columnCount(page)).toBe(8);
 	await expect(links.nth(3)).toBeFocused();
 	expect(await relocatedLink!.evaluate((node) => node.isConnected)).toBe(false);
 	await page.keyboard.press('ArrowDown');
-	await expect(links.nth(12)).toBeFocused();
+	await expect(links.nth(11)).toBeFocused();
 	expect(await links.first().evaluate((node, original) => node === original, firstLink)).toBe(true);
 	await page.evaluate(
 		() =>
@@ -210,19 +210,19 @@ test('unchanged row membership retains result and image nodes across query updat
 	page
 }) => {
 	await openResults(page, 1280);
-	await expectSemanticRows(page, 9);
+	await expectSemanticRows(page, 8);
 	const tile = grid(page).getByRole('link').nth(5);
 	const originalTile = await tile.elementHandle();
 	const originalImage = await tile.locator('img').elementHandle();
 	await input(page).fill('navigationfixture ');
-	await expectSemanticRows(page, 9);
+	await expectSemanticRows(page, 8);
 	await expect(input(page)).toBeFocused();
 	expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
 	expect(
 		await tile.locator('img').evaluate((node, original) => node === original, originalImage)
 	).toBe(true);
 	await page.setViewportSize({ width: 1200, height: 900 });
-	await expectSemanticRows(page, 9);
+	await expectSemanticRows(page, 8);
 	expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
 	await expect(input(page)).toBeFocused();
 });
@@ -231,7 +231,7 @@ test('resizing with details open preserves dialog focus, query, URL and return r
 	page
 }) => {
 	await openResults(page, 1280);
-	await expectSemanticRows(page, 9);
+	await expectSemanticRows(page, 8);
 	const tile = grid(page).getByRole('link').nth(5);
 	const href = await tile.getAttribute('href');
 	const originalTile = await tile.elementHandle();

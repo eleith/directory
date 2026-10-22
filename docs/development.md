@@ -88,16 +88,15 @@ operator configuration or copying images:
 
 ```sh
 CONFIG_PATH="$PWD/demo/config/directory.yaml" \
-  DIRECTORY_PUBLIC_DIR="$PWD/demo/public" \
   AUTH_SECRET="$(openssl rand -base64 32)" \
   ORIGIN=http://localhost:5173 AUTH_URL=http://localhost:5173 pnpm dev
 ```
 
 Open **http://localhost:5173**. See [the demo quickstart](../demo/README.md) for
-local-only credentials, manual preview scope and production preview. This command uses
-real authentication with a fresh ephemeral secret, not an auth bypass. Mounted
-image reads require Linux procfs. The explicit public root overrides any operator
-environment value; by default this demo config also resolves to `demo/public`.
+local-only credentials, manual preview scope and production preview. Its 32 bookmarks
+span five uneven groups and use generated default logos; site branding uses the
+bundled default, so no image mounts or asset copies are needed. This command uses
+real authentication with a fresh ephemeral secret, not an auth bypass.
 The separate `apps/web/config/directory.example.yml` starter is empty and open,
 requires no session secret, and must have authentication added before publishing.
 
@@ -726,7 +725,6 @@ dialog actions keep their loaded snapshot.
    preview=$(mktemp -d)
    cp demo/config/directory.yaml "$preview/directory.yaml"
    CONFIG_PATH="$preview/directory.yaml" \
-     DIRECTORY_PUBLIC_DIR="$PWD/demo/public" \
      AUTH_SECRET="$(openssl rand -base64 32)" \
      ORIGIN=http://localhost:5173 AUTH_URL=http://localhost:5173 pnpm dev
    ```
@@ -734,9 +732,9 @@ dialog actions keep their loaded snapshot.
    Run from the repository root; open `http://localhost:5173` and use
    **demo / directory-demo**. This generates a unique demo-only secret per run.
    Check desktop/narrow widths, OS light/dark and JavaScript disabled. Confirm
-   four configured primary logos and five generated logos load on cards and
-   details; service URLs are placeholders. These are primary logo fixtures, not
-   service-favicon or broken-image-fallback acceptance tests. Edit the
+   all 32 generated default logos load on cards and details across five uneven
+   groups; site branding uses the bundled default and service URLs are placeholders.
+   No image mounts or asset copies are needed for this manual demo. Edit the
    copied site's title/description and refresh after approximately one second.
    Try an atomic rename save, invalid YAML, deletion and restoration: the last
    good copy should remain until a valid file returns. `/healthz` exposes only
@@ -746,8 +744,8 @@ dialog actions keep their loaded snapshot.
    Follow a bookmark to its `?link=<id>` details and close the dialog. Without
    JavaScript, return with Back to directory. Check Tab/Shift-Tab trapping, Escape,
    outside dismissal and return focus, then browser Back/Forward and a direct URL.
-   Throttle or block the dialog chunk to review the usable plain-details fallback. Omit a bookmark's `logo_path` in the disposable copy and check that its
-   prepared logo renders without JavaScript and remains protected before sign-in,
+   Throttle or block the dialog chunk to review the usable plain-details fallback.
+   Check that a generated logo renders without JavaScript and remains protected before sign-in,
    including HEAD and `/bookmarks/<id>/logo` opened as HTML. For a configured logo,
    use a disposable public directory and set `DIRECTORY_PUBLIC_DIR` to its absolute
    path before starting. Check mounted logos on cards/details without JavaScript,
@@ -782,7 +780,6 @@ dialog actions keep their loaded snapshot.
 
    ```sh
    CONFIG_PATH="$PWD/demo/config/directory.yaml" \
-     DIRECTORY_PUBLIC_DIR="$PWD/demo/public" \
      AUTH_SECRET="$(openssl rand -base64 32)" \
      ORIGIN=http://localhost:3000 AUTH_URL=http://localhost:3000 \
      HOST=127.0.0.1 PORT=3000 node apps/web/build/index.js

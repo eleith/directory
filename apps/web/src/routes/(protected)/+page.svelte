@@ -280,7 +280,7 @@
 			onclick={(event) => openDetails(event, link.id)}
 		>
 			<BookmarkLogo {link} loading="lazy" />
-			<span>{link.title}</span>
+			<span class="tile-title">{link.title}</span>
 			{#if groupLabel}
 				<small class="group-caption">{groupLabel}</small>
 			{/if}
@@ -362,10 +362,18 @@
 
 <style>
 	main {
+		--tile-content-width: 6rem;
+		--link-column-gap: var(--space-5);
+		--tile-inline-padding: calc(var(--link-column-gap) / 2);
 		max-width: 76rem;
 		margin-inline: auto;
 		padding: var(--space-8) var(--space-5);
 		overflow-wrap: anywhere;
+	}
+
+	main > * {
+		grid-column: 1 / -1;
+		min-width: 0;
 	}
 
 	header {
@@ -448,8 +456,14 @@
 
 	.link-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, 6rem);
-		gap: var(--space-8) var(--space-5);
+		/* Keep horizontal gutters inside hit areas while aligning content with headings. */
+		grid-template-columns: repeat(
+			auto-fill,
+			calc(var(--tile-content-width) + var(--link-column-gap))
+		);
+		gap: 0;
+		justify-content: center;
+		margin-inline: calc(-1 * var(--tile-inline-padding));
 		padding: 0;
 		list-style: none;
 	}
@@ -466,13 +480,22 @@
 		align-items: center;
 		gap: var(--space-4);
 		height: 100%;
-		padding-block: var(--space-4);
+		padding: var(--space-4) var(--tile-inline-padding);
 		border-radius: var(--radius-sm);
 		color: var(--color-text);
 		text-align: center;
 		text-decoration: none;
 		font-weight: 600;
 		line-height: var(--line-height-heading);
+	}
+
+	.tile-title {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		max-width: 100%;
+		overflow: hidden;
 	}
 
 	.group-caption {
@@ -561,11 +584,13 @@
 		}
 
 		main {
+			--tile-content-width: 7rem;
+			--link-column-gap: var(--space-8);
+			display: grid;
+			grid-template-columns: repeat(auto-fill, var(--tile-content-width));
+			column-gap: var(--link-column-gap);
+			justify-content: center;
 			padding: var(--space-9) var(--space-8);
-		}
-
-		.link-grid {
-			column-gap: var(--space-8);
 		}
 
 		.details {
