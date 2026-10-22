@@ -362,16 +362,16 @@ retry or reload loop. Without JavaScript the full HTML and detail URLs still wor
 Search remains a labelled native search field, not a selection popup. Enter opens
 details when exactly one result is ready, focuses the first of several, and does
 nothing while loading or with no matches. Down focuses the first ready result.
-Filtered results form a layout grid of real detail links with one Tab stop.
-Semantic rows follow the CSS columns as the grid resizes; arrows follow those
-visual rows without wrapping at boundaries. Home/End move to the first/last
-result in the current row. Tab and Shift-Tab leave the grid normally. Escape
+Filtered results form a normal list of real detail links. Tab and Shift-Tab visit
+every result in document order. Optional arrows follow the visual CSS rows without
+wrapping at boundaries; Home/End move to the first/last result in the current row.
+CSS handles responsive wrapping without recreating links or their images. Escape
 from a result focuses Search and preserves the query; Escape in Search or Clear
 restores grouped browsing. IME composition and modified keys do not trigger these
 commands. Changing or clearing a query cancels a pending detail activation.
 Search is discovery, not access control: details always resolve against the full
 loaded directory. Shallow dialog history preserves query/results and returns
-focus to the activating tile (or its replacement after resize), falling back to
+focus to the activating tile, falling back to
 the directory heading when that result is no longer present.
 
 ### Authentication boundary

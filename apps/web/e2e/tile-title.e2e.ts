@@ -75,7 +75,7 @@ test('search and enhanced details retain the full title and do not clamp group c
 	const search = page.getByRole('searchbox', { name: 'Search', exact: true });
 	await expect(search).toBeEnabled();
 	await search.fill('marshmallow');
-	const result = page.getByRole('grid', { name: 'Search results', exact: true }).getByRole('link');
+	const result = page.getByRole('list', { name: 'Search results', exact: true }).getByRole('link');
 	await expect(result).toHaveCount(1);
 	await expect(result).toHaveAccessibleName(`${longTitle} ${groupLabel}`);
 	await expectThreeLines(result.locator('.tile-title'));

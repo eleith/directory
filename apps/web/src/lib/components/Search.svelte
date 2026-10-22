@@ -36,6 +36,7 @@
 
 	let query = $state('');
 	let mounted = $state(false);
+	let macKeyboard = $state(false);
 	let navigating = $state(false);
 	let activated = $state(false);
 	let completedQuery: string | undefined;
@@ -111,6 +112,7 @@
 		navigating = false;
 	});
 	onMount(() => {
+		macKeyboard = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 		mounted = true;
 		return () => {
 			mounted = false;
@@ -128,7 +130,8 @@
 			bind:value={query}
 			id="directory-search"
 			type="search"
-			placeholder="Search"
+			placeholder={macKeyboard ? 'Search · ⌥/' : 'Search · Alt+/'}
+			aria-keyshortcuts="Alt+/"
 			disabled={!mounted}
 			onfocus={() => (activated = true)}
 			oninput={() => {

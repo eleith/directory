@@ -81,7 +81,7 @@ test.afterAll(async () => {
 });
 
 const search = (page: Page) => page.getByRole('searchbox', { name: 'Search', exact: true });
-const results = (page: Page) => page.getByRole('grid', { name: 'Search results', exact: true });
+const results = (page: Page) => page.getByRole('list', { name: 'Search results', exact: true });
 
 async function expectCanvas(page: Page, grids: Locator) {
 	const positions = await grids.evaluateAll((elements) =>
@@ -253,14 +253,23 @@ async function paddingPoint(tile: Locator, edge: 'inline' | 'block') {
 	}, edge);
 }
 
-async function expectResultRows(page: Page, columns: number) {
-	const rows = results(page).getByRole('row');
-	await expect(rows).toHaveCount(Math.ceil(bookmarks.length / columns));
-	for (let index = 0; index < Math.ceil(bookmarks.length / columns); index++) {
-		await expect(rows.nth(index).getByRole('gridcell')).toHaveCount(
-			Math.min(columns, bookmarks.length - index * columns)
-		);
-	}
+async function expectResultColumns(page: Page, columns: number) {
+	const resultList = results(page);
+	await expect(resultList).toHaveCount(1);
+	await expect(page.getByRole('grid')).toHaveCount(0);
+	await expect(resultList.getByRole('listitem')).toHaveCount(32);
+	await expect(resultList.getByRole('link')).toHaveCount(32);
+	await expect
+		.poll(() =>
+			resultList.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
+		)
+		.toBe(columns);
+	await expect(resultList.locator('a[tabindex]')).toHaveCount(0);
+	expect(
+		await resultList
+			.getByRole('link')
+			.evaluateAll((links) => links.every((link) => link.tabIndex === 0))
+	).toBe(true);
 }
 
 for (const colorScheme of ['light', 'dark'] as const) {
@@ -293,10 +302,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
 			if (width >= 1280) expect(columns).toBe(8);
 			await search(page).fill('canvasfixture');
 			await expect(results(page).getByRole('link')).toHaveCount(32);
-			await expectResultRows(page, columns);
+			await expectResultColumns(page, columns);
 			expect(await expectCanvas(page, results(page))).toBe(columns);
 			await expectContinuousCells(results(page), columns);
-			await expect(results(page).locator('a[tabindex="0"]')).toHaveCount(1);
 			await search(page).press('ArrowDown');
 			await expect(results(page).getByRole('link').first()).toBeFocused();
 			await page.keyboard.press('ArrowDown');
@@ -311,14 +319,14 @@ for (const width of [360, 390, 768, 1280, 1920, 2560]) {
 		for (const filtered of [false, true]) {
 			await page.goto(server.url);
 			await expect(search(page)).toBeEnabled();
-			let grid = page.locator('.groups .link-grid').first();
+			let tileList = page.locator('.groups .link-grid').first();
 			if (filtered) {
 				await search(page).fill('canvasfixture');
-				grid = results(page);
-				await expect(grid.getByRole('link')).toHaveCount(32);
+				tileList = results(page);
+				await expect(tileList.getByRole('link')).toHaveCount(32);
 			}
-			const columns = await expectCanvas(page, grid);
-			const tiles = grid.getByRole('link');
+			const columns = await expectCanvas(page, tileList);
+			const tiles = tileList.getByRole('link');
 			for (const [edge, index] of [
 				['inline', 1],
 				['block', columns]
@@ -379,13 +387,13 @@ for (const filtered of [false, true]) {
 		await page.setViewportSize({ width: 360, height: 1000 });
 		await page.goto(server.url);
 		await expect(search(page)).toBeEnabled();
-		let grid = page.locator('.groups .link-grid').first();
+		let tileList = page.locator('.groups .link-grid').first();
 		if (filtered) {
 			await search(page).fill('canvasfixture');
-			grid = results(page);
-			await expect(grid.getByRole('link')).toHaveCount(32);
+			tileList = results(page);
+			await expect(tileList.getByRole('link')).toHaveCount(32);
 		}
-		const tile = grid.getByRole('link').nth(1);
+		const tile = tileList.getByRole('link').nth(1);
 		await expect(tile).toHaveAccessibleName(
 			filtered ? `${bookmarks[1]!.title} ${groups[0]!.label}` : bookmarks[1]!.title
 		);
@@ -408,24 +416,42 @@ for (const filtered of [false, true]) {
 	});
 }
 
-test('resizing the full result canvas preserves relocated focus and semantic rows', async ({
+test('resizing the full result canvas preserves focus, nodes and visual columns', async ({
 	page
 }) => {
 	await page.setViewportSize({ width: 2560, height: 1000 });
 	await page.goto(server.url);
 	await search(page).fill('canvasfixture');
-	await expectResultRows(page, 8);
-	const focused = results(page).getByRole('link').nth(10);
+	await expectResultColumns(page, 8);
+	const links = results(page).getByRole('link');
+	const originalLinks = await links.elementHandles();
+	const images = links.locator('img');
+	await expect(images).toHaveCount(32);
+	const originalImages = await images.elementHandles();
+	const focused = links.nth(10);
 	await focused.focus();
 	for (const width of [360, 1920, 390, 768, 1280, 2560]) {
 		await page.setViewportSize({ width, height: 1000 });
 		const columns = await results(page).evaluate(
 			(node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
 		);
-		await expectResultRows(page, columns);
+		await expectResultColumns(page, columns);
+		await expect(images).toHaveCount(32);
 		await expect(focused).toBeFocused();
+		expect(await originalLinks[10]!.evaluate((node) => node.isConnected)).toBe(true);
+		expect(
+			await links.evaluateAll(
+				(nodes, originals) => nodes.every((node, index) => node === originals[index]),
+				originalLinks
+			)
+		).toBe(true);
+		expect(
+			await images.evaluateAll(
+				(nodes, originals) => nodes.every((node, index) => node === originals[index]),
+				originalImages
+			)
+		).toBe(true);
 		expect(await expectCanvas(page, results(page))).toBe(columns);
-		await expect(results(page).locator('a[tabindex="0"]')).toHaveCount(1);
 	}
 	await page.keyboard.press('Home');
 	await expect(results(page).getByRole('link').nth(8)).toBeFocused();
@@ -434,6 +460,7 @@ test('resizing the full result canvas preserves relocated focus and semantic row
 	await expect(search(page)).toHaveValue('canvasfixture');
 	await page.getByRole('button', { name: 'Clear search', exact: true }).click();
 	await expect(search(page)).toBeFocused();
+	await expect(results(page)).toHaveCount(0);
 	await expect(page.getByRole('listitem')).toHaveCount(32);
 	await expectCanvas(page, page.locator('.groups .link-grid'));
 });

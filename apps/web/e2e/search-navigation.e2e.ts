@@ -27,7 +27,7 @@ test.afterAll(async () => {
 });
 
 const input = (page: Page) => page.getByRole('searchbox', { name: 'Search', exact: true });
-const grid = (page: Page) => page.getByRole('grid', { name: 'Search results', exact: true });
+const resultList = (page: Page) => page.getByRole('list', { name: 'Search results', exact: true });
 
 async function openResults(page: Page, width: number) {
 	await page.setViewportSize({ width, height: 900 });
@@ -36,43 +36,41 @@ async function openResults(page: Page, width: number) {
 	await expect(page.getByRole('grid')).toHaveCount(0);
 	await expect(page.getByRole('listitem')).toHaveCount(13);
 	await input(page).fill('navigationfixture');
-	await expect(grid(page).getByRole('link')).toHaveCount(13);
+	await expect(resultList(page).getByRole('link')).toHaveCount(13);
+	await expect(page.getByRole('grid')).toHaveCount(0);
 	await expect(page.getByRole('status')).toHaveText('13 bookmarks found.');
 }
 
 async function columnCount(page: Page) {
-	return grid(page)
-		.getByRole('gridcell')
-		.evaluateAll((cells) => {
-			const firstTop = cells[0]!.getBoundingClientRect().top;
-			return cells.filter((cell) => Math.abs(cell.getBoundingClientRect().top - firstTop) < 1)
+	return resultList(page)
+		.getByRole('link')
+		.evaluateAll((links) => {
+			const firstTop = links[0]!.getBoundingClientRect().top;
+			return links.filter((link) => Math.abs(link.getBoundingClientRect().top - firstTop) < 1)
 				.length;
 		});
 }
 
-async function expectSemanticRows(page: Page, columns: number) {
-	const rows = grid(page).getByRole('row');
-	const rowCount = Math.ceil(13 / columns);
-	await expect(rows).toHaveCount(rowCount);
-	for (let index = 0; index < rowCount; index++) {
-		await expect(rows.nth(index).getByRole('gridcell')).toHaveCount(
-			Math.min(columns, 13 - index * columns)
-		);
-	}
-	const positions = await rows.evaluateAll((elements) =>
-		elements.map((row) =>
-			Array.from(row.children, (cell) => {
-				const { top, left } = cell.getBoundingClientRect();
-				return { top, left };
-			})
+async function expectResultLayout(page: Page, columns: number) {
+	const results = resultList(page);
+	await expect(results).toHaveCount(1);
+	await expect(results.getByRole('listitem')).toHaveCount(13);
+	await expect(results.getByRole('link')).toHaveCount(13);
+	await expect
+		.poll(() =>
+			results.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
 		)
+		.toBe(columns);
+	const positions = await results.getByRole('link').evaluateAll((links) =>
+		links.map((link) => {
+			const { top, left } = link.getBoundingClientRect();
+			return { top, left };
+		})
 	);
-	for (const [rowIndex, row] of positions.entries()) {
-		if (rowIndex > 0) expect(row[0]!.top).toBeGreaterThan(positions[rowIndex - 1]![0]!.top);
-		for (const [columnIndex, cell] of row.entries()) {
-			expect(cell.top).toBeCloseTo(row[0]!.top, 0);
-			expect(cell.left).toBeCloseTo(positions[0]![columnIndex]!.left, 0);
-		}
+	for (const [index, position] of positions.entries()) {
+		expect(position.left).toBeCloseTo(positions[index % columns]!.left, 0);
+		expect(position.top).toBeCloseTo(positions[Math.floor(index / columns) * columns]!.top, 0);
+		if (index >= columns) expect(position.top).toBeGreaterThan(positions[index - columns]!.top);
 	}
 }
 
@@ -91,23 +89,45 @@ async function hasNativeSearchCancelSuppression(page: Page) {
 }
 
 for (const width of [360, 1280]) {
-	test(`filtered layout grid has real links, visual arrows, boundaries and one Tab stop at ${width}px`, async ({
+	test(`filtered list has native Tab order, real links, visual arrows and boundaries at ${width}px`, async ({
 		page
 	}) => {
 		await openResults(page, width);
-		const results = grid(page);
+		const results = resultList(page);
 		const links = results.getByRole('link');
 		const expectedColumns = width === 360 ? 3 : 8;
-		await expectSemanticRows(page, expectedColumns);
-		await expect(results.getByRole('gridcell')).toHaveCount(13);
+		await expectResultLayout(page, expectedColumns);
 		await expect(page.getByRole('combobox')).toHaveCount(0);
 		await expect(page.getByRole('listbox')).toHaveCount(0);
 		await expect(results).toHaveAccessibleDescription(
-			'Use arrow keys to move, Enter for details, Escape to return to Search.'
+			'Use Tab or arrow keys to move, Enter for details, Escape to return to Search.'
 		);
 		const columns = await columnCount(page);
 		expect(columns).toBe(expectedColumns);
-		await expect(results.locator('a[tabindex="0"]')).toHaveCount(1);
+		await expect(results.locator('a[tabindex]')).toHaveCount(0);
+		expect(await links.evaluateAll((nodes) => nodes.every((node) => node.tabIndex === 0))).toBe(
+			true
+		);
+		await input(page).press('Enter');
+		for (let index = 0; index < 13; index++) {
+			await expect(links.nth(index)).toBeFocused();
+			if (index < 12) await page.keyboard.press('Tab');
+		}
+		await page.keyboard.press('Tab');
+		expect(await results.evaluate((node) => node.contains(document.activeElement))).toBe(false);
+		await page.keyboard.press('Shift+Tab');
+		await expect(links.last()).toBeFocused();
+		for (let index = 12; index > 0; index--) {
+			await page.keyboard.press('Shift+Tab');
+			await expect(links.nth(index - 1)).toBeFocused();
+		}
+		await page.keyboard.press('Shift+Tab');
+		await expect(
+			page.getByRole('button', { name: 'Switch to dark theme', exact: true })
+		).toBeFocused();
+		await page.keyboard.press('Tab');
+		await expect(links.first()).toBeFocused();
+		await input(page).focus();
 		await input(page).press('ArrowDown');
 		await expect(links.first()).toBeFocused();
 		await page.keyboard.press('ArrowLeft');
@@ -137,18 +157,12 @@ for (const width of [360, 1280]) {
 		await expect(links.nth(Math.floor(12 / columns) * columns)).toBeFocused();
 		await links.first().focus();
 		await page.keyboard.press('ArrowRight');
-		await expect(results.locator('a[tabindex="0"]')).toHaveCount(1);
-		await expect(links.nth(1)).toHaveAttribute('tabindex', '0');
-		await page.keyboard.press('Shift+Tab');
-		await expect(
-			page.getByRole('button', { name: 'Switch to dark theme', exact: true })
-		).toBeFocused();
-		await page.keyboard.press('Tab');
 		await expect(links.nth(1)).toBeFocused();
 		await page.keyboard.press('Tab');
-		expect(await results.evaluate((node) => node.contains(document.activeElement))).toBe(false);
+		await expect(links.nth(2)).toBeFocused();
 		await page.keyboard.press('Shift+Tab');
 		await expect(links.nth(1)).toBeFocused();
+		await expect(results.locator('a[tabindex]')).toHaveCount(0);
 		for (const options of [
 			{ isComposing: true },
 			{ ctrlKey: true },
@@ -167,33 +181,49 @@ for (const width of [360, 1280]) {
 		await page.keyboard.press('Escape');
 		await expect(input(page)).toHaveValue('');
 		await expect(page.getByRole('grid')).toHaveCount(0);
+		await expect(resultList(page)).toHaveCount(0);
 		await expect(page.getByRole('listitem')).toHaveCount(13);
+		await input(page).fill('zzzxxyyqqq');
+		await expect(page.getByRole('status')).toHaveText('No bookmarks found.');
+		await expect(resultList(page)).toHaveCount(0);
+		await input(page).press('Enter');
+		await input(page).press('ArrowDown');
+		await expect(input(page)).toBeFocused();
+		await expect(page.getByRole('dialog')).toHaveCount(0);
 	});
 }
 
-test('resizing aligns semantic rows and arrows, preserving stable links and restoring relocated focus', async ({
-	page
-}) => {
+test('resizing aligns visual arrows while preserving link nodes and focus', async ({ page }) => {
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await openResults(page, 1280);
-	await expectSemanticRows(page, 8);
-	const links = grid(page).getByRole('link');
+	await expectResultLayout(page, 8);
+	const links = resultList(page).getByRole('link');
 	const firstLink = await links.first().elementHandle();
 	await input(page).press('Enter');
 	await expect(links.first()).toBeFocused();
 	await page.setViewportSize({ width: 360, height: 900 });
-	await expectSemanticRows(page, 3);
+	await expectResultLayout(page, 3);
 	await expect.poll(() => columnCount(page)).toBe(3);
 	await expect(links.first()).toBeFocused();
 	await page.keyboard.press('ArrowDown');
 	await expect(links.nth(3)).toBeFocused();
-	const relocatedLink = await links.nth(3).elementHandle();
+	const focusedLink = await links.nth(3).elementHandle();
+	const focusedImage = await links.nth(3).locator('img').elementHandle();
 	await page.setViewportSize({ width: 1280, height: 900 });
-	await expectSemanticRows(page, 8);
+	await expectResultLayout(page, 8);
 	await expect.poll(() => columnCount(page)).toBe(8);
 	await expect(links.nth(3)).toBeFocused();
-	expect(await relocatedLink!.evaluate((node) => node.isConnected)).toBe(false);
+	expect(await focusedLink!.evaluate((node) => node.isConnected)).toBe(true);
+	expect(await links.nth(3).evaluate((node, original) => node === original, focusedLink)).toBe(
+		true
+	);
+	expect(
+		await links
+			.nth(3)
+			.locator('img')
+			.evaluate((node, original) => node === original, focusedImage)
+	).toBe(true);
 	await page.keyboard.press('ArrowDown');
 	await expect(links.nth(11)).toBeFocused();
 	expect(await links.first().evaluate((node, original) => node === original, firstLink)).toBe(true);
@@ -206,47 +236,59 @@ test('resizing aligns semantic rows and arrows, preserving stable links and rest
 	expect(errors).toEqual([]);
 });
 
-test('unchanged row membership retains result and image nodes across query updates', async ({
+test('result and image nodes survive query updates and column-changing resizes', async ({
 	page
 }) => {
 	await openResults(page, 1280);
-	await expectSemanticRows(page, 8);
-	const tile = grid(page).getByRole('link').nth(5);
+	await expectResultLayout(page, 8);
+	const tile = resultList(page).getByRole('link').nth(5);
 	const originalTile = await tile.elementHandle();
 	const originalImage = await tile.locator('img').elementHandle();
 	await input(page).fill('navigationfixture ');
-	await expectSemanticRows(page, 8);
+	await expectResultLayout(page, 8);
 	await expect(input(page)).toBeFocused();
 	expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
 	expect(
 		await tile.locator('img').evaluate((node, original) => node === original, originalImage)
 	).toBe(true);
-	await page.setViewportSize({ width: 1200, height: 900 });
-	await expectSemanticRows(page, 8);
-	expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
-	await expect(input(page)).toBeFocused();
+	for (const width of [1200, 360, 1280]) {
+		await page.setViewportSize({ width, height: 900 });
+		await expectResultLayout(page, width === 360 ? 3 : 8);
+		expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
+		expect(
+			await tile.locator('img').evaluate((node, original) => node === original, originalImage)
+		).toBe(true);
+		await expect(input(page)).toBeFocused();
+	}
 });
 
 test('resizing with details open preserves dialog focus, query, URL and return result', async ({
 	page
 }) => {
 	await openResults(page, 1280);
-	await expectSemanticRows(page, 8);
-	const tile = grid(page).getByRole('link').nth(5);
+	await expectResultLayout(page, 8);
+	const tile = resultList(page).getByRole('link').nth(5);
 	const href = await tile.getAttribute('href');
 	const originalTile = await tile.elementHandle();
 	await tile.click();
 	const close = page.getByRole('button', { name: 'Close', exact: true });
 	await expect(close).toBeFocused();
 	await page.setViewportSize({ width: 360, height: 900 });
-	await expect(page.locator('[role="grid"] [role="row"]')).toHaveCount(5);
+	const hiddenResults = page.locator('.groups ul.link-grid');
+	await expect(hiddenResults.locator('li')).toHaveCount(13);
+	await expect
+		.poll(() =>
+			hiddenResults.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
+		)
+		.toBe(3);
 	await expect(close).toBeFocused();
 	await expect(page).toHaveURL(server.url + href);
 	await expect(input(page)).toHaveValue('navigationfixture');
-	expect(await originalTile!.evaluate((node) => node.isConnected)).toBe(false);
+	expect(await originalTile!.evaluate((node) => node.isConnected)).toBe(true);
 	await page.keyboard.press('Escape');
-	await expectSemanticRows(page, 3);
+	await expectResultLayout(page, 3);
 	await expect(tile).toBeFocused();
+	expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
 	await expect(page).toHaveURL(`${server.url}/`);
 	await expect(input(page)).toHaveValue('navigationfixture');
 	await page.goForward();
@@ -260,7 +302,7 @@ test('filtered links preserve modifier/middle new tabs and native Enter details'
 	context
 }) => {
 	await openResults(page, 360);
-	const tile = grid(page).getByRole('link').first();
+	const tile = resultList(page).getByRole('link').first();
 	const href = await tile.getAttribute('href');
 	await expect(tile).toHaveAttribute('data-sveltekit-preload-data', 'off');
 	const chunks: string[] = [];

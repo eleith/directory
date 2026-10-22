@@ -214,7 +214,9 @@ test('refocusing a completed filter preserves result nodes, images, order and po
 			await searchInput(page).focus();
 		} else {
 			await searchInput(page).press('ArrowDown');
-			await expect(page.getByRole('grid').getByRole('link').first()).toBeFocused();
+			await expect(
+				page.getByRole('list', { name: 'Search results', exact: true }).getByRole('link').first()
+			).toBeFocused();
 			await page.keyboard.press('Escape');
 		}
 		await finishRendering(page);
@@ -330,7 +332,7 @@ test('Enter opens the sole ready result through its real detail URL and retains 
 	await openGrid(page);
 	await searchInput(page).fill('backup');
 	await expectTitles(page, ['Immich']);
-	const tile = page.getByRole('grid', { name: 'Search results' }).getByRole('link');
+	const tile = page.getByRole('list', { name: 'Search results', exact: true }).getByRole('link');
 	const originalTile = await tile.elementHandle();
 	await searchInput(page).press('Enter');
 	await expect(page).toHaveURL(`${server.url}/?link=immich`);
@@ -408,11 +410,13 @@ test('Enter with pending, zero or several results never imports details or activ
 		await searchInput(page).press('Enter');
 		await searchInput(page).press('ArrowDown');
 		await expect(searchInput(page)).toBeFocused();
-		await expect(page.getByRole('grid')).toHaveCount(0);
+		await expect(page.getByRole('list', { name: 'Search results', exact: true })).toHaveCount(0);
 		await searchInput(page).fill('amberquartz');
 		await expectTitles(page, ['amberquartz', 'Documents', 'Notes', 'Weather']);
 		await searchInput(page).press('Enter');
-		await expect(page.getByRole('grid').getByRole('link').first()).toBeFocused();
+		await expect(
+			page.getByRole('list', { name: 'Search results', exact: true }).getByRole('link').first()
+		).toBeFocused();
 		await expect(page.getByRole('dialog')).toHaveCount(0);
 		expect(requested).not.toContain(dialogScript);
 	} finally {
@@ -460,7 +464,7 @@ test('IME and modified input keys leave activation, editing and clearing alone',
 	await searchInput(page).press('Escape');
 	await expectTitles(page, originalTitles);
 	await expect(searchInput(page)).toHaveValue('');
-	await expect(page.getByRole('grid')).toHaveCount(0);
+	await expect(page.getByRole('list', { name: 'Search results', exact: true })).toHaveCount(0);
 });
 
 test('search and dialog history retain query, ranked results and connected return tile without fetching data', async ({
@@ -612,7 +616,7 @@ for (const entry of ['grid', 'direct']) {
 		await openGrid(page, `${server.url}/${entry === 'direct' ? '?link=navidrome' : ''}`);
 		await searchInput(page).fill('backup');
 		await expect(page.getByRole('status')).toHaveText('Search unavailable. Reload to try again.');
-		await expect(page.getByRole('grid')).toHaveCount(0);
+		await expect(page.getByRole('list', { name: 'Search results', exact: true })).toHaveCount(0);
 		await expect(page.locator('.groups').getByRole('list')).toHaveCount(4);
 		await expectTitles(page, originalTitles);
 		await expect(page.locator('.groups h2')).toHaveText(groupLabels);
@@ -733,8 +737,12 @@ test('search stays behind authentication; sign-out retains only public branding'
 			const signoutBox = (await signout.boundingBox())!;
 			expect(themeBox.y + themeBox.height / 2).toBe(signoutBox.y + signoutBox.height / 2);
 			if (width === 360) {
+				const brandBox = (await page.locator('main > header > div').first().boundingBox())!;
+				const logoBox = (await page.locator('main > header img').boundingBox())!;
 				expect(fieldBox.width).toBe(328);
-				expect(fieldBox.y + fieldBox.height).toBeLessThanOrEqual(themeBox.y);
+				expect(fieldBox.y).toBe(brandBox.y + brandBox.height + 16);
+				expect(fieldBox.y).toBeGreaterThanOrEqual(themeBox.y + themeBox.height);
+				expect(themeBox.y + themeBox.height / 2).toBe(logoBox.y + logoBox.height / 2);
 			} else {
 				expect(fieldBox.y + fieldBox.height / 2).toBe(themeBox.y + themeBox.height / 2);
 			}

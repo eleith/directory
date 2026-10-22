@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
 	import IconSignOut from 'virtual:icons/ph/sign-out';
 	import { afterNavigate, beforeNavigate, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -18,21 +18,7 @@
 	let searchResults = $state<SearchResult[] | null>(null);
 	let searchStatus = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
 	let searchInput = $state<HTMLInputElement>();
-	let resultGrid = $state<HTMLDivElement>();
-	let focusedResultId = $state<string>();
-	let resultColumnCount = $state(1);
-	const resultRows = $derived.by(() => {
-		const results = searchResults ?? [];
-		const rows: SearchResult[][] = [];
-		for (let index = 0; index < results.length; index += resultColumnCount) {
-			rows.push(results.slice(index, index + resultColumnCount));
-		}
-		return rows;
-	});
-	const tabStopResultId = $derived(
-		searchResults?.find((result) => result.link.id === focusedResultId)?.link.id ??
-			searchResults?.[0]?.link.id
-	);
+	let resultList = $state<HTMLUListElement>();
 	let DetailDialog = $state<typeof import('$lib/components/DetailDialog.svelte').default>();
 	let dialogImport: Promise<typeof import('$lib/components/DetailDialog.svelte')> | undefined;
 	let mounted = false;
@@ -52,49 +38,12 @@
 	const selectedLink = $derived(selectedGroup?.links.find((link) => link.id === selectedId));
 
 	function findResultLink(id: string) {
-		const links = resultGrid?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? [];
+		const links = resultList?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? [];
 		return Array.from(links).find((link) => link.getAttribute('href') === `/?link=${id}`);
 	}
 
-	function observeResultColumns(node: HTMLDivElement) {
-		async function updateColumns() {
-			const columns = getComputedStyle(node).gridTemplateColumns.split(' ').length;
-			if (columns === resultColumnCount) return;
-			const activeLink = node.contains(document.activeElement) ? document.activeElement : null;
-			const activeId = focusedResultId;
-			resultColumnCount = columns;
-			await tick();
-			if (!node.isConnected || !activeLink || activeLink.isConnected || !activeId) return;
-			if (document.activeElement === document.body) {
-				findResultLink(activeId)?.focus({ preventScroll: true });
-			}
-		}
-		let animationFrame: number | undefined;
-		function scheduleUpdate() {
-			if (animationFrame !== undefined) return;
-			animationFrame = requestAnimationFrame(() => {
-				animationFrame = undefined;
-				void updateColumns();
-			});
-		}
-		scheduleUpdate();
-		const observer = new ResizeObserver(scheduleUpdate);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-				if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
-			}
-		};
-	}
-
-	function tileTabIndex(id: string, filtered: boolean) {
-		if (!filtered) return undefined;
-		return id === tabStopResultId ? 0 : -1;
-	}
-
 	function enterResults(activateSingle: boolean) {
-		const firstResult = resultGrid?.querySelector<HTMLAnchorElement>('a.tile');
+		const firstResult = resultList?.querySelector<HTMLAnchorElement>('a.tile');
 		if (!firstResult) return;
 		if (activateSingle) firstResult.click();
 		else firstResult.focus();
@@ -110,13 +59,36 @@
 		}
 		if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
 			return;
-		const links = Array.from(resultGrid?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? []);
+		const links = Array.from(resultList?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? []);
 		const currentIndex = links.indexOf(event.target as HTMLAnchorElement);
 		if (currentIndex === -1) return;
 		event.preventDefault();
 		const positions = links.map((link) => link.getBoundingClientRect());
 		const nextIndex = nextResultIndex(positions, currentIndex, event.key);
 		links[nextIndex]?.focus();
+	}
+
+	function focusSearch(event: KeyboardEvent) {
+		if (event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229)
+			return;
+		if (!event.altKey || event.ctrlKey || event.metaKey || event.getModifierState('AltGraph'))
+			return;
+		// Option+/ reports ÷ on common Mac layouts.
+		const slashKey = event.key === '/' || (event.code === 'Slash' && !event.shiftKey);
+		if (!slashKey) return;
+		if (!searchInput || searchInput.disabled) return;
+		if (selectedLink && DetailDialog) return;
+		const editing = event
+			.composedPath()
+			.some(
+				(target) =>
+					target instanceof HTMLElement &&
+					(target.isContentEditable || target.matches('input, textarea, select, [role="textbox"]'))
+			);
+		if (editing) return;
+		event.preventDefault();
+		searchInput.focus();
+		searchInput.select();
 	}
 
 	function cancelPendingOpen() {
@@ -210,6 +182,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={focusSearch} />
+
 <svelte:head>
 	<title>{data.directory.site.title}</title>
 	<meta name="description" content={data.directory.site.description} />
@@ -231,21 +205,20 @@
 				{/if}
 			</div>
 		</div>
+		<Search
+			directory={data.directory}
+			bind:results={searchResults}
+			bind:status={searchStatus}
+			bind:input={searchInput}
+			onQueryChange={cancelPendingOpen}
+			onEnterResults={enterResults}
+		/>
 		<div class="header-actions">
-			<Search
-				directory={data.directory}
-				bind:results={searchResults}
-				bind:status={searchStatus}
-				bind:input={searchInput}
-				onQueryChange={cancelPendingOpen}
-				onEnterResults={enterResults}
-			/>
 			<ThemeToggle />
 			{#if data.signedIn}
 				<form method="POST" action="?/signout">
-					<button type="submit">
+					<button type="submit" aria-label="Sign out">
 						<span class="icon"><IconSignOut aria-hidden="true" focusable="false" /></span>
-						Sign out
 					</button>
 				</form>
 			{/if}
@@ -273,10 +246,7 @@
 			class="tile"
 			href={`/?link=${link.id}`}
 			data-sveltekit-preload-data="off"
-			tabindex={tileTabIndex(link.id, filtered)}
-			onfocus={() => {
-				if (filtered) focusedResultId = link.id;
-			}}
+			onkeydown={filtered ? navigateResults : undefined}
 			onclick={(event) => openDetails(event, link.id)}
 		>
 			<BookmarkLogo {link} loading="lazy" />
@@ -306,7 +276,7 @@
 		</div>
 		{#if searchResults?.length}
 			<p id="search-keyboard-hint">
-				Use arrow keys to move, Enter for details, Escape to return to Search.
+				Use Tab or arrow keys to move, Enter for details, Escape to return to Search.
 			</p>
 		{/if}
 	</div>
@@ -314,24 +284,17 @@
 	<div class="groups">
 		{#if searchResults !== null}
 			{#if searchResults.length > 0}
-				<!-- svelte-ignore a11y_interactive_supports_focus (Focus roves between the real links inside grid cells.) -->
-				<div
-					bind:this={resultGrid}
-					use:observeResultColumns
+				<ul
+					bind:this={resultList}
 					class="link-grid"
-					role="grid"
+					role="list"
 					aria-label="Search results"
 					aria-describedby="search-keyboard-hint"
-					onkeydown={navigateResults}
 				>
-					{#each resultRows as row, rowIndex (rowIndex)}
-						<div role="row" class="result-row">
-							{#each row as result (result.link.id)}
-								<div role="gridcell">{@render tile(result.link, result.groupLabel, true)}</div>
-							{/each}
-						</div>
+					{#each searchResults as result (result.link.id)}
+						<li>{@render tile(result.link, result.groupLabel, true)}</li>
 					{/each}
-				</div>
+				</ul>
 			{/if}
 		{:else}
 			{#each data.directory.groups as group (group.id)}
@@ -377,39 +340,38 @@
 	}
 
 	header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		flex-wrap: wrap;
+		display: grid;
+		grid-template-areas: 'brand tools' 'search search';
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: start;
 		gap: var(--space-5);
 		margin-block-end: var(--space-9);
 	}
 
 	.header-actions {
+		grid-area: tools;
 		display: flex;
 		align-items: center;
-		justify-content: flex-end;
-		flex-wrap: wrap;
+		min-height: 48px;
 		gap: var(--space-1);
-		max-width: 100%;
-		flex: 1 1 100%;
 	}
 
 	.header-actions form {
+		flex-shrink: 0;
 		margin: 0;
 	}
 
-	.header-actions :global(.search) {
-		flex-basis: 100%;
-		margin-block-end: var(--space-1);
+	header > :global(.search) {
+		grid-area: search;
 	}
 
 	.site-brand {
+		grid-area: brand;
 		display: flex;
 		align-items: flex-start;
+		flex-wrap: wrap;
 		gap: var(--space-4);
 		min-width: 0;
-		flex: 1 1 16rem;
 	}
 
 	.site-brand :global(img) {
@@ -417,6 +379,7 @@
 	}
 
 	.site-copy {
+		flex: 1 1 8ch;
 		min-width: 0;
 	}
 
@@ -466,12 +429,6 @@
 		margin-inline: calc(-1 * var(--tile-inline-padding));
 		padding: 0;
 		list-style: none;
-	}
-
-	.result-row {
-		display: grid;
-		grid-template-columns: subgrid;
-		grid-column: 1 / -1;
 	}
 
 	.tile {
@@ -545,7 +502,8 @@
 	button {
 		display: inline-flex;
 		align-items: center;
-		gap: var(--space-4);
+		justify-content: center;
+		min-width: 44px;
 		color: var(--color-text);
 		background: transparent;
 		border: 0;
@@ -567,20 +525,9 @@
 	}
 
 	@media (min-width: 48rem) {
-		.header-actions {
-			flex: 1 1 28rem;
-			flex-wrap: nowrap;
-			gap: var(--space-4);
-		}
-
-		.header-actions :global(.search) {
-			flex-basis: 18rem;
-			max-width: 22rem;
-			margin-block-end: 0;
-		}
-
-		.header-actions form {
-			flex-shrink: 0;
+		header {
+			grid-template-areas: 'brand search tools';
+			grid-template-columns: minmax(0, 1fr) minmax(0, min(22rem, 40%)) auto;
 		}
 
 		main {
