@@ -163,8 +163,17 @@
 		padding: var(--space-4) var(--space-5);
 	}
 
-	input:focus-visible {
+	input:not(:disabled):hover {
+		background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-card));
+		box-shadow: inset 0 0 0 var(--border-width) var(--color-border-strong);
+	}
+
+	input:not(:disabled):focus {
+		background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-card));
 		border-color: var(--color-primary);
+		box-shadow: none;
+		outline: var(--outline-focus);
+		outline-offset: calc(-1 * var(--space-1));
 	}
 
 	.icon {
@@ -197,8 +206,7 @@
 		transform: scale(0.98);
 	}
 
-	button:focus-visible,
-	input:focus-visible {
+	button:focus-visible {
 		outline: var(--outline-focus);
 		outline-offset: var(--space-1);
 	}

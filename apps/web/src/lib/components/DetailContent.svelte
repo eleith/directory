@@ -175,6 +175,18 @@
 		border-radius: var(--radius-control);
 	}
 
+	.destination-value:hover {
+		background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-card));
+		border-color: var(--color-border-strong);
+	}
+
+	.destination-value:focus-within {
+		background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-card));
+		border-color: var(--color-primary);
+		outline: var(--outline-focus);
+		outline-offset: calc(-1 * var(--space-1));
+	}
+
 	.destination-value :global(img) {
 		flex-shrink: 0;
 		margin-inline-start: var(--space-4);
@@ -193,9 +205,8 @@
 		border-radius: inherit;
 	}
 
-	.url:focus-visible {
-		outline: var(--outline-focus);
-		outline-offset: var(--space-1);
+	.url:focus {
+		outline: none;
 	}
 
 	.metadata {

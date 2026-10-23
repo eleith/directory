@@ -177,6 +177,18 @@
 		border-radius: var(--radius-card);
 	}
 
+	input:not(:disabled):hover {
+		background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-card));
+		box-shadow: inset 0 0 0 var(--border-width) var(--color-border-strong);
+	}
+
+	input:not(:disabled):focus {
+		background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-card));
+		box-shadow: none;
+		outline: var(--outline-focus);
+		outline-offset: calc(-1 * var(--space-1));
+	}
+
 	input::placeholder {
 		color: var(--color-text-muted);
 		opacity: 1;
@@ -222,7 +234,6 @@
 		background: var(--color-surface-muted);
 	}
 
-	input:focus-visible,
 	button:focus-visible {
 		outline: var(--outline-focus);
 		outline-offset: var(--space-1);

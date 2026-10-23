@@ -317,6 +317,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
 for (const width of [360, 390, 768, 1280, 1920, 2560]) {
 	test(`native padded cells hover and open the correct details at ${width}px`, async ({ page }) => {
+		await page.emulateMedia({ reducedMotion: 'no-preference' });
 		await page.setViewportSize({ width, height: 1000 });
 		for (const filtered of [false, true]) {
 			await page.goto(server.url);
@@ -340,10 +341,20 @@ for (const width of [360, 390, 768, 1280, 1920, 2560]) {
 				for (const colorScheme of ['light', 'dark'] as const) {
 					await page.emulateMedia({ colorScheme });
 					await page.mouse.move(point.x, point.y);
-					await expect(tile).toHaveCSS(
-						'background-color',
-						colorScheme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(27, 32, 34)'
+					await expect(tile).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+					await expect(tile).toHaveCSS('border-width', '0px');
+					await expect(tile).toHaveCSS('text-decoration-line', 'none');
+					await expect(tile.locator('.tile-title')).toHaveCSS('text-decoration-line', 'underline');
+					if (filtered) {
+						await expect(tile.locator('.group-caption')).toHaveCSS('text-decoration-line', 'none');
+					}
+					await expect(tile.locator('img')).toHaveCSS(
+						'filter',
+						colorScheme === 'light'
+							? 'drop-shadow(rgba(0, 0, 0, 0.24) 0px 6px 10px)'
+							: 'drop-shadow(rgba(255, 255, 255, 0.45) 0px 6px 10px)'
 					);
+					await expect(tile.locator('img')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
 					await expect(tiles.first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 				}
 				await page.mouse.click(point.x, point.y);

@@ -46,7 +46,11 @@ for (const javaScriptEnabled of [true, false]) {
 			browser
 		}) => {
 			const publicDir = await mkdtemp(join(tmpdir(), 'directory-presentation-'));
-			const context = await browser.newContext({ javaScriptEnabled, colorScheme });
+			const context = await browser.newContext({
+				javaScriptEnabled,
+				colorScheme,
+				reducedMotion: 'no-preference'
+			});
 			const svg =
 				'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#369" d="M0 0h64v64H0z"/></svg>';
 			await Promise.all(
@@ -114,10 +118,17 @@ for (const javaScriptEnabled of [true, false]) {
 					).toBe(true);
 					const first = tiles.first();
 					await first.hover();
-					await expect(first).toHaveCSS(
-						'background-color',
-						colorScheme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(27, 32, 34)'
+					await expect(first).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+					await expect(first).toHaveCSS('border-width', '0px');
+					await expect(first).toHaveCSS('text-decoration-line', 'none');
+					await expect(first.locator('.tile-title')).toHaveCSS('text-decoration-line', 'underline');
+					await expect(first.locator('img')).toHaveCSS(
+						'filter',
+						colorScheme === 'light'
+							? 'drop-shadow(rgba(0, 0, 0, 0.24) 0px 6px 10px)'
+							: 'drop-shadow(rgba(255, 255, 255, 0.45) 0px 6px 10px)'
 					);
+					await expect(first.locator('img')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
 					).toBe(true);
@@ -176,8 +187,14 @@ for (const javaScriptEnabled of [true, false]) {
 					for (const control of controls) {
 						await page.keyboard.press('Tab');
 						await expect(control).toBeFocused();
-						await expect(control).toHaveCSS('outline-style', 'solid');
-						await expect(control).toHaveCSS('outline-color', accent);
+						let focusSurface = control;
+						if (control === destination) {
+							focusSurface = page.locator('.destination-value');
+							await expect(destination).toHaveCSS('outline-style', 'none');
+							await expect(focusSurface).toHaveCSS('outline-offset', '-2px');
+						}
+						await expect(focusSurface).toHaveCSS('outline-style', 'solid');
+						await expect(focusSurface).toHaveCSS('outline-color', accent);
 					}
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
@@ -267,8 +284,14 @@ test('public configured accents preserve the body palette and private directory 
 			for (const control of [close, destination, external]) {
 				await control.focus();
 				await expect(control).toBeFocused();
-				await expect(control).toHaveCSS('outline-style', 'solid');
-				await expect(control).toHaveCSS('outline-color', accent);
+				let focusSurface = control;
+				if (control === destination) {
+					focusSurface = page.locator('.destination-value');
+					await expect(destination).toHaveCSS('outline-style', 'none');
+					await expect(focusSurface).toHaveCSS('outline-offset', '-2px');
+				}
+				await expect(focusSurface).toHaveCSS('outline-style', 'solid');
+				await expect(focusSurface).toHaveCSS('outline-color', accent);
 			}
 			await close.click();
 			await expect(page.getByRole('heading', { level: 1 })).toBeFocused();

@@ -473,9 +473,29 @@
 		font-weight: 400;
 	}
 
-	.tile:hover {
-		background: var(--color-surface-card);
+	.tile :global(img) {
+		transition:
+			transform var(--transition-control),
+			filter var(--transition-control);
+	}
+
+	.tile:hover .tile-title {
 		text-decoration: underline;
+	}
+
+	.tile:hover :global(img) {
+		transform: translateY(-2px);
+		filter: drop-shadow(0 6px 10px light-dark(rgb(0 0 0 / 24%), rgb(255 255 255 / 45%)));
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tile :global(img) {
+			transition: none;
+		}
+
+		.tile:hover :global(img) {
+			transform: none;
+		}
 	}
 
 	.details {
