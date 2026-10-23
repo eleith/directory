@@ -4,6 +4,7 @@
 	import IconX from 'virtual:icons/ph/x';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import DetailContent from './DetailContent.svelte';
+	import Button from './ui/Button.svelte';
 
 	let {
 		link,
@@ -67,23 +68,27 @@
 				{#snippet child({ props })}
 					<section {...props} bind:this={dialogElement} class="details" inert={!link}>
 						<div class="scroll-content">
-							<DetailContent link={details.link} groupLabel={details.groupLabel} {onTagSearch}>
-								{#snippet title(text)}
-									<Dialog.Title>
-										{#snippet child({ props: titleProps })}
-											<h2 {...titleProps}>{text}</h2>
-										{/snippet}
-									</Dialog.Title>
+							<Dialog.Title>
+								{#snippet child({ props: titleProps })}
+									<DetailContent
+										link={details.link}
+										groupLabel={details.groupLabel}
+										headingAttributes={titleProps}
+										reserveCloseSpace
+										{onTagSearch}
+									/>
 								{/snippet}
-							</DetailContent>
+							</Dialog.Title>
 						</div>
-						<Dialog.Close>
-							{#snippet child({ props: closeProps })}
-								<button {...closeProps} class="close" aria-label="Close">
-									<IconX aria-hidden="true" focusable="false" />
-								</button>
-							{/snippet}
-						</Dialog.Close>
+						<div class="close">
+							<Dialog.Close>
+								{#snippet child({ props: closeProps })}
+									<Button {...closeProps} variant="surface" size="icon" aria-label="Close">
+										<IconX aria-hidden="true" focusable="false" />
+									</Button>
+								{/snippet}
+							</Dialog.Close>
+						</div>
 					</section>
 				{/snippet}
 			</Dialog.Content>
@@ -141,34 +146,11 @@
 	}
 
 	.close {
+		display: flex;
 		position: absolute;
 		inset-block-start: var(--space-4);
 		inset-inline-end: var(--space-4);
 		z-index: 1;
-		min-width: 44px;
-		min-height: 44px;
-		display: grid;
-		place-items: center;
-		padding: var(--space-4);
-		font-size: 1.25rem;
-		color: var(--color-text-muted);
-		background: var(--color-surface-card);
-		border: 0;
-		border-radius: var(--radius-control);
-		cursor: pointer;
-	}
-
-	.scroll-content :global(.identity) {
-		padding-inline-end: 44px;
-	}
-
-	.close:hover {
-		background: var(--color-surface-muted);
-	}
-
-	.close:focus-visible {
-		outline: var(--outline-focus);
-		outline-offset: var(--space-1);
 	}
 
 	@media (min-width: 48rem) {

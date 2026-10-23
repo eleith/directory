@@ -10,6 +10,7 @@
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import Search from '$lib/components/Search.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 	import { nextResultIndex } from '$lib/search/result-navigation.js';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import type { SearchResult } from '$lib/search/engine.js';
@@ -204,21 +205,23 @@
 				{/if}
 			</div>
 		</div>
-		<Search
-			directory={data.directory}
-			bind:query={() => searchQuery, setSearchQuery}
-			bind:results={searchResults}
-			bind:status={searchStatus}
-			bind:input={searchInput}
-			onEnterResults={enterResults}
-		/>
+		<div class="search-slot">
+			<Search
+				directory={data.directory}
+				bind:query={() => searchQuery, setSearchQuery}
+				bind:results={searchResults}
+				bind:status={searchStatus}
+				bind:input={searchInput}
+				onEnterResults={enterResults}
+			/>
+		</div>
 		<div class="header-actions">
 			<ThemeToggle />
 			{#if data.signedIn}
 				<form method="POST" action="?/signout">
-					<button type="submit" aria-label="Sign out">
+					<Button type="submit" size="icon" aria-label="Sign out">
 						<span class="icon"><IconSignOut aria-hidden="true" focusable="false" /></span>
-					</button>
+					</Button>
 				</form>
 			{/if}
 		</div>
@@ -251,7 +254,7 @@
 			onkeydown={filtered ? navigateResults : undefined}
 			onclick={(event) => openDetails(event, link.id)}
 		>
-			<BookmarkLogo {link} loading="lazy" />
+			<div class="tile-icon"><BookmarkLogo {link} loading="lazy" /></div>
 			<span class="tile-title">{link.title}</span>
 			{#if groupLabel}
 				<small class="group-caption">{groupLabel}</small>
@@ -359,12 +362,14 @@
 	}
 
 	.header-actions form {
+		display: flex;
 		flex-shrink: 0;
 		margin: 0;
 	}
 
-	header > :global(.search) {
+	.search-slot {
 		grid-area: search;
+		min-width: 0;
 	}
 
 	.site-brand {
@@ -374,10 +379,6 @@
 		flex-wrap: wrap;
 		gap: var(--space-4);
 		min-width: 0;
-	}
-
-	.site-brand :global(img) {
-		flex-shrink: 0;
 	}
 
 	.site-copy {
@@ -473,7 +474,8 @@
 		font-weight: 400;
 	}
 
-	.tile :global(img) {
+	.tile-icon {
+		flex-shrink: 0;
 		transition:
 			transform var(--transition-control),
 			filter var(--transition-control);
@@ -483,17 +485,17 @@
 		text-decoration: underline;
 	}
 
-	.tile:hover :global(img) {
+	.tile:hover .tile-icon {
 		transform: translateY(-2px);
 		filter: drop-shadow(0 6px 10px light-dark(rgb(0 0 0 / 24%), rgb(255 255 255 / 45%)));
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.tile :global(img) {
+		.tile-icon {
 			transition: none;
 		}
 
-		.tile:hover :global(img) {
+		.tile:hover .tile-icon {
 			transform: none;
 		}
 	}
@@ -534,27 +536,7 @@
 		font-size: 1.25rem;
 	}
 
-	button {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 44px;
-		color: var(--color-text);
-		background: transparent;
-		border: 0;
-		border-radius: var(--radius-control);
-		min-height: 44px;
-		padding: var(--space-4);
-		font: inherit;
-		cursor: pointer;
-	}
-
-	button:hover {
-		background: var(--color-surface-muted);
-	}
-
-	a:focus-visible,
-	button:focus-visible {
+	a:focus-visible {
 		outline: var(--outline-focus);
 		outline-offset: var(--space-1);
 	}

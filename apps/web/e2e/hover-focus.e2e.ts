@@ -64,14 +64,12 @@ async function fieldPalette(control: Locator) {
 		const focus = rgb(getComputedStyle(probe).backgroundColor);
 		probe.style.color = 'var(--color-primary)';
 		probe.style.borderColor = 'var(--color-border-strong)';
-		probe.style.boxShadow = 'inset 0 0 0 var(--border-width) var(--color-border-strong)';
 		const style = getComputedStyle(probe);
 		const palette = {
 			hover,
 			focus,
 			primary: style.color,
-			strong: style.borderTopColor,
-			hoverShadow: style.boxShadow
+			strong: style.borderTopColor
 		};
 		probe.remove();
 		return palette;
@@ -116,18 +114,25 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
 				await expect(results.getByRole('link')).toHaveCount(2);
 				const tile = results.getByRole('link').first();
 				const image = tile.locator('img');
+				const motionSurface = tile.locator('.tile-icon');
 				await expect
 					.poll(() => image.evaluate((node: HTMLImageElement) => node.naturalWidth))
 					.toBeGreaterThan(0);
 				await tile.scrollIntoViewIfNeeded();
 				const anchorBox = (await tile.boundingBox())!;
 				const imageBox = (await image.boundingBox())!;
+				await expect(motionSurface).toHaveJSProperty('tagName', 'DIV');
+				expect(await motionSurface.boundingBox()).toEqual(imageBox);
+				expect(imageBox.width).toBe(64);
+				expect(imageBox.height).toBe(64);
 				expect(anchorBox.width).toBe(width === 360 ? 112 : 144);
 				await expect(tile).toHaveAttribute('href', '/?link=archive&q=tag%3Ainteractionfixture');
 				for (const edge of ['inline', 'block']) {
 					await page.mouse.move(0, 0);
 					await expect(image).toHaveCSS('transform', 'none');
 					await expect(image).toHaveCSS('filter', 'none');
+					await expect(motionSurface).toHaveCSS('transform', 'none');
+					await expect(motionSurface).toHaveCSS('filter', 'none');
 					let x = anchorBox.x + anchorBox.width / 2;
 					let y = anchorBox.y + 2;
 					if (edge === 'inline') {
@@ -156,7 +161,9 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
 						return underlined;
 					});
 					expect(underlinedAncestors).toEqual([]);
-					await expect(image).toHaveCSS(
+					await expect(image).toHaveCSS('transform', 'none');
+					await expect(image).toHaveCSS('filter', 'none');
+					await expect(motionSurface).toHaveCSS(
 						'filter',
 						colorScheme === 'light'
 							? 'drop-shadow(rgba(0, 0, 0, 0.24) 0px 6px 10px)'
@@ -167,12 +174,12 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
 					if (reducedMotion === 'reduce') {
 						lift = 0;
 						transform = 'none';
-						await expect(image).toHaveCSS('transition-duration', '0s');
+						await expect(motionSurface).toHaveCSS('transition-duration', '0s');
 					} else {
-						await expect(image).toHaveCSS('transition-property', 'transform, filter');
-						await expect(image).toHaveCSS('transition-duration', '0.15s, 0.15s');
+						await expect(motionSurface).toHaveCSS('transition-property', 'transform, filter');
+						await expect(motionSurface).toHaveCSS('transition-duration', '0.15s, 0.15s');
 					}
-					await expect(image).toHaveCSS('transform', transform);
+					await expect(motionSurface).toHaveCSS('transform', transform);
 					expect(await tile.boundingBox()).toEqual(anchorBox);
 					const hoveredImage = (await image.boundingBox())!;
 					expect(hoveredImage.width).toBe(imageBox.width);
@@ -193,20 +200,26 @@ test('Search distinguishes hover from mouse and keyboard focus without moving co
 		await page.goto(server.url);
 		const search = page.getByRole('searchbox', { name: 'Search', exact: true });
 		await expect(search).toBeEnabled();
-		const palette = await fieldPalette(search);
+		const frame = search.locator('..');
+		const palette = await fieldPalette(frame);
 		const box = await search.boundingBox();
+		const frameBox = await frame.boundingBox();
 		await search.hover();
 		await expect(search).not.toBeFocused();
-		await expectBackground(search, palette.hover);
-		await expect(search).toHaveCSS('box-shadow', palette.hoverShadow);
+		await expectBackground(frame, palette.hover);
+		await expect(frame).toHaveCSS('border-color', palette.strong);
 		await expect(search).toHaveCSS('cursor', 'text');
 		await search.click();
 		await expect(search).toBeFocused();
-		await expectBackground(search, palette.focus);
-		await expectInsetFocus(search, palette.primary);
+		await expectBackground(frame, palette.focus);
+		await expectInsetFocus(frame, palette.primary);
+		await expect(search).toHaveCSS('outline-style', 'none');
 		expect(await search.boundingBox()).toEqual(box);
+		expect(await frame.boundingBox()).toEqual(frameBox);
 		await search.fill('tag:interactionfixture');
 		const clear = page.getByRole('button', { name: 'Clear search', exact: true });
+		await expect(clear).toBeVisible();
+		const filledBox = await search.boundingBox();
 		const theme = page.getByRole('button', { name: 'Switch to dark theme', exact: true });
 		for (const button of [clear, theme]) {
 			await page.keyboard.press('Tab');
@@ -214,15 +227,17 @@ test('Search distinguishes hover from mouse and keyboard focus without moving co
 			await expect(button).toHaveCSS('outline-style', 'solid');
 			await expect(button).toHaveCSS('outline-width', '2px');
 			await expect(button).toHaveCSS('outline-color', palette.primary);
-			await expect(button).toHaveCSS('outline-offset', '2px');
+			await expect(button).toHaveCSS('outline-offset', '-2px');
+			await expect(frame).toHaveCSS('outline-style', 'none');
 		}
 		await page.keyboard.press('Shift+Tab');
 		await expect(clear).toBeFocused();
 		await page.keyboard.press('Shift+Tab');
 		await expect(search).toBeFocused();
-		await expectBackground(search, palette.focus);
-		await expectInsetFocus(search, palette.primary);
-		expect(await search.boundingBox()).toEqual(box);
+		await expectBackground(frame, palette.focus);
+		await expectInsetFocus(frame, palette.primary);
+		expect(await search.boundingBox()).toEqual(filledBox);
+		expect(await frame.boundingBox()).toEqual(frameBox);
 	}
 });
 
@@ -315,19 +330,22 @@ test('both sign-in credentials use inset focus and a distinct hover in either sc
 			await page.keyboard.press('Tab');
 			await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeFocused();
 			for (const input of [password, username]) {
-				const palette = await fieldPalette(input);
+				const frame = input.locator('..');
+				const palette = await fieldPalette(frame);
 				const box = await input.boundingBox();
+				const frameBox = await frame.boundingBox();
 				await input.hover();
 				await expect(input).not.toBeFocused();
-				await expectBackground(input, palette.hover);
-				await expect(input).toHaveCSS('box-shadow', palette.hoverShadow);
-				await expect(input).toHaveCSS('border-color', palette.strong);
+				await expectBackground(frame, palette.hover);
+				await expect(frame).toHaveCSS('border-color', palette.strong);
 				await page.keyboard.press('Shift+Tab');
 				await expect(input).toBeFocused();
-				await expectBackground(input, palette.focus);
-				await expectInsetFocus(input, palette.primary);
-				await expect(input).toHaveCSS('border-color', palette.primary);
+				await expectBackground(frame, palette.focus);
+				await expectInsetFocus(frame, palette.primary);
+				await expect(frame).toHaveCSS('border-color', palette.primary);
+				await expect(input).toHaveCSS('outline-style', 'none');
 				expect(await input.boundingBox()).toEqual(box);
+				expect(await frame.boundingBox()).toEqual(frameBox);
 			}
 		}
 	} finally {
@@ -348,10 +366,13 @@ test('disabled Search has no interactive surface before hydration or without Jav
 		await page.goto(server.url, { waitUntil: 'domcontentloaded' });
 		const search = page.getByRole('searchbox', { name: 'Search', exact: true });
 		await expect(search).toBeDisabled();
-		const background = await search.evaluate((node) => getComputedStyle(node).backgroundColor);
+		const frame = search.locator('..');
+		const background = await frame.evaluate((node) => getComputedStyle(node).backgroundColor);
 		await search.hover();
-		await expect(search).toHaveCSS('background-color', background);
-		await expect(search).toHaveCSS('box-shadow', 'none');
+		await expect(frame).toHaveCSS('background-color', background);
+		await expect(frame).toHaveCSS('box-shadow', 'none');
+		await expect(frame).toHaveCSS('outline-style', 'none');
+		await expect(frame).toHaveCSS('opacity', '0.5');
 		await page.keyboard.press('Tab');
 		await expect(search).not.toBeFocused();
 		await expect(search).not.toHaveCSS('outline-style', 'solid');
@@ -367,10 +388,13 @@ test('disabled Search has no interactive surface before hydration or without Jav
 		await plain.goto(server.url);
 		const search = plain.getByRole('searchbox', { name: 'Search', exact: true });
 		await expect(search).toBeDisabled();
-		const background = await search.evaluate((node) => getComputedStyle(node).backgroundColor);
+		const frame = search.locator('..');
+		const background = await frame.evaluate((node) => getComputedStyle(node).backgroundColor);
 		await search.hover();
-		await expect(search).toHaveCSS('background-color', background);
-		await expect(search).toHaveCSS('box-shadow', 'none');
+		await expect(frame).toHaveCSS('background-color', background);
+		await expect(frame).toHaveCSS('box-shadow', 'none');
+		await expect(frame).toHaveCSS('outline-style', 'none');
+		await expect(frame).toHaveCSS('opacity', '0.5');
 		await plain.keyboard.press('Tab');
 		await expect(search).not.toBeFocused();
 		await expect(search).not.toHaveCSS('outline-style', 'solid');

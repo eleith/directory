@@ -138,9 +138,12 @@ for (const strategy of ['credentials', 'sso'] as const) {
 						background: getComputedStyle(node).backgroundColor
 					}));
 					expect(contrast(colors.foreground, colors.background)).toBeGreaterThanOrEqual(4.5);
-					for (const control of await page.locator('input:not([type="hidden"]), button').all()) {
-						const bounds = await control.boundingBox();
-						expect(bounds!.height).toBeGreaterThanOrEqual(48);
+					for (const input of await page.locator('input:not([type="hidden"])').all()) {
+						expect((await input.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+					}
+					expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+					for (const frame of await page.locator('.ui-input').all()) {
+						expect((await frame.boundingBox())!.height).toBeGreaterThanOrEqual(48);
 					}
 					await expect(page.locator('[autofocus]')).toHaveCount(0);
 					await expect(page.locator('body')).toHaveCSS('font-size', '16px');
@@ -181,9 +184,11 @@ for (const strategy of ['credentials', 'sso'] as const) {
 					}
 					await expect(button).toBeFocused();
 					await expect(button).toHaveCSS('outline-style', 'solid');
-					await expect(button).toHaveCSS('outline-color', colors.background);
+					await expect(button).toHaveCSS('outline-color', colors.foreground);
+					await expect(button).toHaveCSS('outline-offset', '-2px');
 					await button.hover();
-					await expect(button).not.toHaveCSS('box-shadow', 'none');
+					await expect(button).toHaveCSS('box-shadow', 'none');
+					await expect(button).toHaveCSS('background-color', colors.background);
 					await page.mouse.down();
 					await expect(button).toHaveCSS(
 						'box-shadow',

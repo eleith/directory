@@ -4,6 +4,8 @@
 	import IconLock from 'virtual:icons/ph/lock';
 	import IconSignIn from 'virtual:icons/ph/sign-in';
 	import Logo from '$lib/components/Logo.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import type { PageData } from './$types.js';
 
 	let { data }: { data: PageData } = $props();
@@ -47,8 +49,8 @@
 			{#if data.strategy === 'credentials'}
 				<div class="form-group">
 					<label for="username">Username</label>
-					<input
-						bind:this={usernameInput}
+					<Input
+						bind:element={usernameInput}
 						id="username"
 						name="username"
 						type="text"
@@ -58,7 +60,7 @@
 				</div>
 				<div class="form-group">
 					<label for="password">Password</label>
-					<input
+					<Input
 						id="password"
 						name="password"
 						type="password"
@@ -66,16 +68,16 @@
 						required
 					/>
 				</div>
-				<button type="submit">
+				<Button variant="primary" type="submit">
 					<span class="icon"><IconLock aria-hidden="true" focusable="false" /></span>
 					Sign in
-				</button>
+				</Button>
 			{:else}
 				<p class="sso-description">Use your single sign-on account to access the directory.</p>
-				<button bind:this={ssoButton} type="submit">
+				<Button bind:element={ssoButton} variant="primary" type="submit">
 					<span class="icon"><IconSignIn aria-hidden="true" focusable="false" /></span>
 					Sign in with single sign-on
-				</button>
+				</Button>
 			{/if}
 		</form>
 	</main>
@@ -147,68 +149,10 @@
 		font-weight: 600;
 	}
 
-	input {
-		width: 100%;
-		min-width: 0;
-		color: var(--color-text);
-		background: var(--color-surface-page);
-		border: var(--border-width) solid var(--color-border-strong);
-		transition: border-color var(--transition-control);
-	}
-
-	button,
-	input {
-		min-height: 3rem;
-		border-radius: var(--radius-control);
-		padding: var(--space-4) var(--space-5);
-	}
-
-	input:not(:disabled):hover {
-		background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-card));
-		box-shadow: inset 0 0 0 var(--border-width) var(--color-border-strong);
-	}
-
-	input:not(:disabled):focus {
-		background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-card));
-		border-color: var(--color-primary);
-		box-shadow: none;
-		outline: var(--outline-focus);
-		outline-offset: calc(-1 * var(--space-1));
-	}
-
 	.icon {
 		display: inline-flex;
 		flex-shrink: 0;
 		font-size: 1.25rem;
-	}
-
-	button {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: var(--space-4);
-		color: var(--color-on-primary);
-		background: var(--color-primary);
-		border: var(--border-width) solid transparent;
-		font-weight: 600;
-		cursor: pointer;
-		transition:
-			box-shadow var(--transition-control),
-			transform var(--transition-control);
-	}
-
-	button:hover {
-		box-shadow: inset 0 0 0 2px currentColor;
-	}
-
-	button:active {
-		box-shadow: inset 0 0 0 3px currentColor;
-		transform: scale(0.98);
-	}
-
-	button:focus-visible {
-		outline: var(--outline-focus);
-		outline-offset: var(--space-1);
 	}
 
 	.sso-description {
@@ -227,17 +171,6 @@
 			border: none;
 			box-shadow: none;
 			background: transparent;
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		button,
-		input {
-			transition: none;
-		}
-
-		button:active {
-			transform: none;
 		}
 	}
 </style>

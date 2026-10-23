@@ -88,6 +88,10 @@ function searchInput(page: Page) {
 	return page.getByRole('searchbox', { name: 'Search', exact: true });
 }
 
+function searchFrame(page: Page) {
+	return page.locator('.search-controls.ui-input');
+}
+
 async function openGrid(page: Page, url = server.url) {
 	await page.goto(url);
 	await expect(searchInput(page)).toBeEnabled();
@@ -691,7 +695,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
 						await expect(searchInput(page)).toBeEnabled();
 						await searchInput(page).fill('backup');
 						await expectTitles(page, ['Immich']);
-						await expect(searchInput(page)).toHaveCSS(
+						await expect(searchInput(page)).toBeFocused();
+						await expect(searchInput(page)).toHaveCSS('outline-style', 'none');
+						await expect(searchFrame(page)).toHaveCSS('outline-style', 'solid');
+						await expect(searchFrame(page)).toHaveCSS('outline-width', '2px');
+						await expect(searchFrame(page)).toHaveCSS('outline-offset', '-2px');
+						await expect(searchFrame(page)).toHaveCSS(
 							'outline-color',
 							colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)'
 						);
@@ -748,7 +757,15 @@ test('search stays behind authentication; sign-out retains only public branding'
 		for (const width of [360, 1280]) {
 			await page.setViewportSize({ width, height: 900 });
 			await expect(signout).toBeInViewport();
-			const fieldBox = (await searchInput(page).boundingBox())!;
+			const fieldBox = (await searchFrame(page).boundingBox())!;
+			const inputBox = (await searchInput(page).boundingBox())!;
+			expect(fieldBox.height).toBeGreaterThanOrEqual(48);
+			expect(inputBox.height).toBeGreaterThanOrEqual(44);
+			expect(inputBox.width).toBeGreaterThanOrEqual(44);
+			expect(inputBox.x).toBeGreaterThanOrEqual(fieldBox.x);
+			expect(inputBox.y).toBeGreaterThanOrEqual(fieldBox.y);
+			expect(inputBox.x + inputBox.width).toBeLessThanOrEqual(fieldBox.x + fieldBox.width);
+			expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(fieldBox.y + fieldBox.height);
 			const themeBox = (await page
 				.getByRole('button', { name: 'Switch to dark theme', exact: true })
 				.boundingBox())!;

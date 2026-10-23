@@ -1,46 +1,51 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import type { HTMLAttributes } from 'svelte/elements';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import BookmarkLogo from './BookmarkLogo.svelte';
 	import Logo from './Logo.svelte';
+	import ButtonLink from './ui/ButtonLink.svelte';
+	import Chip from './ui/Chip.svelte';
+	import Input from './ui/Input.svelte';
 
 	let {
 		link,
 		groupLabel,
-		title,
+		headingAttributes = {},
+		reserveCloseSpace = false,
 		onTagSearch
 	}: {
 		link: DisplayLink;
 		groupLabel?: string | undefined;
-		title?: Snippet<[string]>;
+		headingAttributes?: HTMLAttributes<HTMLHeadingElement>;
+		reserveCloseSpace?: boolean;
 		onTagSearch?: (query: string) => void;
 	} = $props();
 </script>
 
 {#snippet chip(label: string, query: string, access = false)}
-	{#if onTagSearch}
-		<button
-			type="button"
-			class="tag"
-			class:access-tag={access}
-			aria-label={`Filter by ${access ? 'access' : 'tag'}: ${label}`}
-			onclick={() => onTagSearch?.(query)}>{label}</button
-		>
-	{:else}
-		<span class="tag" class:access-tag={access}>{label}</span>
+	{@const filterKind = access ? 'access' : 'tag'}
+	<Chip
+		class="tag"
+		{access}
+		aria-label={onTagSearch ? `Filter by ${filterKind}: ${label}` : undefined}
+		onclick={onTagSearch ? () => onTagSearch?.(query) : undefined}>{label}</Chip
+	>
+{/snippet}
+
+{#snippet serviceIcon()}
+	{#if link.favicon_path !== undefined}
+		<Logo source={link.favicon_path} fallback={`/bookmarks/${link.id}/logo`} size={24} />
 	{/if}
 {/snippet}
 
 <div class="details">
 	<div class="summary">
-		<div class="identity">
+		<div class="identity" class:has-close-control={reserveCloseSpace}>
 			<BookmarkLogo {link} />
 			<div class="identity-copy">
-				{#if title}
-					{@render title(link.title)}
-				{:else}
-					<h2 id="link-details-title">{link.title}</h2>
-				{/if}
+				<h2 {...headingAttributes} id={headingAttributes.id ?? 'link-details-title'}>
+					{link.title}
+				</h2>
 				{#if groupLabel}
 					<p class="category">{groupLabel}</p>
 				{/if}
@@ -71,29 +76,23 @@
 		{/if}
 		<div class="destination">
 			<div class="destination-address">
-				<div class="destination-value">
-					{#if link.favicon_path !== undefined}
-						<Logo source={link.favicon_path} fallback={`/bookmarks/${link.id}/logo`} size={24} />
-					{/if}
-					<input
-						class="url"
-						aria-label="Destination"
-						id={`destination-${link.id}`}
-						type="url"
-						value={link.url}
-						readonly
-						spellcheck="false"
-					/>
-				</div>
-				<!-- eslint-disable svelte/no-navigation-without-resolve -- Prepared service URLs are external destinations, not application routes. -->
-				<a
+				<Input
+					class="destination-value"
+					aria-label="Destination"
+					id={`destination-${link.id}`}
+					type="url"
+					value={link.url}
+					readonly
+					spellcheck="false"
+					leading={link.favicon_path !== undefined ? serviceIcon : undefined}
+				/>
+				<ButtonLink
 					class="open-service"
 					href={link.url}
 					target="_blank"
 					rel="noopener noreferrer"
-					aria-label={`Open ${link.title} (opens in a new tab)`}>Open</a
+					aria-label={`Open ${link.title} (opens in a new tab)`}>Open</ButtonLink
 				>
-				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			</div>
 		</div>
 	</div>
@@ -128,21 +127,21 @@
 		min-width: 0;
 	}
 
-	.identity :global(img) {
-		flex-shrink: 0;
+	.identity.has-close-control {
+		padding-inline-end: 44px;
 	}
 
 	.identity-copy {
 		min-width: 0;
 	}
 
-	.details :global(h2),
+	h2,
 	p,
 	ul {
 		margin: 0;
 	}
 
-	.details :global(h2) {
+	h2 {
 		font-size: 1.5rem;
 		line-height: var(--line-height-heading);
 	}
@@ -165,50 +164,6 @@
 		min-width: 0;
 	}
 
-	.destination-value {
-		display: flex;
-		align-items: center;
-		min-width: 0;
-		min-height: 48px;
-		background: var(--color-surface-muted);
-		border: var(--border-width) solid var(--color-border-subtle);
-		border-radius: var(--radius-control);
-	}
-
-	.destination-value:hover {
-		background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-card));
-		border-color: var(--color-border-strong);
-	}
-
-	.destination-value:focus-within {
-		background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-card));
-		border-color: var(--color-primary);
-		outline: var(--outline-focus);
-		outline-offset: calc(-1 * var(--space-1));
-	}
-
-	.destination-value :global(img) {
-		flex-shrink: 0;
-		margin-inline-start: var(--space-4);
-	}
-
-	.url {
-		align-self: stretch;
-		min-width: 0;
-		width: 100%;
-		padding: var(--space-4);
-		font: inherit;
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-		background: transparent;
-		border: 0;
-		border-radius: inherit;
-	}
-
-	.url:focus {
-		outline: none;
-	}
-
 	.metadata {
 		display: grid;
 		gap: calc(var(--space-4) * 2);
@@ -226,69 +181,9 @@
 		gap: var(--space-4);
 		padding: 0;
 		list-style: none;
-		font-size: var(--font-size-sm);
 	}
 
 	.tags li {
 		min-width: 0;
-	}
-
-	.tag {
-		display: block;
-		min-width: 0;
-		min-height: 24px;
-		max-width: 100%;
-		font: inherit;
-		text-align: start;
-		padding: var(--space-1) var(--space-4);
-		color: var(--color-text);
-		background: color-mix(in srgb, var(--color-text) 15%, var(--color-surface-card));
-		border: var(--border-width) solid var(--color-border-strong);
-		border-radius: var(--radius-control);
-	}
-
-	.tags .access-tag {
-		background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-card));
-	}
-
-	button.tag {
-		cursor: pointer;
-	}
-
-	button.tag:hover {
-		background: color-mix(in srgb, var(--color-text) 22%, var(--color-surface-card));
-	}
-
-	button.tag.access-tag:hover {
-		background: color-mix(in srgb, var(--color-primary) 22%, var(--color-surface-card));
-	}
-
-	button.tag:focus-visible {
-		outline: var(--outline-focus);
-		outline-offset: var(--space-1);
-	}
-
-	.open-service {
-		display: grid;
-		place-items: center;
-		width: auto;
-		min-width: 5rem;
-		min-height: 48px;
-		padding: var(--space-4) var(--space-5);
-		color: var(--color-on-primary);
-		background: var(--color-primary);
-		border-radius: var(--radius-control);
-		font-weight: 600;
-		text-align: center;
-		text-decoration: none;
-	}
-
-	.open-service:hover {
-		text-decoration: underline;
-	}
-
-	.open-service:focus-visible {
-		outline: var(--outline-focus);
-		outline-offset: var(--space-1);
 	}
 </style>

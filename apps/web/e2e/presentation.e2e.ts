@@ -117,18 +117,21 @@ for (const javaScriptEnabled of [true, false]) {
 						)
 					).toBe(true);
 					const first = tiles.first();
+					const motionSurface = first.locator('.tile-icon');
 					await first.hover();
 					await expect(first).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 					await expect(first).toHaveCSS('border-width', '0px');
 					await expect(first).toHaveCSS('text-decoration-line', 'none');
 					await expect(first.locator('.tile-title')).toHaveCSS('text-decoration-line', 'underline');
-					await expect(first.locator('img')).toHaveCSS(
+					await expect(first.locator('img')).toHaveCSS('filter', 'none');
+					await expect(first.locator('img')).toHaveCSS('transform', 'none');
+					await expect(motionSurface).toHaveCSS(
 						'filter',
 						colorScheme === 'light'
 							? 'drop-shadow(rgba(0, 0, 0, 0.24) 0px 6px 10px)'
 							: 'drop-shadow(rgba(255, 255, 255, 0.45) 0px 6px 10px)'
 					);
-					await expect(first.locator('img')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
+					await expect(motionSurface).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
 					).toBe(true);
@@ -136,7 +139,8 @@ for (const javaScriptEnabled of [true, false]) {
 					if (javaScriptEnabled) {
 						const search = page.getByRole('searchbox', { name: 'Search', exact: true });
 						await expect(search).toBeFocused();
-						await expect(search).toHaveCSS('outline-color', accent);
+						await expect(search.locator('..')).toHaveCSS('outline-color', accent);
+						await expect(search).toHaveCSS('outline-style', 'none');
 						await page.keyboard.press('Tab');
 						const toggle = page.getByRole('button', { name: 'Switch to dark theme', exact: true });
 						await expect(toggle).toBeFocused();
@@ -152,12 +156,31 @@ for (const javaScriptEnabled of [true, false]) {
 						exact: true
 					});
 					const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
+					const heading = page.getByRole('heading', { name: labels[0]!, exact: true, level: 2 });
+					await expect(heading).toHaveCount(1);
+					await expect(heading).toHaveJSProperty('tagName', 'H2');
+					await expect(heading).toHaveText(labels[0]!);
 					let dismiss = page.getByRole('link', { name: 'Back to directory', exact: true });
 					if (javaScriptEnabled) {
-						await expect(page.getByRole('dialog')).toBeVisible();
+						const dialog = page.getByRole('dialog');
+						await expect(dialog).toBeVisible();
+						await expect(dialog.getByRole('heading', { level: 2 })).toHaveCount(1);
+						await expect(heading).toHaveAttribute('role', 'heading');
+						await expect(heading).toHaveAttribute('aria-level', '2');
+						await expect(heading).toHaveAttribute('id', /.+/);
+						await expect(dialog).toHaveAttribute(
+							'aria-labelledby',
+							(await heading.getAttribute('id'))!
+						);
+						await expect(dialog).toHaveAccessibleName(labels[0]!);
 						dismiss = page.getByRole('button', { name: 'Close', exact: true });
 						await expect(external).toBeFocused();
 					} else {
+						await expect(heading).toHaveAttribute('id', 'link-details-title');
+						await expect(page.locator('section.details')).toHaveAttribute(
+							'aria-labelledby',
+							'link-details-title'
+						);
 						await expect(dismiss).toHaveAttribute('href', '/');
 						await expect(dismiss).toHaveAttribute('data-sveltekit-preload-data', 'off');
 						await expect(dismiss).toHaveCSS('text-decoration-color', accent);
@@ -193,8 +216,12 @@ for (const javaScriptEnabled of [true, false]) {
 							await expect(destination).toHaveCSS('outline-style', 'none');
 							await expect(focusSurface).toHaveCSS('outline-offset', '-2px');
 						}
+						let focusColor = accent;
+						if (control === external) {
+							focusColor = await external.evaluate((node) => getComputedStyle(node).color);
+						}
 						await expect(focusSurface).toHaveCSS('outline-style', 'solid');
-						await expect(focusSurface).toHaveCSS('outline-color', accent);
+						await expect(focusSurface).toHaveCSS('outline-color', focusColor);
 					}
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
@@ -250,8 +277,9 @@ test('public configured accents preserve the body palette and private directory 
 			await page.keyboard.press('Tab');
 			const input = page.getByLabel('Password');
 			await expect(input).toBeFocused();
-			await expect(input).toHaveCSS('outline-style', 'solid');
-			await expect(input).toHaveCSS(
+			await expect(input).toHaveCSS('outline-style', 'none');
+			await expect(input.locator('..')).toHaveCSS('outline-style', 'solid');
+			await expect(input.locator('..')).toHaveCSS(
 				'outline-color',
 				colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)'
 			);
@@ -273,7 +301,17 @@ test('public configured accents preserve the body palette and private directory 
 			const html = await document!.text();
 			expect(html).toContain(`--color-primary:light-dark(${light},${dark})`);
 			const accent = colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)';
-			await expect(page.getByRole('dialog')).toBeVisible();
+			const dialog = page.getByRole('dialog');
+			await expect(dialog).toBeVisible();
+			const heading = dialog.getByRole('heading', { level: 2 });
+			await expect(heading).toHaveCount(1);
+			await expect(heading).toHaveJSProperty('tagName', 'H2');
+			await expect(heading).toHaveText(labels[0]!);
+			await expect(heading).toHaveAttribute('role', 'heading');
+			await expect(heading).toHaveAttribute('aria-level', '2');
+			await expect(heading).toHaveAttribute('id', /.+/);
+			await expect(dialog).toHaveAttribute('aria-labelledby', (await heading.getAttribute('id'))!);
+			await expect(dialog).toHaveAccessibleName(labels[0]!);
 			const close = page.getByRole('button', { name: 'Close', exact: true });
 			const external = page.getByRole('link', {
 				name: `Open ${labels[0]} (opens in a new tab)`,
@@ -290,8 +328,12 @@ test('public configured accents preserve the body palette and private directory 
 					await expect(destination).toHaveCSS('outline-style', 'none');
 					await expect(focusSurface).toHaveCSS('outline-offset', '-2px');
 				}
+				let focusColor = accent;
+				if (control === external) {
+					focusColor = await external.evaluate((node) => getComputedStyle(node).color);
+				}
 				await expect(focusSurface).toHaveCSS('outline-style', 'solid');
-				await expect(focusSurface).toHaveCSS('outline-color', accent);
+				await expect(focusSurface).toHaveCSS('outline-color', focusColor);
 			}
 			await close.click();
 			await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
@@ -302,8 +344,13 @@ test('public configured accents preserve the body palette and private directory 
 			]) {
 				await page.keyboard.press('Tab');
 				await expect(control).toBeFocused();
-				await expect(control).toHaveCSS('outline-style', 'solid');
-				await expect(control).toHaveCSS('outline-color', accent);
+				let focusSurface = control;
+				if (await control.evaluate((node) => node instanceof HTMLInputElement)) {
+					focusSurface = control.locator('..');
+					await expect(control).toHaveCSS('outline-style', 'none');
+				}
+				await expect(focusSurface).toHaveCSS('outline-style', 'solid');
+				await expect(focusSurface).toHaveCSS('outline-color', accent);
 			}
 		}
 	} finally {

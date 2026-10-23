@@ -1,0 +1,202 @@
+.ui-button {
+	box-sizing: border-box;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-4);
+	min-height: 48px;
+	padding: var(--space-4) var(--space-5);
+	font: inherit;
+	color: var(--color-text);
+	text-align: center;
+	text-decoration: none;
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-control);
+	outline: none;
+	cursor: pointer;
+}
+
+.ui-button--surface {
+	background: var(--color-surface-card);
+}
+
+.ui-button--primary {
+	--ui-control-focus-color: var(--color-on-primary);
+	--ui-control-focus-background: var(--color-primary);
+
+	min-width: 80px;
+	font-weight: 600;
+	color: var(--color-on-primary);
+	background: var(--color-primary);
+}
+
+.ui-button--icon {
+	flex-shrink: 0;
+	width: 44px;
+	min-width: 44px;
+	height: 44px;
+	min-height: 44px;
+	padding: 0;
+	font-size: 1.25rem;
+}
+
+.ui-button--chip,
+.ui-button--access-chip,
+.ui-chip {
+	--ui-control-hover-amount: 22%;
+
+	box-sizing: border-box;
+	display: block;
+	min-width: 0;
+	min-height: 24px;
+	max-width: 100%;
+	padding: var(--space-1) var(--space-4);
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 400;
+	text-align: start;
+	color: var(--color-text);
+	background: color-mix(in srgb, var(--color-text) 15%, var(--color-surface-card));
+	border: var(--border-width) solid var(--color-border-strong);
+	border-radius: var(--radius-control);
+}
+
+.ui-button--access-chip,
+.ui-chip--access {
+	--ui-control-hover-color: var(--color-primary);
+
+	background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-card));
+}
+
+.ui-input {
+	box-sizing: border-box;
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+	min-height: 48px;
+	font: inherit;
+	color: var(--color-text);
+	background: var(--color-surface-page);
+	border: var(--border-width) solid var(--color-border-strong);
+	border-radius: var(--radius-control);
+	cursor: text;
+}
+
+.ui-input--search {
+	background: var(--color-surface-muted);
+	border-color: transparent;
+	border-radius: var(--radius-card);
+}
+
+.ui-input--readonly {
+	background: var(--color-surface-muted);
+	border-color: var(--color-border-subtle);
+}
+
+.ui-input__control {
+	box-sizing: border-box;
+	flex: 1;
+	min-width: 0;
+	min-height: 46px;
+	padding: calc(var(--space-4) - var(--border-width)) calc(var(--space-5) - var(--border-width));
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	border-radius: inherit;
+	outline: none;
+	cursor: text;
+}
+
+.ui-input--leading > .ui-input__control {
+	padding-inline-start: var(--space-4);
+}
+
+.ui-input--readonly > .ui-input__control {
+	padding-inline: var(--space-4);
+	font-size: var(--font-size-sm);
+	color: var(--color-text-muted);
+}
+
+.ui-input--trailing > .ui-input__control {
+	padding-inline-end: var(--space-1);
+}
+
+.ui-input__leading {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	padding-inline-start: calc(var(--space-4) - var(--border-width));
+	color: var(--color-text-muted);
+}
+
+.ui-input__trailing {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	margin: var(--border-width);
+}
+
+.ui-input__control::placeholder {
+	color: var(--color-text-muted);
+	opacity: 1;
+}
+
+.ui-input__control::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+}
+
+.ui-button:not(:disabled):hover {
+	background: color-mix(
+		in srgb,
+		var(--ui-control-hover-color, var(--color-text)) var(--ui-control-hover-amount, 8%),
+		var(--color-surface-card)
+	);
+	box-shadow: inset 0 0 0 var(--border-width) var(--color-border-strong);
+}
+
+.ui-button--primary:not(:disabled):hover {
+	background: var(--color-primary);
+	box-shadow:
+		inset 0 0 0 var(--border-width) var(--color-on-primary),
+		var(--shadow-card);
+}
+
+.ui-input:has(> .ui-input__control:enabled):hover {
+	background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-card));
+	border-color: var(--color-border-strong);
+}
+
+.ui-button:not(:disabled):focus,
+.ui-input:has(> .ui-input__control:enabled:focus) {
+	background: var(
+		--ui-control-focus-background,
+		color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-card))
+	);
+	border-color: var(--ui-control-focus-color, var(--color-primary));
+	box-shadow: none;
+	outline: 2px solid var(--ui-control-focus-color, var(--color-primary));
+	outline-offset: -2px;
+}
+
+.ui-button:not(:disabled):active {
+	background: color-mix(in srgb, var(--color-primary) 24%, var(--color-surface-card));
+}
+
+.ui-button--primary:not(:disabled):active {
+	background: var(--color-primary);
+	box-shadow: inset 0 0 0 3px var(--color-on-primary);
+	outline: none;
+}
+
+.ui-button:disabled,
+.ui-input--disabled,
+.ui-input:has(> .ui-input__control:disabled) {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.ui-input__control:disabled {
+	cursor: default;
+}

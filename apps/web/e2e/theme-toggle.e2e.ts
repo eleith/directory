@@ -318,7 +318,10 @@ test('saved theme on public sign-in and sign-out retains the public configured a
 		await expect(page.getByLabel('Username')).toBeFocused();
 		await page.keyboard.press('Tab');
 		await expect(page.getByLabel('Password')).toBeFocused();
-		await expect(page.getByLabel('Password')).toHaveCSS('outline-color', accents.dark);
+		await expect(page.getByLabel('Password').locator('..')).toHaveCSS(
+			'outline-color',
+			accents.dark
+		);
 		await page.getByLabel('Username').fill(username);
 		await page.getByLabel('Password').fill(password);
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -339,7 +342,10 @@ test('saved theme on public sign-in and sign-out retains the public configured a
 		await expect(page).toHaveURL(`${protectedServer.url}/signin?callbackUrl=%2F`);
 		await expectTheme(page, 'dark', 'dark');
 		await page.getByLabel('Username').focus();
-		await expect(page.getByLabel('Username')).toHaveCSS('outline-color', accents.dark);
+		await expect(page.getByLabel('Username').locator('..')).toHaveCSS(
+			'outline-color',
+			accents.dark
+		);
 		await page.getByLabel('Username').fill(username);
 		await page.getByLabel('Password').fill(password);
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click();

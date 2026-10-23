@@ -44,6 +44,7 @@ test.afterAll(async () => {
 });
 
 const search = (page: Page) => page.getByRole('searchbox', { name: 'Search', exact: true });
+const searchFrame = (page: Page) => page.locator('.search-controls.ui-input');
 const theme = (page: Page) => page.locator('.header-actions > button');
 const signout = (page: Page) => page.getByRole('button', { name: 'Sign out', exact: true });
 
@@ -64,9 +65,20 @@ async function expectHeaderLayout(page: Page, signedIn = true) {
 	const brandBox = (await brand.boundingBox())!;
 	const logoBox = (await header.locator('img').boundingBox())!;
 	const toolsBox = (await tools.boundingBox())!;
-	const searchBox = (await search(page).boundingBox())!;
+	const searchFrameBox = (await searchFrame(page).boundingBox())!;
+	const inputBox = (await search(page).boundingBox())!;
 	const themeBox = (await theme(page).boundingBox())!;
 	const width = await page.evaluate(() => innerWidth);
+
+	expect(searchFrameBox.height).toBeGreaterThanOrEqual(48);
+	expect(inputBox.height).toBeGreaterThanOrEqual(44);
+	expect(inputBox.width).toBeGreaterThanOrEqual(44);
+	expect(inputBox.x).toBeGreaterThanOrEqual(searchFrameBox.x);
+	expect(inputBox.y).toBeGreaterThanOrEqual(searchFrameBox.y);
+	expect(inputBox.x + inputBox.width).toBeLessThanOrEqual(searchFrameBox.x + searchFrameBox.width);
+	expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(
+		searchFrameBox.y + searchFrameBox.height
+	);
 
 	expect(brandBox.y).toBeCloseTo(headerBox.y, 1);
 	expect(logoBox.y).toBeCloseTo(headerBox.y, 1);
@@ -100,18 +112,18 @@ async function expectHeaderLayout(page: Page, signedIn = true) {
 	}
 
 	if (width < 768) {
-		expect(searchBox.y).toBeGreaterThanOrEqual(brandBox.y + brandBox.height);
-		expect(searchBox.y).toBeGreaterThanOrEqual(toolsBox.y + toolsBox.height);
-		expect(searchBox.x).toBeCloseTo(headerBox.x, 1);
-		expect(searchBox.width).toBeCloseTo(headerBox.width, 1);
+		expect(searchFrameBox.y).toBeGreaterThanOrEqual(brandBox.y + brandBox.height);
+		expect(searchFrameBox.y).toBeGreaterThanOrEqual(toolsBox.y + toolsBox.height);
+		expect(searchFrameBox.x).toBeCloseTo(headerBox.x, 1);
+		expect(searchFrameBox.width).toBeCloseTo(headerBox.width, 1);
 	} else {
-		expect(searchBox.y).toBeCloseTo(headerBox.y, 1);
-		expect(searchBox.x).toBeGreaterThanOrEqual(brandBox.x + brandBox.width);
-		expect(searchBox.x + searchBox.width).toBeLessThan(toolsBox.x);
+		expect(searchFrameBox.y).toBeCloseTo(headerBox.y, 1);
+		expect(searchFrameBox.x).toBeGreaterThanOrEqual(brandBox.x + brandBox.width);
+		expect(searchFrameBox.x + searchFrameBox.width).toBeLessThan(toolsBox.x);
 		const rem = await page.evaluate(() =>
 			parseFloat(getComputedStyle(document.documentElement).fontSize)
 		);
-		expect(searchBox.width).toBeLessThanOrEqual(22 * rem);
+		expect(searchFrameBox.width).toBeLessThanOrEqual(22 * rem);
 	}
 	if (themeBox.height <= 48) {
 		expect(themeBox.y + themeBox.height / 2).toBeCloseTo(logoBox.y + logoBox.height / 2, 1);
@@ -147,7 +159,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 					);
 				expect(lines).toBe(2);
 			}
-			if (width === 1280) expect((await search(page).boundingBox())!.width).toBe(352);
+			if (width === 1280) expect((await searchFrame(page).boundingBox())!.width).toBe(352);
 		});
 	}
 }

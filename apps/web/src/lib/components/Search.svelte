@@ -14,6 +14,8 @@
 	import { onMount } from 'svelte';
 	import IconMagnifyingGlass from 'virtual:icons/ph/magnifying-glass';
 	import IconX from 'virtual:icons/ph/x';
+	import Button from './ui/Button.svelte';
+	import Input from './ui/Input.svelte';
 	import { beforeNavigate, afterNavigate } from '$app/navigation';
 	import type { DirectoryDisplay } from '$lib/display/types.js';
 	import type { SearchResult } from '$lib/search/engine.js';
@@ -121,28 +123,39 @@
 	});
 </script>
 
+{#snippet magnifier()}
+	<IconMagnifyingGlass
+		class="icon"
+		width="1.25rem"
+		height="1.25rem"
+		aria-hidden="true"
+		focusable="false"
+	/>
+{/snippet}
+
+{#snippet clearButton()}
+	<Button size="icon" aria-label="Clear search" disabled={!mounted} onclick={clearSearch}>
+		<IconX class="icon" width="1.25rem" height="1.25rem" aria-hidden="true" focusable="false" />
+	</Button>
+{/snippet}
+
 <div class="search">
 	<label class="visually-hidden" for="directory-search">Search</label>
-	<div class="search-controls">
-		<IconMagnifyingGlass class="icon magnifier" aria-hidden="true" focusable="false" />
-		<input
-			bind:this={input}
-			bind:value={query}
-			id="directory-search"
-			type="search"
-			placeholder={macKeyboard ? 'Search · ⌥/' : 'Search · Alt+/'}
-			aria-keyshortcuts="Alt+/"
-			disabled={!mounted}
-			onfocus={() => (activated = true)}
-			oninput={() => (activated = true)}
-			onkeydown={handleKeydown}
-		/>
-		{#if query}
-			<button type="button" aria-label="Clear search" onclick={clearSearch}>
-				<IconX class="icon" aria-hidden="true" focusable="false" />
-			</button>
-		{/if}
-	</div>
+	<Input
+		class="search-controls"
+		bind:element={input}
+		bind:value={query}
+		id="directory-search"
+		type="search"
+		placeholder={macKeyboard ? 'Search · ⌥/' : 'Search · Alt+/'}
+		aria-keyshortcuts="Alt+/"
+		disabled={!mounted}
+		leading={magnifier}
+		trailing={query ? clearButton : undefined}
+		onfocus={() => (activated = true)}
+		oninput={() => (activated = true)}
+		onkeydown={handleKeydown}
+	/>
 </div>
 
 <style>
@@ -158,84 +171,5 @@
 		overflow: hidden;
 		clip-path: inset(50%);
 		white-space: nowrap;
-	}
-
-	.search-controls {
-		position: relative;
-	}
-
-	input {
-		box-sizing: border-box;
-		min-width: 0;
-		width: 100%;
-		min-height: 48px;
-		padding: var(--space-4) 48px var(--space-4) 44px;
-		font: inherit;
-		color: var(--color-text);
-		background: var(--color-surface-muted);
-		border: 0;
-		border-radius: var(--radius-card);
-	}
-
-	input:not(:disabled):hover {
-		background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-card));
-		box-shadow: inset 0 0 0 var(--border-width) var(--color-border-strong);
-	}
-
-	input:not(:disabled):focus {
-		background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-card));
-		box-shadow: none;
-		outline: var(--outline-focus);
-		outline-offset: calc(-1 * var(--space-1));
-	}
-
-	input::placeholder {
-		color: var(--color-text-muted);
-		opacity: 1;
-	}
-
-	input::-webkit-search-cancel-button {
-		-webkit-appearance: none;
-	}
-
-	.search-controls :global(.icon) {
-		width: 1.25rem;
-		height: 1.25rem;
-	}
-
-	.search-controls :global(.magnifier) {
-		position: absolute;
-		inset-inline-start: var(--space-5);
-		top: 50%;
-		transform: translateY(-50%);
-		color: var(--color-text-muted);
-		pointer-events: none;
-	}
-
-	button {
-		position: absolute;
-		inset-inline-end: var(--space-1);
-		top: 50%;
-		transform: translateY(-50%);
-		display: grid;
-		place-items: center;
-		width: 44px;
-		height: 44px;
-		padding: 0;
-		font-size: inherit;
-		color: var(--color-text-muted);
-		background: transparent;
-		border: 0;
-		border-radius: var(--radius-control);
-		cursor: pointer;
-	}
-
-	button:hover {
-		background: var(--color-surface-muted);
-	}
-
-	button:focus-visible {
-		outline: var(--outline-focus);
-		outline-offset: var(--space-1);
 	}
 </style>

@@ -35,18 +35,28 @@ const archiveAction = (page: Page) =>
 
 async function pauseDetailMotion(page: Page, state: 'open' | 'closed') {
 	await page.evaluate((state) => {
-		document.addEventListener('animationstart', (event) => {
-			const element = event.target;
-			if (!(element instanceof HTMLElement)) return;
-			if (!element.matches('[data-dialog-overlay], section[role="dialog"]')) return;
-			if (element.dataset.state !== state) return;
-			for (const animation of element.getAnimations()) {
-				if (!(animation instanceof CSSAnimation) || animation.animationName !== event.animationName)
-					continue;
+		const pause = () => {
+			const elements = document.querySelectorAll(
+				`[data-dialog-overlay][data-state="${state}"], section[role="dialog"][data-state="${state}"]`
+			);
+			const animations = [...elements].flatMap((element) => element.getAnimations());
+			if (animations.length !== 2) return;
+			for (const animation of animations) {
+				if (!(animation instanceof CSSAnimation)) return;
 				animation.pause();
 				animation.currentTime = Number(animation.effect!.getTiming().duration) / 2;
 			}
+			observer.disconnect();
+		};
+		// Pause before painting, rather than racing a delayed animationstart event.
+		const observer = new MutationObserver(pause);
+		observer.observe(document.body, {
+			subtree: true,
+			childList: true,
+			attributes: true,
+			attributeFilter: ['data-state']
 		});
+		pause();
 	}, state);
 }
 
@@ -197,6 +207,7 @@ test('chip queries wait for the outro; rapid Forward cancels the old query and f
 	await expect(archiveAction(page)).toBeFocused();
 	await expect(dialog(page)).toHaveCount(1);
 	await expect(search(page)).toHaveValue('archive');
+	await pauseDetailMotion(page, 'closed');
 	await page.goBack();
 	await expect(dialog(page)).toHaveAttribute('data-state', 'closed');
 	await expectPausedMotion(page);
@@ -328,6 +339,7 @@ test('every dismissal retains inert closed content through its real outro; reduc
 			await expect(search(page)).toHaveValue('archive');
 			await expect(archiveAction(page)).toBeFocused();
 			await completeDetailMotion(page);
+			await pauseDetailMotion(page, 'closed');
 			await page.goBack();
 			await expect(dialog(page)).toHaveAttribute('data-state', 'closed');
 			await expectPausedMotion(page);

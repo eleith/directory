@@ -357,7 +357,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 			const clear = page.getByRole('button', { name: 'Clear search', exact: true });
 			await expect(clear).toHaveCount(1);
 			await expect(clear).toHaveText('');
-			for (const icon of [page.locator('.search .magnifier'), clear.locator('svg')]) {
+			for (const icon of [page.locator('.search .ui-input__leading svg'), clear.locator('svg')]) {
 				await expect(icon).toBeVisible();
 				await expect(icon).toHaveAttribute('aria-hidden', 'true');
 				await expect(icon).toHaveAttribute('focusable', 'false');
@@ -365,16 +365,21 @@ for (const colorScheme of ['light', 'dark'] as const) {
 				const color = await icon.evaluate((node) => getComputedStyle(node).color);
 				await expect(icon.locator('path')).toHaveCSS('fill', color);
 			}
+			const frame = input(page).locator('..');
+			const frameBox = (await frame.boundingBox())!;
 			const inputBox = (await input(page).boundingBox())!;
 			const clearBox = (await clear.boundingBox())!;
-			expect(inputBox.height).toBeGreaterThanOrEqual(48);
+			expect(frameBox.height).toBeGreaterThanOrEqual(48);
+			expect(inputBox.height).toBeGreaterThanOrEqual(44);
 			expect(clearBox.width).toBeGreaterThanOrEqual(44);
 			expect(clearBox.height).toBeGreaterThanOrEqual(44);
-			expect(clearBox.x).toBeGreaterThan(inputBox.x);
-			expect(clearBox.x + clearBox.width).toBeLessThanOrEqual(inputBox.x + inputBox.width);
+			expect(clearBox.x).toBeGreaterThanOrEqual(inputBox.x + inputBox.width);
+			expect(clearBox.x + clearBox.width).toBeLessThanOrEqual(frameBox.x + frameBox.width);
 			await expect(input(page)).toHaveCSS('border-width', '0px');
 			await expect(input(page)).toHaveCSS('border-radius', '12px');
-			await expect(input(page)).toHaveCSS('outline-style', 'solid');
+			await expect(input(page)).toHaveCSS('outline-style', 'none');
+			await expect(frame).toHaveCSS('outline-style', 'solid');
+			await expect(frame).toHaveCSS('outline-offset', '-2px');
 			expect(await hasNativeSearchCancelSuppression(page)).toBe(true);
 			await expect(page.getByRole('heading', { level: 1 })).toHaveCSS('font-size', '24px');
 			await expect(page.locator('.description')).toHaveText(

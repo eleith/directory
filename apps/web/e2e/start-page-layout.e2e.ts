@@ -81,6 +81,7 @@ test.afterAll(async () => {
 });
 
 const search = (page: Page) => page.getByRole('searchbox', { name: 'Search', exact: true });
+const searchFrame = (page: Page) => page.locator('.search-controls.ui-input');
 const results = (page: Page) => page.getByRole('list', { name: 'Search results', exact: true });
 
 async function expectCanvas(page: Page, grids: Locator) {
@@ -297,9 +298,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
 			).toEqual(bookmarks.map((bookmark) => `/?link=${bookmark.id}`));
 			const columns = await expectCanvas(page, page.locator('.groups .link-grid'));
 			await expectContinuousCells(page.locator('.groups .link-grid'), columns);
+			const searchFrameBox = (await searchFrame(page).boundingBox())!;
+			const inputBox = (await search(page).boundingBox())!;
+			expect(searchFrameBox.height).toBeGreaterThanOrEqual(48);
+			expect(inputBox.height).toBeGreaterThanOrEqual(44);
+			expect(inputBox.width).toBeGreaterThanOrEqual(44);
+			expect(inputBox.x).toBeGreaterThanOrEqual(searchFrameBox.x);
+			expect(inputBox.y).toBeGreaterThanOrEqual(searchFrameBox.y);
+			expect(inputBox.x + inputBox.width).toBeLessThanOrEqual(
+				searchFrameBox.x + searchFrameBox.width
+			);
+			expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(
+				searchFrameBox.y + searchFrameBox.height
+			);
 			if (width <= 414) {
 				expect(columns).toBe(3);
-				await expect(search(page)).toHaveCSS('width', `${width - 32}px`);
+				await expect(searchFrame(page)).toHaveCSS('width', `${width - 32}px`);
 			}
 			if (width >= 1280) expect(columns).toBe(8);
 			await search(page).fill('canvasfixture');
@@ -335,6 +349,7 @@ for (const width of [360, 390, 768, 1280, 1920, 2560]) {
 				['block', columns]
 			] as const) {
 				const tile = tiles.nth(index);
+				const motionSurface = tile.locator('.tile-icon');
 				const href = await tile.getAttribute('href');
 				const point = await paddingPoint(tile, edge);
 				expect(point.hit).toBe(href);
@@ -348,13 +363,15 @@ for (const width of [360, 390, 768, 1280, 1920, 2560]) {
 					if (filtered) {
 						await expect(tile.locator('.group-caption')).toHaveCSS('text-decoration-line', 'none');
 					}
-					await expect(tile.locator('img')).toHaveCSS(
+					await expect(tile.locator('img')).toHaveCSS('filter', 'none');
+					await expect(tile.locator('img')).toHaveCSS('transform', 'none');
+					await expect(motionSurface).toHaveCSS(
 						'filter',
 						colorScheme === 'light'
 							? 'drop-shadow(rgba(0, 0, 0, 0.24) 0px 6px 10px)'
 							: 'drop-shadow(rgba(255, 255, 255, 0.45) 0px 6px 10px)'
 					);
-					await expect(tile.locator('img')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
+					await expect(motionSurface).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
 					await expect(tiles.first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 				}
 				await page.mouse.click(point.x, point.y);

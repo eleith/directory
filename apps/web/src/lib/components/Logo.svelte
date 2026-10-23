@@ -52,6 +52,7 @@
 <style>
 	img {
 		display: block;
+		flex-shrink: 0;
 		object-fit: contain;
 		border-radius: var(--radius-sm);
 	}

@@ -382,8 +382,9 @@ for (const width of [360, 1280]) {
 			await expect(external).toBeFocused();
 			await expect(external).toHaveCSS(
 				'outline-color',
-				colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)'
+				await external.evaluate((node) => getComputedStyle(node).color)
 			);
+			await expect(external).toHaveCSS('outline-offset', '-2px');
 			expect(await dialog.evaluate((node) => node.parentElement === document.body)).toBe(true);
 			const box = (await dialog.boundingBox())!;
 			expect(box.x).toBeGreaterThanOrEqual(0);

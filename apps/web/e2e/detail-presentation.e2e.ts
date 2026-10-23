@@ -275,7 +275,9 @@ async function expectPresentation(content: Locator, primaryColor: string, intera
 			const hover = await chip.evaluate((node, primaryColor) => {
 				const style = getComputedStyle(node);
 				const card = getComputedStyle(node.closest('section.details')!).backgroundColor;
-				const source = node.classList.contains('access-tag') ? primaryColor : style.color;
+				const source = node.matches('.ui-button--access-chip, .ui-chip--access')
+					? primaryColor
+					: style.color;
 				const canvas = document.createElement('canvas').getContext('2d')!;
 				function rgb(value: string) {
 					canvas.fillStyle = value;
@@ -351,7 +353,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 				await expect(chip).toHaveAttribute('type', 'button');
 				await expect(chip).toHaveCSS('outline-style', 'solid');
 				await expect(chip).toHaveCSS('outline-width', '2px');
-				await expect(chip).toHaveCSS('outline-offset', '2px');
+				await expect(chip).toHaveCSS('outline-offset', '-2px');
 				await expect(chip).toHaveCSS('outline-color', primaryColor);
 				const chipBox = (await chip.boundingBox())!;
 				expect(chipBox.width).toBeGreaterThanOrEqual(24);

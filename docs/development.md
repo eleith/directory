@@ -317,6 +317,36 @@ public sign-in. The root records both `data-theme-preference` and the applied
 or server-side preference. Without JavaScript, CSS follows the OS and the button
 stays disabled.
 
+### Shared controls
+
+Visible controls live in `apps/web/src/lib/components/ui`: `Button`, `ButtonLink`,
+`Input` and `Chip`, with appearance and interaction states owned by `controls.css`.
+Feature components own behavior, labels, icons and placement—not duplicate hover,
+focus, pressed, disabled or field styling. Root semantic theme colors remain the
+palette source; no separate UI theme is introduced.
+
+Scoped styles belong with the component that renders the affected DOM. Use native
+layout wrappers for placement and animation, explicit presentation props for
+context-specific spacing, and forwarded headless-library attributes for semantics
+instead of reaching into child classes with `:global`. The class-prefixed shared
+UI stylesheet is intentionally shared; it does not style unrelated native elements.
+
+`Button` forwards native button attributes/events and defaults to `type="button"`;
+submit controls must opt in. `ButtonLink` retains a real caller-provided href,
+target and rel. Both expose a native `element` binding, including forwarded Bits
+Close attachments. Primary actions keep their validated foreground/background
+colors through all states; quiet/icon and chip controls use restrained fills.
+
+`Input` wraps its native input with optional leading/trailing snippets, forwarding
+id/name/ARIA/autocomplete/required/readonly/disabled and native events. Its `value`
+and `element` bindings refer to the actual string value and HTML input. The `class`
+prop belongs to the shell for layout hooks. Decorative leading content is an
+associated native label, so clicking it focuses the input without another handler.
+Only input focus highlights the shell; a trailing Clear button gets its own focus
+indicator, not a second field ring.
+`Chip` delegates interactive labels to Button and keeps informational labels as
+spans without scripting. Hidden form metadata remains a native hidden input.
+
 ### Progressive details
 
 Every tile retains a real `/?link=<id>` URL with speculative preloading disabled;
