@@ -319,20 +319,25 @@ stays disabled.
 
 ### Progressive details
 
-Every tile retains a real `/?link=<id>` URL with speculative preloading disabled.
-Direct entries render plain details and Back alongside the full grid, including
-without JavaScript. Dialog code is statically imported with the page, not fetched
-on first activation. After hydration, the enhancement replaces, rather than
-duplicates, plain details with a desktop dialog or phone sheet. With JavaScript
-disabled, the server-rendered links and plain details remain usable.
+Every tile retains a real `/?link=<id>` URL with speculative preloading disabled;
+a current search is preserved as `q`. Dialog code is statically imported with the
+page, not fetched on first activation. JavaScript-enabled direct entries show the
+directory before the dialog's entrance, rather than a wide detail preview. Plain
+details and Back live in native `noscript` content and remain usable when JavaScript
+is disabled.
 
-Kit 2 `pushState`/`replaceState` and typed `page.state` carry only the selected ID
-and a grid-entry marker. Local opens, closes and Back/Forward use the loaded
-snapshot, without a data request. A real navigation or refresh accepts a fresh
-server snapshot. Grid close goes back once; direct close safely replaces the URL
-with `/`. Bits owns trapping, dismissal and scroll lock, with focus returning to
-the connected activating tile or directory heading. Its default body portal
-inherits the configured accents naturally from the document root.
+Kit 2 `pushState`/`replaceState` and typed `page.state` carry the selected ID,
+grid-entry marker and current query. Local opens, closes and Back/Forward use the
+loaded snapshot, without a data request. A real navigation or refresh accepts a
+fresh server snapshot. Grid close goes back once; direct close removes `link` while
+preserving `q`. Bits owns trapping, dismissal, scroll lock and animation presence.
+The mounted dialog retains its last link/group through the exit, then returns
+focus after native animation completion. Backdrop fades take 150ms, phone slides
+200ms, and desktop fades 150ms in both directions; reduced motion disables them.
+Ordinary dismissal returns to the activating tile or heading. Chip selection
+instead applies its query to the destination directory entry and focuses Search
+after exit, not to the detail entry that is being popped. The body portal inherits
+the configured accents naturally from the document root.
 
 ### Local search
 
@@ -341,21 +346,43 @@ focus or input dynamically imports `lib/search/engine.ts`, the only runtime Fuse
 import. Empty focus quietly warms the engine without moving the full directory;
 refocusing an unchanged query retains its results and images. Nonempty query
 replacements publish results without an intervening grouped directory. Tile-only
-visits do not load search. Fuse.js 7.5.0's full build uses token
+visits do not load search unless the URL already contains a nonempty query. Normal
+text queries use Fuse.js 7.5.0's full-build token
 search with all query words required, independent of word order or field. The
 fixed threshold is 0.35 with location ignored; weights are title 4, prepared tags
 3, description 2 and remaining link-local public text 1. Unit fixtures cover
 ranking, typos, fragments, long queries and metadata boundaries.
 
+A leading `tag:` matches the entire trimmed remainder against one whole prepared
+tag, using `toLowerCase()` on both sides. Spaces, punctuation and further colons
+are literal. A leading `access:` accepts only `login`, `internal` or `admin`,
+matching `requires_auth`, `internal_only` or `admin_only` strictly equal to `true`.
+Both prefixes and access values are case-insensitive. Empty known-prefix values
+and invalid access values return zero results, never fuzzy fallback. Other prefixes
+and non-leading prefix text remain normal Fuse queries. There are no quote escapes,
+operators, stacked filters or free-text suffixes: each query selects one mode.
+Exact modes filter the existing allowlisted documents in prepared display order
+across groups, preserving original link references without mutating field data.
+
 The index includes only explicit bookmark text: title, prepared tags, description,
 ID, URL, group label and enabled advisory labels. Image references, private config
 and common site copy are not search content. One successful index is retained for
 the loaded snapshot ID; real navigation accepting a different snapshot rebuilds
-it. Search never requests new configuration. Queries are not saved or put in URLs.
+it. Search never requests new configuration. The visible query is represented by
+`q` in the URL: typing replaces the current entry, Clear removes it, and shared or
+reloaded queries activate search after hydration without taking focus. Typed
+`page.state.directoryQuery` carries the same query through Kit shallow history,
+whose APIs do not update `page.url`; real navigation falls back to the URL value.
+No local storage or server search is involved.
 
-Nonempty queries show flat ranked tiles with group captions. Empty/whitespace
-queries restore the original groups and order. Clear returns focus to the input;
-result counts, loading, no-results and failure messages are announced. A failed
+Nonempty queries show flat tiles with group captions, ranked for normal text and
+in prepared display order for exact prefixes. Selecting a detail chip closes details,
+replaces the current query with its `tag:` or `access:` query and focuses Search.
+Without JavaScript, chips remain informational. Empty/whitespace queries restore
+the original groups and order. Clear returns focus to the input;
+result counts, loading, no-results and failure messages are announced. Positive
+counts and keyboard help are screen-reader-only; loading, empty and failure
+messages remain visible without reserving a success-feedback gap. A failed
 import leaves the full grid usable and suggests reloading, without an automatic
 retry or reload loop. Without JavaScript the full HTML and detail URLs still work.
 Search remains a labelled native search field, not a selection popup. Enter opens
@@ -370,8 +397,9 @@ restores grouped browsing. IME composition and modified keys do not trigger thes
 commands. Detail activation is synchronous and uses the already-loaded dialog.
 Search is discovery, not access control: details always resolve against the full
 loaded directory. Shallow dialog history preserves query/results and returns
-focus to the activating tile, falling back to
-the directory heading when that result is no longer present.
+focus to the activating tile, falling back to the directory heading when that result
+is no longer present. Chip selection instead returns focus to Search with the new
+query. Access flags remain advisory; filtering does not enforce service access.
 
 ### Authentication boundary
 

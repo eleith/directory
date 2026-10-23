@@ -59,8 +59,9 @@ test('groups, bookmark titles and plain details work without JavaScript', async 
 		await page.locator('a[href="/?link=photos"]').click();
 		await expect(page).toHaveURL(`${server.url}/?link=photos`);
 		await expect(page.getByRole('heading', { name: 'Photos', exact: true })).toBeVisible();
-		await expect(page.getByText('Store your originals.', { exact: false })).toBeVisible();
-		await expect(page.getByText('Keep shared albums together.', { exact: false })).toBeVisible();
+		const details = page.getByRole('region', { name: 'Photos', exact: true });
+		await expect(details.getByText('Store your originals.', { exact: false })).toBeVisible();
+		await expect(details.getByText('Keep shared albums together.', { exact: false })).toBeVisible();
 		await expect(page.getByRole('list', { name: 'Tags' }).getByRole('listitem')).toHaveText([
 			'photos',
 			'backup'

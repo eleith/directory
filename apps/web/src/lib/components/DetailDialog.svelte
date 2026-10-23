@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick, untrack } from 'svelte';
 	import { Dialog } from 'bits-ui';
 	import IconX from 'virtual:icons/ph/x';
 	import type { DisplayLink } from '$lib/display/types.js';
@@ -8,66 +9,85 @@
 		link,
 		groupLabel,
 		onClose,
-		onReturnFocus
+		onReturnFocus,
+		onTagSearch
 	}: {
-		link: DisplayLink;
+		link?: DisplayLink | undefined;
 		groupLabel?: string | undefined;
 		onClose: () => void;
 		onReturnFocus: () => void;
+		onTagSearch: (query: string) => void;
 	} = $props();
 
+	let retainedDetails = $state<{ link: DisplayLink; groupLabel?: string | undefined } | undefined>(
+		untrack(() => (link ? { link, groupLabel } : undefined))
+	);
 	let dialogElement: HTMLElement | undefined = $state();
+
+	$effect.pre(() => {
+		if (link) retainedDetails = { link, groupLabel };
+	});
+
+	async function handleOpenChangeComplete(open: boolean) {
+		if (open || link || !retainedDetails) return;
+		retainedDetails = undefined;
+		await tick();
+		if (!link && !retainedDetails) onReturnFocus();
+	}
 </script>
 
 <Dialog.Root
 	bind:open={
-		() => true,
+		() => Boolean(link),
 		(open) => {
 			if (!open) onClose();
 		}
 	}
+	onOpenChangeComplete={handleOpenChangeComplete}
 >
 	<Dialog.Portal>
-		<Dialog.Overlay>
-			{#snippet child({ props })}
-				<div {...props} class="overlay"></div>
-			{/snippet}
-		</Dialog.Overlay>
-		<Dialog.Content
-			onOpenAutoFocus={(event) => {
-				const action = dialogElement?.querySelector<HTMLAnchorElement>('.open-service');
-				if (!action) return;
-				event.preventDefault();
-				action.focus();
-			}}
-			onCloseAutoFocus={(event) => {
-				event.preventDefault();
-				onReturnFocus();
-			}}
-		>
-			{#snippet child({ props })}
-				<section {...props} bind:this={dialogElement} class="details">
-					<div class="scroll-content">
-						<DetailContent {link} {groupLabel}>
-							{#snippet title(text)}
-								<Dialog.Title>
-									{#snippet child({ props: titleProps })}
-										<h2 {...titleProps}>{text}</h2>
-									{/snippet}
-								</Dialog.Title>
+		{#if retainedDetails}
+			{@const details = retainedDetails}
+			<Dialog.Overlay>
+				{#snippet child({ props })}
+					<div {...props} class="overlay"></div>
+				{/snippet}
+			</Dialog.Overlay>
+			<Dialog.Content
+				onOpenAutoFocus={(event) => {
+					const action = dialogElement?.querySelector<HTMLAnchorElement>('.open-service');
+					if (!action) return;
+					event.preventDefault();
+					action.focus();
+				}}
+				onCloseAutoFocus={(event) => {
+					event.preventDefault();
+				}}
+			>
+				{#snippet child({ props })}
+					<section {...props} bind:this={dialogElement} class="details" inert={!link}>
+						<div class="scroll-content">
+							<DetailContent link={details.link} groupLabel={details.groupLabel} {onTagSearch}>
+								{#snippet title(text)}
+									<Dialog.Title>
+										{#snippet child({ props: titleProps })}
+											<h2 {...titleProps}>{text}</h2>
+										{/snippet}
+									</Dialog.Title>
+								{/snippet}
+							</DetailContent>
+						</div>
+						<Dialog.Close>
+							{#snippet child({ props: closeProps })}
+								<button {...closeProps} class="close" aria-label="Close">
+									<IconX aria-hidden="true" focusable="false" />
+								</button>
 							{/snippet}
-						</DetailContent>
-					</div>
-					<Dialog.Close>
-						{#snippet child({ props: closeProps })}
-							<button {...closeProps} class="close" aria-label="Close">
-								<IconX aria-hidden="true" focusable="false" />
-							</button>
-						{/snippet}
-					</Dialog.Close>
-				</section>
-			{/snippet}
-		</Dialog.Content>
+						</Dialog.Close>
+					</section>
+				{/snippet}
+			</Dialog.Content>
+		{/if}
 	</Dialog.Portal>
 </Dialog.Root>
 
@@ -78,7 +98,14 @@
 		z-index: 10;
 		background: rgb(0 0 0 / 45%);
 		backdrop-filter: blur(3px);
+	}
+
+	.overlay[data-state='open'] {
 		animation: backdrop-fade-in 0.15s ease-out;
+	}
+
+	.overlay[data-state='closed'] {
+		animation: backdrop-fade-out 0.15s ease-in forwards;
 	}
 
 	.details {
@@ -96,7 +123,14 @@
 		box-shadow: 0 -8px 24px rgb(0 0 0 / 12%);
 		overflow: hidden;
 		overflow-wrap: anywhere;
+	}
+
+	.details[data-state='open'] {
 		animation: sheet-slide-up 0.2s ease-out;
+	}
+
+	.details[data-state='closed'] {
+		animation: sheet-slide-down 0.2s ease-in forwards;
 	}
 
 	.scroll-content {
@@ -144,7 +178,14 @@
 			transform: translate(-50%, -50%);
 			border-radius: var(--radius-card);
 			box-shadow: 0 1rem 3rem rgb(0 0 0 / 18%);
-			animation: none;
+		}
+
+		.details[data-state='open'] {
+			animation: card-fade-in 0.15s ease-out;
+		}
+
+		.details[data-state='closed'] {
+			animation: card-fade-out 0.15s ease-in forwards;
 		}
 	}
 
@@ -157,6 +198,15 @@
 		}
 	}
 
+	@keyframes backdrop-fade-out {
+		from {
+			opacity: 1;
+		}
+		to {
+			opacity: 0;
+		}
+	}
+
 	@keyframes sheet-slide-up {
 		from {
 			transform: translateY(100%);
@@ -166,9 +216,36 @@
 		}
 	}
 
+	@keyframes sheet-slide-down {
+		from {
+			transform: translateY(0);
+		}
+		to {
+			transform: translateY(100%);
+		}
+	}
+
+	@keyframes card-fade-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes card-fade-out {
+		from {
+			opacity: 1;
+		}
+		to {
+			opacity: 0;
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
-		.overlay,
-		.details {
+		.overlay[data-state],
+		.details[data-state] {
 			animation: none;
 		}
 	}

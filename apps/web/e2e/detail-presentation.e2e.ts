@@ -135,7 +135,7 @@ async function expectNoHorizontalOverflow(content: Locator) {
 	expect(overflow).toEqual({ page: false, panel: false, children: false });
 }
 
-async function expectPresentation(content: Locator, primaryColor: string) {
+async function expectPresentation(content: Locator, primaryColor: string, interactive = true) {
 	const identity = content.locator('.identity');
 	const image = identity.locator('img');
 	await expect(image).toHaveAttribute('width', '64');
@@ -204,7 +204,21 @@ async function expectPresentation(content: Locator, primaryColor: string) {
 	const destinationBox = (await destinationGroup.boundingBox())!;
 	expect(rowBox.y - destinationBox.y).toBeCloseTo(24, 0);
 	await expect(tags).toHaveCSS('list-style-type', 'none');
-	await expect(tags.locator('svg, img, a, button, input, [tabindex]')).toHaveCount(0);
+	await expect(tags.locator('svg, img, a, input, [tabindex]')).toHaveCount(0);
+	await expect(tags.locator('button.tag')).toHaveCount(interactive ? 5 : 0);
+	await expect(tags.locator('span.tag')).toHaveCount(interactive ? 0 : 5);
+	if (interactive) {
+		const names = [
+			'Filter by access: login',
+			'Filter by access: internal',
+			'Filter by access: admin',
+			'Filter by tag: family',
+			'Filter by tag: photographs'
+		];
+		for (const [index, name] of names.entries()) {
+			await expect(tags.getByRole('button').nth(index)).toHaveAccessibleName(name);
+		}
+	}
 	await expect(tags.getByRole('listitem')).toHaveText([
 		'login',
 		'internal',
@@ -213,7 +227,7 @@ async function expectPresentation(content: Locator, primaryColor: string) {
 		'photographs'
 	]);
 	await expect(tags.getByRole('listitem', { name: 'admin only', exact: true })).toHaveText('admin');
-	const chipColors = await metadata.locator('.metadata-group li').evaluateAll((chips) => {
+	const chipColors = await metadata.locator('.metadata-group .tag').evaluateAll((chips) => {
 		// Canvas resolves native CSS color expressions to sRGB for contrast measurements.
 		const context = document.createElement('canvas').getContext('2d')!;
 		function rgb(color: string) {
@@ -240,18 +254,47 @@ async function expectPresentation(content: Locator, primaryColor: string) {
 	expect(chipColors.slice(3)).toEqual(Array(2).fill(chipColors[3]));
 	expect(chipColors[0]!.background).not.toBe(chipColors[3]!.background);
 	for (const colors of chipColors) {
-		expect(colors.cursor).not.toBe('pointer');
+		expect(colors.cursor).toBe(interactive ? 'pointer' : 'auto');
 		expect(colors.borderWidth).toBe('1px');
 		expect(colors.borderStyle).toBe('solid');
 		expect(contrastRatio(colors.foreground, colors.background)).toBeGreaterThanOrEqual(4.5);
 		expect(contrastRatio(colors.border, colors.card)).toBeGreaterThanOrEqual(3);
 		expect(contrastRatio(colors.border, colors.background)).toBeGreaterThanOrEqual(3);
 	}
-	const firstChip = tags.getByRole('listitem').first();
-	const background = await firstChip.evaluate((node) => getComputedStyle(node).backgroundColor);
-	await firstChip.hover();
-	await expect(firstChip).toHaveCSS('background-color', background);
-	await expect(metadata.locator('.metadata-group').getByRole('button')).toHaveCount(0);
+	for (const index of [0, 3]) {
+		const chip = tags.locator('.tag').nth(index);
+		const background = await chip.evaluate((node) => getComputedStyle(node).backgroundColor);
+		await chip.hover({ position: { x: 4, y: 4 } });
+		await expect(chip).toHaveCSS('text-decoration-line', 'none');
+		await expect(chip).toHaveCSS('padding', '2px 12px');
+		await expect(chip).toHaveCSS('font-size', '14px');
+		expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(24);
+		if (interactive) {
+			await expect(chip).not.toHaveCSS('background-color', background);
+			await expect(chip).toHaveCSS('cursor', 'pointer');
+			const hover = await chip.evaluate((node, primaryColor) => {
+				const style = getComputedStyle(node);
+				const card = getComputedStyle(node.closest('section.details')!).backgroundColor;
+				const source = node.classList.contains('access-tag') ? primaryColor : style.color;
+				const canvas = document.createElement('canvas').getContext('2d')!;
+				function rgb(value: string) {
+					canvas.fillStyle = value;
+					canvas.fillRect(0, 0, 1, 1);
+					return [...canvas.getImageData(0, 0, 1, 1).data].slice(0, 3);
+				}
+				const point = node.getBoundingClientRect();
+				return {
+					actual: rgb(style.backgroundColor),
+					expected: rgb(`color-mix(in srgb, ${source} 22%, ${card})`),
+					hit: document.elementFromPoint(point.x + 4, point.y + 4) === node
+				};
+			}, primaryColor);
+			expect(hover.actual).toEqual(hover.expected);
+			expect(hover.hit).toBe(true);
+		} else {
+			await expect(chip).toHaveCSS('background-color', background);
+		}
+	}
 	await expect(metadata.locator('.metadata-group').getByRole('link')).toHaveCount(0);
 	return action;
 }
@@ -301,8 +344,33 @@ for (const colorScheme of ['light', 'dark'] as const) {
 			await expect(action).toHaveCSS('outline-width', '2px');
 			await page.keyboard.press('Tab');
 			await expect(close).toBeFocused();
+			const chips = await dialog.locator('button.tag').all();
+			for (const chip of chips) {
+				await page.keyboard.press('Tab');
+				await expect(chip).toBeFocused();
+				await expect(chip).toHaveAttribute('type', 'button');
+				await expect(chip).toHaveCSS('outline-style', 'solid');
+				await expect(chip).toHaveCSS('outline-width', '2px');
+				await expect(chip).toHaveCSS('outline-offset', '2px');
+				await expect(chip).toHaveCSS('outline-color', primaryColor);
+				const chipBox = (await chip.boundingBox())!;
+				expect(chipBox.width).toBeGreaterThanOrEqual(24);
+				expect(chipBox.height).toBeGreaterThanOrEqual(24);
+			}
 			await page.keyboard.press('Tab');
 			await expect(urlField).toBeFocused();
+			await page.keyboard.press('Tab');
+			await expect(action).toBeFocused();
+			await page.keyboard.press('Shift+Tab');
+			await expect(urlField).toBeFocused();
+			for (const chip of chips.toReversed()) {
+				await page.keyboard.press('Shift+Tab');
+				await expect(chip).toBeFocused();
+			}
+			await page.keyboard.press('Shift+Tab');
+			await expect(close).toBeFocused();
+			await page.keyboard.press('Shift+Tab');
+			await expect(action).toBeFocused();
 			const scroll = (await dialog.locator('.scroll-content').boundingBox())!;
 			const actionBox = (await action.boundingBox())!;
 			expect(actionBox.x - 4).toBeGreaterThanOrEqual(scroll.x - 1);
@@ -376,6 +444,11 @@ test('long summaries grow naturally and keep the autofocus action visible', asyn
 		await expect(close).toBeInViewport();
 		await page.keyboard.press('Shift+Tab');
 		await expect(dialog.getByRole('textbox', { name: 'Destination', exact: true })).toBeFocused();
+		for (const chip of (await dialog.locator('button.tag').all()).toReversed()) {
+			await page.keyboard.press('Shift+Tab');
+			await expect(chip).toBeFocused();
+			await expect(chip).toBeInViewport();
+		}
 		await page.keyboard.press('Shift+Tab');
 		await expect(close).toBeFocused();
 		await page.keyboard.press('Escape');
@@ -409,7 +482,7 @@ test('long unbroken tags wrap within the phone scrollport and keep actions reach
 		const tagGroup = dialog.locator('.metadata-group');
 		await tagGroup.scrollIntoViewIfNeeded();
 		await expect(tagGroup).toBeVisible();
-		const chip = tagGroup.getByRole('listitem').last();
+		const chip = tagGroup.locator('.tag').last();
 		await expect(chip).toHaveText(longTag.toLowerCase());
 		const chipBox = (await chip.boundingBox())!;
 		const lineHeight = await chip.evaluate((node) => parseFloat(getComputedStyle(node).lineHeight));
@@ -462,7 +535,7 @@ test('plain details share the presentation and action without JavaScript', async
 		const backBox = (await back.boundingBox())!;
 		const summaryBox = (await content.locator('.summary').boundingBox())!;
 		expect(summaryBox.y - backBox.y - backBox.height).toBeCloseTo(32, 0);
-		await expectPresentation(content, 'rgb(18, 52, 86)');
+		await expectPresentation(content, 'rgb(18, 52, 86)', false);
 	} finally {
 		await context.close();
 	}

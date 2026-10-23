@@ -23,6 +23,14 @@ Tab and Shift+Tab visit every result, with arrow keys as an optional shortcut.
 Escape returns to Search without losing the query. Escape in Search clears it. Search stays local
 to the loaded directory and is disabled without JavaScript; the full directory
 and real detail URLs still work.
+
+Use `tag:family photos` for an exact, case-insensitive whole tag, or `access:login`,
+`access:internal` and `access:admin` for enabled advisory flags, not access rules.
+Selecting a tag or access chip in details closes details and fills Search with that
+single query. Search is preserved in the URL's `q` parameter for sharing and reloads;
+Clear removes it and restores grouped browsing. Without JavaScript, chips remain
+informational and the full directory and plain details stay usable.
+
 The header theme button cycles System → Dark → Light → System and saves the
 choice in this browser. System follows OS changes; without JavaScript the OS
 scheme applies and the button stays disabled. Existing
@@ -83,7 +91,8 @@ empty and has no authentication. For the populated, authenticated preview that
 leaves operator configuration and media untouched, use [demo/README.md](demo/README.md).
 Groups, bookmark titles and `?link=<id>` details also render without JavaScript.
 The desktop dialog and phone sheet code loads with the page, so opening details
-has no additional code-loading wait. Plain details remain available without
+has no additional code-loading wait. Direct links animate in without a stretched
+preview, and closing plays the matching exit. Plain details remain available without
 JavaScript, with browser history and keyboard focus preserved after enhancement.
 `/healthz` returns generic readiness. Invalid auth environment settings stop startup
 with `auth_failed` and a fixed, value-free setting hint. Linux prerequisites,

@@ -36,6 +36,173 @@ function ids(search: ReturnType<typeof createSearch>, query: string) {
 	return search(query).map((result) => result.link.id);
 }
 
+describe('exact prefix search', () => {
+	it('matches whole prepared tags with case folding and trimmed query edges', () => {
+		const search = createSearch(
+			directory([
+				{
+					id: 'flat',
+					links: [
+						link('tagged', { tags: Object.freeze(['Family Photos', 'ops: status / v2!']) }),
+						link('longer', { tags: Object.freeze(['Family Photos archive']) }),
+						link('title', { title: 'Family Photos' }),
+						link('description', { description: 'Family Photos' })
+					]
+				}
+			])
+		);
+		expect(ids(search, ' \tTaG:  FAMILY PHOTOS \n')).toEqual(['tagged']);
+		expect(ids(search, 'tag:OPS: STATUS / V2!')).toEqual(['tagged']);
+		for (const query of ['tag:family', 'tag:photos', 'tag:family phots', 'tag:family  photos']) {
+			expect(search(query)).toEqual([]);
+		}
+	});
+
+	it('treats the entire tag remainder literally without quotes, operators or stacked prefixes', () => {
+		const search = createSearch(
+			directory([
+				{
+					id: 'flat',
+					links: [
+						link('photos', { tags: Object.freeze(['photos']), requires_auth: true }),
+						link('backup', { tags: Object.freeze(['backup']) }),
+						link('literal', {
+							tags: Object.freeze([
+								'photos access:login',
+								'photos OR backup',
+								'photos/backup',
+								'tag:photos',
+								'photos extra'
+							])
+						})
+					]
+				}
+			])
+		);
+		for (const query of [
+			'tag:photos access:login',
+			'tag:photos OR backup',
+			'tag:photos/backup',
+			'tag:tag:photos',
+			'tag:photos extra'
+		]) {
+			expect(ids(search, query)).toEqual(['literal']);
+		}
+		expect(search('tag:"photos"')).toEqual([]);
+		expect(search('tag:photos | backup')).toEqual([]);
+	});
+
+	it('matches only the corresponding true access boolean, not tags or other public text', () => {
+		const stringFlags = Object.freeze({
+			...link('string-flags'),
+			requires_auth: 'true',
+			internal_only: 'true',
+			admin_only: 'true'
+		}) as unknown as DisplayLink;
+		const search = createSearch(
+			directory([
+				{
+					id: 'flat',
+					links: [
+						link('login', { requires_auth: true }),
+						link('internal', { internal_only: true }),
+						link('admin', { admin_only: true }),
+						link('disabled'),
+						link('decoy', {
+							title: 'access:login access:internal access:admin',
+							description: 'Requires authentication Internal only Admin only',
+							tags: Object.freeze(['login', 'internal', 'admin', 'access:login'])
+						}),
+						stringFlags
+					]
+				}
+			])
+		);
+		expect(ids(search, ' AcCeSs: LOGIN ')).toEqual(['login']);
+		expect(ids(search, 'access:internal')).toEqual(['internal']);
+		expect(ids(search, 'access:admin')).toEqual(['admin']);
+	});
+
+	it('returns no results for empty known prefixes and invalid access values without fuzzy fallback', () => {
+		const search = createSearch(
+			directory([
+				{
+					id: 'flat',
+					links: [
+						link('decoy', { title: 'tag: access:owner', tags: Object.freeze(['']) }),
+						link('enabled', { requires_auth: true, internal_only: true, admin_only: true })
+					]
+				}
+			])
+		);
+		for (const query of [
+			'tag:',
+			' TAG: \t ',
+			'access:',
+			' ACCESS: \n ',
+			'access:owner',
+			'access:logn',
+			'access:login extra',
+			'access:login access:admin',
+			'access:login/admin',
+			'access:login OR admin',
+			'access:"login"'
+		]) {
+			expect(search(query)).toEqual([]);
+		}
+	});
+
+	it('leaves other prefixes and non-leading prefix text to normal Fuse search', () => {
+		const search = createSearch(
+			directory([
+				{
+					id: 'flat',
+					links: [
+						link('unknown', { title: 'topic:nebula' }),
+						link('embedded-tag', { title: 'notes tag:observatory' }),
+						link('embedded-access', { title: 'notes access:login' })
+					]
+				}
+			])
+		);
+		expect(ids(search, 'topic:nebula')).toEqual(['unknown']);
+		expect(ids(search, 'notes tag:observatory')).toEqual(['embedded-tag']);
+		expect(ids(search, 'notes access:login')).toEqual(['embedded-access']);
+	});
+
+	it('preserves prepared display order, original references and frozen inputs across groups', () => {
+		const bookmarks = Object.freeze([
+			link('zulu', { tags: Object.freeze(['Shared']), requires_auth: true }),
+			link('alpha', { tags: Object.freeze(['shared']), requires_auth: true }),
+			link('middle', { tags: Object.freeze(['SHARED']), requires_auth: true })
+		]);
+		const snapshot = directory(
+			Object.freeze([
+				Object.freeze({
+					id: 'first',
+					label: 'First group',
+					links: Object.freeze([bookmarks[0]!, bookmarks[1]!])
+				}),
+				Object.freeze({ id: 'second', links: Object.freeze([bookmarks[2]!]) })
+			])
+		);
+		const before = JSON.stringify(snapshot);
+		const search = createSearch(snapshot);
+		for (const query of ['tag:shared', 'access:login']) {
+			const results = search(query);
+			expect(results).toEqual([
+				{ link: bookmarks[0], groupLabel: 'First group' },
+				{ link: bookmarks[1], groupLabel: 'First group' },
+				{ link: bookmarks[2], groupLabel: undefined }
+			]);
+			for (const [index, result] of results.entries()) {
+				expect(result.link).toBe(bookmarks[index]);
+			}
+		}
+		expect(JSON.stringify(snapshot)).toBe(before);
+	});
+});
+
 describe('weighted full-build token search', () => {
 	it('ranks title above prepared tags, description and remaining public text', () => {
 		const search = createSearch(
@@ -151,7 +318,7 @@ describe('weighted full-build token search', () => {
 		expect(search('internal-group-identity')).toEqual([]);
 	});
 
-	it('indexes only the visible true advisory labels', () => {
+	it('indexes only the enabled true advisory labels', () => {
 		const search = createSearch(
 			directory([
 				{

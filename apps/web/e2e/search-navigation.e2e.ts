@@ -268,6 +268,7 @@ test('resizing with details open preserves dialog focus, query, URL and return r
 	await expectResultLayout(page, 8);
 	const tile = resultList(page).getByRole('link').nth(5);
 	const href = await tile.getAttribute('href');
+	expect(new URL(href!, server.url).searchParams.get('q')).toBe('navigationfixture');
 	const originalTile = await tile.elementHandle();
 	await tile.click();
 	const external = page.getByRole('dialog').getByRole('link', { name: /^Open / });
@@ -288,18 +289,24 @@ test('resizing with details open preserves dialog focus, query, URL and return r
 	await expectResultLayout(page, 3);
 	await expect(tile).toBeFocused();
 	expect(await tile.evaluate((node, original) => node === original, originalTile)).toBe(true);
-	await expect(page).toHaveURL(`${server.url}/`);
+	await expect(page).toHaveURL(`${server.url}/?q=navigationfixture`);
 	await expect(input(page)).toHaveValue('navigationfixture');
 	await page.goForward();
+	await expect(page).toHaveURL(server.url + href);
 	await expect(external).toBeFocused();
 	const close = page.getByRole('button', { name: 'Close', exact: true });
 	const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
 	await expect(destination).toHaveJSProperty('readOnly', true);
-	for (const control of [close, destination, external]) {
+	const tag = page.getByRole('button', {
+		name: 'Filter by tag: navigationfixture',
+		exact: true
+	});
+	for (const control of [close, tag, destination, external]) {
 		await page.keyboard.press('Tab');
 		await expect(control).toBeFocused();
 	}
 	await page.goBack();
+	await expect(page).toHaveURL(`${server.url}/?q=navigationfixture`);
 	await expect(tile).toBeFocused();
 });
 
@@ -310,6 +317,7 @@ test('filtered links preserve modifier/middle new tabs and native Enter details'
 	await openResults(page, 360);
 	const tile = resultList(page).getByRole('link').first();
 	const href = await tile.getAttribute('href');
+	expect(new URL(href!, server.url).searchParams.get('q')).toBe('navigationfixture');
 	await expect(tile).toHaveAttribute('data-sveltekit-preload-data', 'off');
 	const assets: string[] = [];
 	page.on('request', (request) => {
@@ -324,7 +332,7 @@ test('filtered links preserve modifier/middle new tabs and native Enter details'
 		const opened = await popup;
 		await expect(opened).toHaveURL(server.url + href);
 		await opened.close();
-		await expect(page).toHaveURL(`${server.url}/`);
+		await expect(page).toHaveURL(`${server.url}/?q=navigationfixture`);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
 	}
 	expect(assets).toEqual([]);
@@ -334,6 +342,7 @@ test('filtered links preserve modifier/middle new tabs and native Enter details'
 	await expect(page.getByRole('dialog')).toBeVisible();
 	expect(assets).toEqual([]);
 	await page.keyboard.press('Escape');
+	await expect(page).toHaveURL(`${server.url}/?q=navigationfixture`);
 	await expect(tile).toBeFocused();
 	await expect(input(page)).toHaveValue('navigationfixture');
 });

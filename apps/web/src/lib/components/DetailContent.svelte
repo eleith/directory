@@ -7,13 +7,29 @@
 	let {
 		link,
 		groupLabel,
-		title
+		title,
+		onTagSearch
 	}: {
 		link: DisplayLink;
 		groupLabel?: string | undefined;
 		title?: Snippet<[string]>;
+		onTagSearch?: (query: string) => void;
 	} = $props();
 </script>
+
+{#snippet chip(label: string, query: string, access = false)}
+	{#if onTagSearch}
+		<button
+			type="button"
+			class="tag"
+			class:access-tag={access}
+			aria-label={`Filter by ${access ? 'access' : 'tag'}: ${label}`}
+			onclick={() => onTagSearch?.(query)}>{label}</button
+		>
+	{:else}
+		<span class="tag" class:access-tag={access}>{label}</span>
+	{/if}
+{/snippet}
 
 <div class="details">
 	<div class="summary">
@@ -39,16 +55,16 @@
 			<div class="metadata-group">
 				<ul class="tags" aria-label="Tags">
 					{#if link.requires_auth}
-						<li class="access-tag">login</li>
+						<li>{@render chip('login', 'access:login', true)}</li>
 					{/if}
 					{#if link.internal_only}
-						<li class="access-tag">internal</li>
+						<li>{@render chip('internal', 'access:internal', true)}</li>
 					{/if}
 					{#if link.admin_only}
-						<li class="access-tag" aria-label="admin only">admin</li>
+						<li aria-label="admin only">{@render chip('admin', 'access:admin', true)}</li>
 					{/if}
 					{#each link.tags as tag, index (index)}
-						<li>{tag.toLowerCase()}</li>
+						<li>{@render chip(tag.toLowerCase(), `tag:${tag.toLowerCase()}`)}</li>
 					{/each}
 				</ul>
 			</div>
@@ -204,6 +220,15 @@
 
 	.tags li {
 		min-width: 0;
+	}
+
+	.tag {
+		display: block;
+		min-width: 0;
+		min-height: 24px;
+		max-width: 100%;
+		font: inherit;
+		text-align: start;
 		padding: var(--space-1) var(--space-4);
 		color: var(--color-text);
 		background: color-mix(in srgb, var(--color-text) 15%, var(--color-surface-card));
@@ -213,6 +238,23 @@
 
 	.tags .access-tag {
 		background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-card));
+	}
+
+	button.tag {
+		cursor: pointer;
+	}
+
+	button.tag:hover {
+		background: color-mix(in srgb, var(--color-text) 22%, var(--color-surface-card));
+	}
+
+	button.tag.access-tag:hover {
+		background: color-mix(in srgb, var(--color-primary) 22%, var(--color-surface-card));
+	}
+
+	button.tag:focus-visible {
+		outline: var(--outline-focus);
+		outline-offset: var(--space-1);
 	}
 
 	.open-service {

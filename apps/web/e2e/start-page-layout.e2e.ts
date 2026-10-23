@@ -177,8 +177,10 @@ async function expectCanvas(page: Page, grids: Locator) {
 	for (const clearance of clearances) {
 		expect(clearance.firstTileTop - clearance.headingBottom).toBeGreaterThanOrEqual(sizing.rem - 1);
 	}
+	const headerBox = await page.locator('main > header').boundingBox();
+	expect(firstTrack.top - headerBox!.y - headerBox!.height).toBeGreaterThanOrEqual(sizing.rem - 1);
 	const feedback = page.locator('.search-feedback');
-	if ((await feedback.innerText()).trim()) {
+	if (await feedback.locator('p:not(.visually-hidden)').count()) {
 		const feedbackBox = await feedback.boundingBox();
 		expect(firstTrack.top - feedbackBox!.y - feedbackBox!.height).toBeGreaterThanOrEqual(
 			sizing.rem - 1
@@ -396,6 +398,10 @@ for (const filtered of [false, true]) {
 			await expect(tileList.getByRole('link')).toHaveCount(32);
 		}
 		const tile = tileList.getByRole('link').nth(1);
+		await expect(tile).toHaveAttribute(
+			'href',
+			filtered ? '/?link=layout-0-1&q=canvasfixture' : '/?link=layout-0-1'
+		);
 		await expect(tile).toHaveAccessibleName(
 			filtered ? `${bookmarks[1]!.title} ${groups[0]!.label}` : bookmarks[1]!.title
 		);
@@ -412,7 +418,7 @@ for (const filtered of [false, true]) {
 			const opened = await popup;
 			await expect(opened).toHaveURL(server.url + (await tile.getAttribute('href')));
 			await opened.close();
-			await expect(page).toHaveURL(`${server.url}/`);
+			await expect(page).toHaveURL(filtered ? `${server.url}/?q=canvasfixture` : `${server.url}/`);
 			await expect(page.getByRole('dialog')).toHaveCount(0);
 		}
 	});
@@ -522,8 +528,8 @@ test('compact tiles keep heading and feedback clear of hover and focus surfaces'
 		const firstResult = results(page).getByRole('link').first();
 		await expect(firstResult).toBeVisible();
 		const resultBox = await firstResult.boundingBox();
-		const feedback = await page.locator('.search-feedback').boundingBox();
-		expect(resultBox!.y - 4 - feedback!.y - feedback!.height).toBeGreaterThanOrEqual(12);
+		const header = await page.locator('main > header').boundingBox();
+		expect(resultBox!.y - 4 - header!.y - header!.height).toBeGreaterThanOrEqual(12);
 	}
 });
 

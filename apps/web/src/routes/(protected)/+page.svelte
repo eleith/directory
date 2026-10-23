@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import IconSignOut from 'virtual:icons/ph/sign-out';
 	import { beforeNavigate, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -16,12 +17,15 @@
 
 	let { data }: { data: PageData } = $props();
 
+	// Kit shallow routing updates page.state, not page.url.
+	const searchQuery = $derived(page.state.directoryQuery ?? page.url.searchParams.get('q') ?? '');
 	let searchResults = $state<SearchResult[] | null>(null);
 	let searchStatus = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
 	let searchInput = $state<HTMLInputElement>();
 	let resultList = $state<HTMLUListElement>();
 	let mounted = $state(false);
 	let closing = false;
+	let pendingSearchQuery: string | undefined;
 	let returnTile: HTMLAnchorElement | undefined;
 	let directoryHeading: HTMLHeadingElement | undefined = $state();
 
@@ -30,14 +34,42 @@
 		if (page.state.directoryDetail) return page.state.directoryDetail.id;
 		return data.selectedLinkId;
 	});
+	const directoryURL = $derived.by(() => {
+		const parameters = new SvelteURLSearchParams();
+		if (searchQuery) parameters.set('q', searchQuery);
+		return parameters.size ? `/?${parameters}` : '/';
+	});
 	const selectedGroup = $derived(
 		data.directory.groups.find((group) => group.links.some((link) => link.id === selectedId))
 	);
 	const selectedLink = $derived(selectedGroup?.links.find((link) => link.id === selectedId));
 
+	$effect(() => {
+		if (selectedLink) {
+			closing = false;
+			pendingSearchQuery = undefined;
+		}
+	});
+
+	function setSearchQuery(query: string) {
+		if (query === searchQuery) return;
+		const parameters = new SvelteURLSearchParams();
+		if (selectedId !== null) parameters.set('link', selectedId);
+		if (query) parameters.set('q', query);
+		const url = parameters.size ? `/?${parameters}` : '/';
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Query URLs stay absolute in this root-only directory.
+		replaceState(url, { ...page.state, directoryQuery: query });
+	}
+
+	function detailURL(id: string) {
+		const parameters = new SvelteURLSearchParams({ link: id });
+		if (searchQuery) parameters.set('q', searchQuery);
+		return `/?${parameters}`;
+	}
+
 	function findResultLink(id: string) {
 		const links = resultList?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? [];
-		return Array.from(links).find((link) => link.getAttribute('href') === `/?link=${id}`);
+		return Array.from(links).find((link) => new URL(link.href).searchParams.get('link') === id);
 	}
 
 	function enterResults(activateSingle: boolean) {
@@ -96,6 +128,7 @@
 		const href = tile.href;
 		event.preventDefault();
 		returnTile = tile;
+		pendingSearchQuery = undefined;
 		closing = false;
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- This absolute href comes from the real tile anchor.
 		pushState(href, { ...page.state, directoryDetail: { id, fromGrid: true } });
@@ -109,10 +142,24 @@
 			return;
 		}
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute.
-		replaceState('/', { ...page.state, directoryDetail: null });
+		replaceState(directoryURL, { ...page.state, directoryDetail: null });
+	}
+
+	function searchByTag(query: string) {
+		if (closing) return;
+		pendingSearchQuery = query;
+		closeDetails();
 	}
 
 	function returnFocus() {
+		closing = false;
+		if (pendingSearchQuery !== undefined) {
+			const query = pendingSearchQuery;
+			pendingSearchQuery = undefined;
+			setSearchQuery(query);
+			searchInput?.focus();
+			return;
+		}
 		if (returnTile && !returnTile.isConnected) {
 			const id = new URL(returnTile.href).searchParams.get('link');
 			if (id) returnTile = findResultLink(id);
@@ -126,6 +173,7 @@
 
 	beforeNavigate(() => {
 		closing = false;
+		pendingSearchQuery = undefined;
 		returnTile = undefined;
 	});
 	onMount(() => {
@@ -133,7 +181,7 @@
 	});
 </script>
 
-<svelte:window onkeydown={focusSearch} onpopstate={() => (closing = false)} />
+<svelte:window onkeydown={focusSearch} />
 
 <svelte:head>
 	<title>{data.directory.site.title}</title>
@@ -158,6 +206,7 @@
 		</div>
 		<Search
 			directory={data.directory}
+			bind:query={() => searchQuery, setSearchQuery}
 			bind:results={searchResults}
 			bind:status={searchStatus}
 			bind:input={searchInput}
@@ -175,26 +224,29 @@
 		</div>
 	</header>
 
-	{#if selectedLink && mounted}
+	{#if mounted}
 		<DetailDialog
 			link={selectedLink}
 			groupLabel={selectedGroup?.label}
 			onClose={closeDetails}
 			onReturnFocus={returnFocus}
+			onTagSearch={searchByTag}
 		/>
 	{:else if selectedLink}
-		<section class="details" aria-labelledby="link-details-title">
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
-			<a class="back" href="/" data-sveltekit-preload-data="off">Back to directory</a>
-			<DetailContent link={selectedLink} groupLabel={selectedGroup?.label} />
-		</section>
+		<noscript>
+			<section class="details" aria-labelledby="link-details-title">
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
+				<a class="back" href={directoryURL} data-sveltekit-preload-data="off">Back to directory</a>
+				<DetailContent link={selectedLink} groupLabel={selectedGroup?.label} />
+			</section>
+		</noscript>
 	{/if}
 
 	{#snippet tile(link: DisplayLink, groupLabel: string | undefined, filtered = false)}
 		<!-- eslint-disable svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 		<a
 			class="tile"
-			href={`/?link=${link.id}`}
+			href={detailURL(link.id)}
 			data-sveltekit-preload-data="off"
 			onkeydown={filtered ? navigateResults : undefined}
 			onclick={(event) => openDetails(event, link.id)}
@@ -218,14 +270,14 @@
 				{#if searchResults.length === 0}
 					<p>No bookmarks found.</p>
 				{:else if searchResults.length === 1}
-					<p>1 bookmark found.</p>
+					<p class="visually-hidden">1 bookmark found.</p>
 				{:else}
-					<p>{searchResults.length} bookmarks found.</p>
+					<p class="visually-hidden">{searchResults.length} bookmarks found.</p>
 				{/if}
 			{/if}
 		</div>
 		{#if searchResults?.length}
-			<p id="search-keyboard-hint">
+			<p id="search-keyboard-hint" class="visually-hidden">
 				Use Tab or arrow keys to move, Enter for details, Escape to return to Search.
 			</p>
 		{/if}
@@ -349,7 +401,17 @@
 		font-size: var(--font-size-sm);
 	}
 
-	.search-feedback:has(p) {
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	.search-feedback:has(p:not(.visually-hidden)) {
 		margin-block-end: var(--space-5);
 	}
 

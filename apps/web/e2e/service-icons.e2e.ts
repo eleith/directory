@@ -160,14 +160,17 @@ for (const javaScriptEnabled of [true, false]) {
 }
 
 for (const abortFallback of [false, true]) {
-	test(`pre-hydration failure ${abortFallback ? 'stops after a failed fallback' : 'decodes one private fallback'} after page hydration`, async ({
+	test(`a service icon deferred until hydration ${abortFallback ? 'stops after a failed fallback' : 'decodes one private fallback'}`, async ({
 		page
 	}) => {
 		await writeFile(join(publicDir, 'service-a.svg'), 'not an image');
 		const app = await boot();
+		let serviceRequests = 0;
 		let fallbackRequests = 0;
 		page.on('request', (request) => {
-			if (new URL(request.url()).pathname === '/bookmarks/provided/logo') fallbackRequests++;
+			const path = new URL(request.url()).pathname;
+			if (path === sourceA) serviceRequests++;
+			if (path === '/bookmarks/provided/logo') fallbackRequests++;
 		});
 		if (abortFallback) await page.route('**/bookmarks/provided/logo', (route) => route.abort());
 		const hydration = Promise.withResolvers<void>();
@@ -180,24 +183,33 @@ for (const abortFallback of [false, true]) {
 		try {
 			await page.goto(`${app.url}/?link=provided`, { waitUntil: 'commit' });
 			const image = serviceImage(page);
-			await expect(image).toHaveAttribute('src', sourceA);
-			await expectBroken(image);
 			await expect.poll(() => heldDirectoryScript).toBe(true);
+			await expect(page.locator('a[href="/?link=provided"]')).toBeVisible();
+			await expect(image).toHaveCount(0);
+			await expect(page.locator('section.details img[width="24"]')).toHaveCount(0);
 			await expect(page.getByRole('dialog')).toHaveCount(0);
-			await expectControl(page, 'provided');
+			await expect(control(page)).toHaveCount(0);
+			expect(serviceRequests).toBe(0);
 			expect(fallbackRequests).toBe(0);
+			const failedPrimary = page.waitForResponse(
+				(response) => new URL(response.url()).pathname === sourceA
+			);
 			hydration.resolve();
+			expect((await failedPrimary).status()).toBe(404);
 			await expect(page.getByRole('dialog')).toBeVisible();
 			await expectControl(page, 'provided');
 			await expect(image).toHaveAttribute('src', '/bookmarks/provided/logo');
 			if (abortFallback) await expectBroken(image);
 			else await expectDecoded(image, '/bookmarks/provided/logo', 64);
+			await control(page).hover();
+			await expectControl(page, 'provided');
 			await page.evaluate(
 				() =>
 					new Promise<void>((resolve) =>
 						requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
 					)
 			);
+			expect(serviceRequests).toBe(1);
 			expect(fallbackRequests).toBe(1);
 		} finally {
 			hydration.resolve();

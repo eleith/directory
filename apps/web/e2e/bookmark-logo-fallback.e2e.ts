@@ -85,9 +85,11 @@ test.afterEach(async () => {
 });
 
 for (const view of ['card', 'details'] as const) {
-	test(`a ${view} primary that fails before hydration switches to its decoded fallback`, async ({
-		page
-	}) => {
+	const caption =
+		view === 'card'
+			? 'a card primary that fails before hydration switches to its decoded fallback'
+			: 'direct details defer their image until hydration, then decode the primary’s fallback';
+	test(caption, async ({ page }) => {
 		const hydration = Promise.withResolvers<void>();
 		let heldDirectoryScript = false;
 		await page.route(`**${directoryScript}`, async (route) => {
@@ -99,19 +101,31 @@ for (const view of ['card', 'details'] as const) {
 			await page.goto(`${server.url}/${view === 'details' ? '?link=broken' : ''}`, {
 				waitUntil: 'commit'
 			});
-			const image =
-				view === 'card'
-					? page.locator('a[href="/?link=broken"] img')
-					: page.locator('section.details img[width="64"]');
-			await expect(image).toHaveAttribute('src', '/public/primary-a.svg');
-			await expectBroken(image);
+			const cardImage = page.locator('a[href="/?link=broken"] img');
+			await expect(cardImage).toHaveAttribute('src', '/public/primary-a.svg');
+			await expectBroken(cardImage);
 			await expect.poll(() => heldDirectoryScript).toBe(true);
 			await expect(page.getByRole('dialog')).toHaveCount(0);
+			const detailsImage = page.locator('section.details img[width="64"]');
+			if (view === 'details') await expect(detailsImage).toHaveCount(0);
+			const image = view === 'card' ? cardImage : detailsImage;
 			const ssrImage = view === 'card' ? await image.elementHandle() : null;
 			try {
 				hydration.resolve();
 				if (view === 'details') await expect(page.getByRole('dialog')).toBeVisible();
 				await expectDecoded(image, '/bookmarks/broken/logo');
+				if (view === 'details') {
+					const dialog = page.getByRole('dialog');
+					await expect(dialog.getByText('The service is still available.')).toBeVisible();
+					const destination = dialog.getByRole('link', {
+						name: 'Open Broken primary (opens in a new tab)',
+						exact: true
+					});
+					await expect(destination).toBeVisible();
+					await expect(destination).toHaveAttribute('href', 'https://broken.example.test');
+					await expect(destination).toHaveAttribute('target', '_blank');
+					await expect(destination).toHaveAttribute('rel', 'noopener noreferrer');
+				}
 				if (ssrImage) {
 					expect(await image.evaluate((node, previous) => node === previous, ssrImage)).toBe(true);
 				}

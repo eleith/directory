@@ -67,7 +67,7 @@ async function finishRendering(page: Page) {
 	);
 }
 
-test('direct SSR retains the plain section while page hydration is delayed, then enhances once', async ({
+test('direct SSR keeps plain details in noscript without a visible card before hydration, then enhances once', async ({
 	page
 }) => {
 	const errors: string[] = [];
@@ -79,15 +79,15 @@ test('direct SSR retains the plain section while page hydration is delayed, then
 	try {
 		const response = await page.goto(`${server.url}/?link=alpha`, { waitUntil: 'commit' });
 		const html = await response!.text();
-		expect(html).toContain('Back to directory');
+		expect(html).toMatch(/<noscript\b[^>]*>[\s\S]*Back to directory[\s\S]*<\/noscript>/);
 		expect(html).not.toContain('role="dialog"');
 		const section = page.getByRole('region', { name: 'Alpha service', exact: true });
-		await expect(section).toBeVisible();
+		await expect(section).toHaveCount(0);
+		await expect(page.locator('section.details')).toHaveCount(0);
 		await expect(page.locator('.tile')).toHaveCount(2);
-		const baseline = await section.elementHandle();
 		await delayed.requested;
 		await finishRendering(page);
-		expect(await section.evaluate((node, previous) => node === previous, baseline)).toBe(true);
+		await expect(section).toHaveCount(0);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
 		await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeDisabled();
 		delayed.release();
@@ -231,7 +231,7 @@ test('direct close safely replaces the URL, keeps the baseline dismissed, and re
 });
 
 for (const entry of ['grid', 'direct']) {
-	test(`blocked client boot: ${entry} retains disabled controls and native SSR detail navigation`, async ({
+	test(`blocked client boot: ${entry} retains disabled controls and native grid URLs without plain details`, async ({
 		page
 	}) => {
 		let documents = 0;
@@ -249,7 +249,9 @@ for (const entry of ['grid', 'direct']) {
 			page.getByRole('button', { name: 'Switch to dark theme', exact: true })
 		).toBeDisabled();
 		if (entry === 'grid') await page.locator('a[href="/?link=beta"]').click();
-		await expect(page.getByRole('region', { name: 'Beta service', exact: true })).toBeVisible();
+		await expect(page).toHaveURL(`${server.url}/?link=beta`);
+		await expect(page.getByRole('region', { name: 'Beta service', exact: true })).toHaveCount(0);
+		await expect(page.locator('section.details')).toHaveCount(0);
 		await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeDisabled();
 		await expect(
 			page.getByRole('button', { name: 'Switch to dark theme', exact: true })
@@ -263,14 +265,16 @@ for (const entry of ['grid', 'direct']) {
 		);
 		expect(documents).toBe(entry === 'grid' ? 2 : 1);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
-		const back = page.getByRole('link', { name: 'Back to directory' });
-		await expect(back).toHaveAttribute('href', '/');
-		await expect(
-			page.getByRole('link', { name: 'Open Beta service (opens in a new tab)', exact: true })
-		).toHaveAttribute('href', 'https://beta.example.test/');
-		await back.click();
-		await expect(page).toHaveURL(`${server.url}/`);
-		await expect(page.getByRole('region', { name: 'Beta service', exact: true })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: 'Back to directory' })).toHaveCount(0);
+		const html = await (await server.fetch('/?link=beta')).text();
+		expect(html).toMatch(/<noscript\b[^>]*>[\s\S]*Back to directory[\s\S]*<\/noscript>/);
+		expect(html).toContain('href="https://beta.example.test/"');
+		const tile = page.locator('a[href="/?link=alpha"]');
+		await expect(tile).toHaveAttribute('data-sveltekit-preload-data', 'off');
+		await tile.click();
+		await expect(page).toHaveURL(`${server.url}/?link=alpha`);
+		await expect(page.getByRole('region', { name: 'Alpha service', exact: true })).toHaveCount(0);
+		await expect(page.locator('.tile')).toHaveCount(2);
 		expect(documents).toBe(entry === 'grid' ? 3 : 2);
 	});
 }
@@ -343,7 +347,9 @@ for (const width of [360, 1280]) {
 					await expect(dialog).toHaveCSS('animation-duration', '0.2s');
 					await expect(dialog).toHaveCSS('animation-timing-function', 'ease-out');
 				} else {
-					await expect(dialog).toHaveCSS('animation-name', 'none');
+					await expect(dialog).toHaveCSS('animation-name', /card-fade-in$/);
+					await expect(dialog).toHaveCSS('animation-duration', '0.15s');
+					await expect(dialog).toHaveCSS('animation-timing-function', 'ease-out');
 				}
 			}
 			await dialog.evaluate((node) =>
@@ -557,20 +563,19 @@ test('rapid A then B activation synchronously records both URLs and leaves B con
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('baseline Back remains native while hydration is pending and cannot reopen details afterward', async ({
+test('browser Back remains native while hydration is pending and cannot reopen details afterward', async ({
 	page
 }) => {
 	const delayed = await holdHydration(page);
 	try {
-		await page.goto(`${server.url}/?link=alpha`, { waitUntil: 'commit' });
+		await page.goto(server.url, { waitUntil: 'commit' });
 		await delayed.requested;
-		await expect(page.getByRole('region', { name: 'Alpha service', exact: true })).toBeVisible();
-		await Promise.all([
-			page.waitForURL(`${server.url}/`, { waitUntil: 'commit' }),
-			page
-				.getByRole('link', { name: 'Back to directory', exact: true })
-				.click({ noWaitAfter: true })
-		]);
+		await page.goto(`${server.url}/?link=alpha`, { waitUntil: 'commit' });
+		await expect(page.locator('.tile')).toHaveCount(2);
+		await expect(page.getByRole('region', { name: 'Alpha service', exact: true })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: 'Back to directory', exact: true })).toHaveCount(0);
+		await page.goBack({ waitUntil: 'commit' });
+		await expect(page).toHaveURL(`${server.url}/`);
 		delayed.release();
 		await hydrated(page);
 		await finishRendering(page);

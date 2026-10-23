@@ -20,19 +20,20 @@
 
 	let {
 		directory,
+		query = $bindable(''),
 		results = $bindable(null),
 		status = $bindable('idle'),
 		input = $bindable(),
 		onEnterResults
 	}: {
 		directory: DirectoryDisplay;
+		query?: string;
 		results: SearchResult[] | null;
 		status: 'idle' | 'loading' | 'ready' | 'failed';
 		input: HTMLInputElement | undefined;
 		onEnterResults: (activateSingle: boolean) => void;
 	} = $props();
 
-	let query = $state('');
 	let mounted = $state(false);
 	let macKeyboard = $state(false);
 	let navigating = $state(false);
@@ -107,9 +108,11 @@
 	});
 	afterNavigate(() => {
 		navigating = false;
+		if (query.trim()) activated = true;
 	});
 	onMount(() => {
 		macKeyboard = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+		activated = Boolean(query.trim());
 		mounted = true;
 		return () => {
 			mounted = false;

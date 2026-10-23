@@ -295,7 +295,7 @@ test('ranked flat tiles cover weighted metadata, real typos, unordered multiword
 	}
 	const result = page.locator('.tile');
 	await expect(result.locator('.group-caption')).toHaveText('amberquartz');
-	await expect(result).toHaveAttribute('href', '/?link=slug-observatory');
+	await expect(result).toHaveAttribute('href', '/?link=slug-observatory&q=admin+only');
 	await expect(result).toHaveAttribute('data-sveltekit-preload-data', 'off');
 	await expect(result.locator('img')).toHaveCSS('width', '64px');
 });
@@ -337,7 +337,7 @@ test('Enter opens the sole ready result through its real detail URL and retains 
 	const tile = page.getByRole('list', { name: 'Search results', exact: true }).getByRole('link');
 	const originalTile = await tile.elementHandle();
 	await searchInput(page).press('Enter');
-	await expect(page).toHaveURL(`${server.url}/?link=immich`);
+	await expect(page).toHaveURL(`${server.url}/?link=immich&q=backup`);
 	await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
 	await expect(
 		page.getByRole('link', { name: 'Open Immich (opens in a new tab)', exact: true })
@@ -369,16 +369,17 @@ for (const change of ['type', 'clear'] as const) {
 			input.dispatchEvent(new Event('input', { bubbles: true }));
 			return activatedURL;
 		}, change);
-		expect(activatedURL).toBe(`${server.url}/?link=immich`);
+		expect(activatedURL).toBe(`${server.url}/?link=immich&q=backup`);
 		await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
 		await expectTitles(page, change === 'type' ? ['Navidrome'] : originalTitles);
 		await expect(searchInput(page)).toHaveValue(change === 'type' ? 'drome' : '');
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
-		await expect(page).toHaveURL(`${server.url}/`);
-		await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+		await expect(page).toHaveURL(`${server.url}/?q=backup`);
+		await expect(page.locator('.tile')).toBeFocused();
+		await expect(searchInput(page)).toHaveValue('backup');
 		await finishRendering(page);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
-		await expectTitles(page, change === 'type' ? ['Navidrome'] : originalTitles);
+		await expectTitles(page, ['Immich']);
 		await searchInput(page).focus();
 		await expect(searchInput(page)).toBeFocused();
 	});
@@ -420,7 +421,7 @@ test('Enter with pending, zero or several results never activates stale details 
 			page.getByRole('list', { name: 'Search results', exact: true }).getByRole('link').first()
 		).toBeFocused();
 		await expect(page.getByRole('dialog')).toHaveCount(0);
-		await expect(page).toHaveURL(`${server.url}/`);
+		await expect(page).toHaveURL(`${server.url}/?q=amberquartz`);
 		expect(requested.filter((path) => path === engineScript)).toHaveLength(1);
 		expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
 		expect(requested.filter((path) => path.includes('__data.json'))).toEqual([]);
@@ -466,7 +467,7 @@ test('IME and modified input keys leave activation, editing and clearing alone',
 		1
 	);
 	await expect(page.getByRole('dialog')).toHaveCount(0);
-	await expect(page).toHaveURL(`${server.url}/`);
+	await expect(page).toHaveURL(`${server.url}/?q=backup`);
 	expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
 	expect(requested.filter((path) => path.includes('__data.json'))).toEqual([]);
 	await searchInput(page).press('Escape');
@@ -500,7 +501,7 @@ test('search and dialog history retain query, ranked results and connected retur
 	await expectTitles(page, ['Immich']);
 	expect(await tile.evaluate((node, previous) => node === previous, originalTile)).toBe(true);
 	expect(dataRequests).toEqual([]);
-	await navigateQuery(page, '/?link=navidrome');
+	await navigateQuery(page, '/?link=navidrome&q=backup');
 	await expect(page.getByRole('dialog', { name: 'Navidrome', exact: true })).toBeVisible();
 	await expect(searchInput(page)).toHaveValue('backup');
 	await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -568,7 +569,7 @@ for (const state of ['loading', 'loaded']) {
 				await searchInput(page).fill('backup');
 				await expectTitles(page, ['Immich']);
 			}
-			await navigateQuery(page, '/?link=navidrome');
+			await navigateQuery(page, '/?link=navidrome&q=backup');
 			await expect(page.getByRole('dialog', { name: 'Navidrome', exact: true })).toBeVisible();
 			delayed?.release();
 			await expectTitles(page, ['Paperless']);
@@ -628,6 +629,8 @@ for (const entry of ['grid', 'direct']) {
 		}
 		await searchInput(page).fill('backup');
 		await expect(page.getByRole('status')).toHaveText('Search unavailable. Reload to try again.');
+		await expect(page.getByRole('status').locator('p')).toBeVisible();
+		await expect(page.getByRole('status').locator('p')).toHaveCSS('clip-path', 'none');
 		await expect(page.getByRole('list', { name: 'Search results', exact: true })).toHaveCount(0);
 		await expect(page.locator('.groups').getByRole('list')).toHaveCount(4);
 		await expectTitles(page, originalTitles);
@@ -635,7 +638,9 @@ for (const entry of ['grid', 'direct']) {
 		await finishRendering(page);
 		expect(chunks).toBe(1);
 		expect(documents).toBe(1);
-		await page.locator('a[href="/?link=navidrome"]').click();
+		const fallbackTile = page.locator('a[href^="/?link=navidrome"]');
+		await expect(fallbackTile).toHaveAttribute('href', '/?link=navidrome&q=backup');
+		await fallbackTile.click();
 		await expect(page.getByRole('dialog', { name: 'Navidrome', exact: true })).toBeVisible();
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
 		const status = page.getByRole('status');
@@ -703,7 +708,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
 					).toBe(true);
-					await page.locator('a[href="/?link=immich"]').click();
+					const tile = page.locator('a[href^="/?link=immich"]');
+					await expect(tile).toHaveAttribute(
+						'href',
+						javaScriptEnabled ? '/?link=immich&q=backup' : '/?link=immich'
+					);
+					await tile.click();
 					if (javaScriptEnabled) {
 						await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
 						await page.getByRole('button', { name: 'Close', exact: true }).click();

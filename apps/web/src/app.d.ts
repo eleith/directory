@@ -11,6 +11,7 @@ declare global {
 
 	namespace App {
 		interface PageState {
+			directoryQuery?: string;
 			directoryDetail?: { id: string; fromGrid: boolean } | null;
 		}
 

@@ -49,6 +49,25 @@ export function createSearch(directory: DirectoryDisplay) {
 	return (query: string): SearchResult[] => {
 		const trimmedQuery = query.trim();
 		if (!trimmedQuery) return [];
+		const foldedQuery = trimmedQuery.toLowerCase();
+		if (foldedQuery.startsWith('tag:')) {
+			const tag = foldedQuery.slice(4).trim();
+			if (!tag) return [];
+			return documents
+				.filter((document) => document.tags.some((label) => label.toLowerCase() === tag))
+				.map((document) => document.result);
+		}
+		if (foldedQuery.startsWith('access:')) {
+			const access = foldedQuery.slice(7).trim();
+			return documents
+				.filter(({ result }) => {
+					if (access === 'login') return result.link.requires_auth === true;
+					if (access === 'internal') return result.link.internal_only === true;
+					if (access === 'admin') return result.link.admin_only === true;
+					return false;
+				})
+				.map((document) => document.result);
+		}
 		return index.search(trimmedQuery).map((match) => match.item.result);
 	};
 }
