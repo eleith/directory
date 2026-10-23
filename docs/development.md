@@ -487,9 +487,14 @@ on state-changing requests independent of content type. Auth.js uses its standar
 `AUTH_URL` setting for callback/action URLs. Session handling uses the native
 SvelteKit event and cookie context; only submitted form fields are allowlisted. Native CSP protects scripts and framing;
 it does not restrict form redirects to self, because Chromium would block the
-OIDC redirect to the identity provider. Referrer policy follows When's
-`strict-origin-when-cross-origin`, preserving form Origin headers without leaking
-directory paths to another origin. Cookie security uses the native Auth.js and
+OIDC redirect to the identity provider. Responses returned through the outer
+application hook receive `nosniff` and `strict-origin-when-cross-origin` headers in
+both authenticated and open-access modes, including auth redirects and denials.
+Kit-generated responses outside that hook, such as slash normalization, early CSRF
+rejections and conditional 304s, are not covered by this policy. Referrer policy
+preserves form Origin headers without leaking directory paths to another origin.
+This baseline does not change authentication's private/no-store caching or
+adapter-served static asset caching. Cookie security uses the native Auth.js and
 SvelteKit defaults for HTTPS and HTTP localhost.
 
 Server diagnostics use **tslog 5.2.0**: JSON in production and pretty output in

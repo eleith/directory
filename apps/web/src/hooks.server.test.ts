@@ -159,6 +159,8 @@ describe('server hooks', () => {
 		const unavailable = await hooks.handle({ event: event(), resolve });
 		expect(unavailable.status).toBe(503);
 		expect(unavailable.headers.get('cache-control')).toBe('no-store');
+		expect(unavailable.headers.get('x-content-type-options')).toBe('nosniff');
+		expect(unavailable.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
 		expect(await unavailable.text()).toBe('Service unavailable');
 		expect(resolve).not.toHaveBeenCalled();
 		expect(ready.directory.currentSnapshot).not.toHaveBeenCalled();
@@ -199,6 +201,56 @@ describe('server hooks', () => {
 		expect(resolve).not.toHaveBeenCalled();
 	});
 
+	it.each(['none', 'credentials', 'oidc'] as const)(
+		'applies baseline response headers without changing status, body, cookies or caching (%s)',
+		async (strategy) => {
+			let authentication: Authentication | undefined;
+			if (strategy !== 'none') {
+				authentication = {
+					strategy,
+					handle: ({ event, resolve }) => resolve(event),
+					signIn: vi.fn<Authentication['signIn']>(),
+					signOut: vi.fn<Authentication['signOut']>()
+				};
+			}
+			mocks.boot.mockResolvedValueOnce(application('Ready', authentication));
+			const hooks = await import('./hooks.server.js');
+			await hooks.init();
+			const headers = new Headers({
+				'content-type': 'text/html',
+				'cache-control': 'public, max-age=60',
+				etag: '"unchanged"'
+			});
+			headers.append('set-cookie', 'one=opaque; Path=/; HttpOnly');
+			headers.append('set-cookie', 'two=opaque; Path=/; HttpOnly');
+			const responses = [
+				new Response('<p>Ready</p>', { headers }),
+				Response.json({ ready: true }),
+				Response.redirect('https://directory.example/signin', 303),
+				new Response(null, {
+					status: 304,
+					statusText: 'Not Modified',
+					headers: { etag: '"cached"' }
+				})
+			];
+			for (const original of responses) {
+				const body = await original.clone().text();
+				const resolve = vi.fn<Resolve>().mockResolvedValue(original);
+				const response = await hooks.handle({ event: event(), resolve });
+				expect(response.status).toBe(original.status);
+				expect(response.statusText).toBe(original.statusText);
+				expect(await response.text()).toBe(body);
+				expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+				expect(response.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+				expect(response.headers.getSetCookie()).toEqual(original.headers.getSetCookie());
+				for (const name of ['content-type', 'cache-control', 'etag', 'location']) {
+					expect(response.headers.get(name)).toBe(original.headers.get(name));
+				}
+				expect(resolve).toHaveBeenCalledOnce();
+			}
+		}
+	);
+
 	it.each(['credentials', 'oidc'] as const)(
 		'forwards enabled %s auth to its boot-owned native pipeline after setting locals',
 		async (strategy) => {
@@ -223,7 +275,11 @@ describe('server hooks', () => {
 			await hooks.init();
 			const request = event();
 			const resolve = vi.fn<Resolve>();
-			expect(await hooks.handle({ event: request, resolve })).toBe(response);
+			const result = await hooks.handle({ event: request, resolve });
+			expect(result.status).toBe(401);
+			expect(await result.text()).toBe('Native pipeline');
+			expect(result.headers.get('x-content-type-options')).toBe('nosniff');
+			expect(result.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
 			expect(authentication.handle).toHaveBeenCalledExactlyOnceWith({
 				event: expect.objectContaining({ locals: request.locals }),
 				resolve: expect.any(Function)

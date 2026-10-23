@@ -127,7 +127,6 @@ describe('bookmark logo API access', () => {
 			);
 			expect(response.status).toBe(401);
 			expect(response.headers.get('cache-control')).toBe('private, no-store');
-			expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 		}
 		expect(mocks.resolve).not.toHaveBeenCalled();
 	});
@@ -177,7 +176,6 @@ describe('mounted image access', () => {
 				expect(response.status).toBe(401);
 				expect(response.headers.has('location')).toBe(false);
 				expect(response.headers.get('cache-control')).toBe('private, no-store');
-				expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 			}
 			expect(mocks.resolve).not.toHaveBeenCalled();
 		}
@@ -422,18 +420,16 @@ describe('whole-directory gate', () => {
 		);
 	});
 
-	it('adds private security headers to immutable SDK redirects', async () => {
+	it('adds private caching and safe locations to immutable SDK redirects', async () => {
 		mocks.handle.mockResolvedValue(
 			Response.redirect(`${origin}/signin?error=RawSDKCode&code=secret`, 302)
 		);
 		const response = await responseFor(eventFor('/signin'));
 		expect(response.headers.get('cache-control')).toBe('private, no-store');
-		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
-		expect(response.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
 		expect(response.headers.get('location')).toBe('/signin?callbackUrl=%2F&error=signin');
 	});
 
-	it('preserves multiple native SDK cookie headers when adding security headers', async () => {
+	it('preserves multiple native SDK cookie headers when applying private caching', async () => {
 		const headers = new Headers({ location: '/' });
 		headers.append('set-cookie', 'one=opaque; Path=/; HttpOnly');
 		headers.append('set-cookie', 'two=opaque; Path=/; HttpOnly');
