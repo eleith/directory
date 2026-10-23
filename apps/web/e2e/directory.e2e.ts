@@ -74,10 +74,10 @@ test('groups, bookmark titles and plain details work without JavaScript', async 
 		await page.getByRole('link', { name: 'Back to directory' }).click();
 		await expect(page).toHaveURL(`${server.url}/`);
 		await page.goto(`${server.url}/?link=router`);
-		for (const label of ['Requires authentication', 'Internal only', 'Admin only']) {
-			await expect(page.getByText(label, { exact: true })).toBeVisible();
-		}
-		await expect(page.getByRole('list', { name: 'Tags' })).toHaveCount(0);
+		const tags = page.getByRole('list', { name: 'Tags' });
+		await expect(tags).toHaveCount(1);
+		await expect(tags.getByRole('listitem')).toHaveText(['login', 'internal', 'admin']);
+		await expect(tags.getByRole('listitem').last()).toHaveAccessibleName('admin only');
 		await expect(page.locator('a[href="/?link=photos"]')).toBeVisible();
 	} finally {
 		await context.close();

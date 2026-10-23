@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page, type Request } from '@playwright/test';
 import {
 	clientManifest,
-	dialogScript,
+	directoryScript,
 	eagerClientFiles,
 	navigateQuery,
 	staticClientFiles
@@ -127,12 +127,14 @@ async function finishRendering(page: Page) {
 	);
 }
 
-test('full Fuse engine is outside eager and dialog graphs; only search focus loads it once', async ({
+test('full Fuse engine is outside the eager directory/dialog graph; only search focus loads it once', async ({
 	page
 }) => {
 	for (const file of engineFiles) {
 		expect(eagerClientFiles.has(file)).toBe(false);
-		expect(staticClientFiles(['src/lib/components/DetailDialog.svelte']).has(file)).toBe(false);
+		expect(staticClientFiles(['.svelte-kit/generated/client-optimized/nodes/2.js']).has(file)).toBe(
+			false
+		);
 	}
 	const engineSource = readFileSync(
 		new URL(`../.svelte-kit/output/client${engineScript}`, import.meta.url),
@@ -156,7 +158,7 @@ test('full Fuse engine is outside eager and dialog graphs; only search focus loa
 	await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
 	await page.getByRole('button', { name: 'Close', exact: true }).click();
 	for (const file of engineFiles) expect(requested).not.toContain('/' + file);
-	const dialogRequests = requested.filter((path) => path === dialogScript).length;
+	expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
 	await searchInput(page).focus();
 	await expect.poll(() => requested.filter((path) => path === engineScript).length).toBe(1);
 	await searchInput(page).fill('backup');
@@ -167,7 +169,7 @@ test('full Fuse engine is outside eager and dialog graphs; only search focus loa
 	await searchInput(page).fill('drome');
 	await expectTitles(page, ['Navidrome']);
 	expect(requested.filter((path) => path === engineScript)).toHaveLength(1);
-	expect(requested.filter((path) => path === dialogScript)).toHaveLength(dialogRequests);
+	expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
 });
 
 test('empty focus quietly warms search without moving or reloading the full directory', async ({
@@ -338,7 +340,7 @@ test('Enter opens the sole ready result through its real detail URL and retains 
 	await expect(page).toHaveURL(`${server.url}/?link=immich`);
 	await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
 	await expect(
-		page.getByRole('link', { name: 'Open service (opens in a new tab)', exact: true })
+		page.getByRole('link', { name: 'Open Immich (opens in a new tab)', exact: true })
 	).toHaveAttribute('href', 'https://photos.example.test/');
 	await page.keyboard.press('Escape');
 	await expect(tile).toBeFocused();
@@ -351,38 +353,38 @@ test('Enter opens the sole ready result through its real detail URL and retains 
 });
 
 for (const change of ['type', 'clear'] as const) {
-	test(`query ${change} cancels a sole-result Enter waiting for the dialog chunk`, async ({
+	test(`sole-result Enter activates immediately before query ${change}, with no deferred reopen`, async ({
 		page
 	}) => {
-		const delayed = await holdChunk(page, dialogScript);
-		try {
-			await openGrid(page);
-			await searchInput(page).fill('backup');
-			await expectTitles(page, ['Immich']);
-			await searchInput(page).press('Enter');
-			await delayed.requested;
-			await expect(searchInput(page)).toBeFocused();
-			if (change === 'type') {
-				await searchInput(page).fill('drome');
-				await expectTitles(page, ['Navidrome']);
-			} else {
-				await page.getByRole('button', { name: 'Clear search', exact: true }).click();
-				await expectTitles(page, originalTitles);
-			}
-			delayed.release();
-			await delayed.settled;
-			await finishRendering(page);
-			await expect(page.getByRole('dialog')).toHaveCount(0);
-			await expect(page).toHaveURL(`${server.url}/`);
-			await expect(searchInput(page)).toBeFocused();
-		} finally {
-			delayed.release();
-			await page.unrouteAll({ behavior: 'wait' });
-		}
+		await openGrid(page);
+		await searchInput(page).fill('backup');
+		await expectTitles(page, ['Immich']);
+		// Same-task input changes exercise ordering without trying to edit behind an active focus trap.
+		const activatedURL = await searchInput(page).evaluate((input: HTMLInputElement, change) => {
+			input.dispatchEvent(
+				new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+			);
+			const activatedURL = location.href;
+			input.value = change === 'type' ? 'drome' : '';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			return activatedURL;
+		}, change);
+		expect(activatedURL).toBe(`${server.url}/?link=immich`);
+		await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
+		await expectTitles(page, change === 'type' ? ['Navidrome'] : originalTitles);
+		await expect(searchInput(page)).toHaveValue(change === 'type' ? 'drome' : '');
+		await page.getByRole('button', { name: 'Close', exact: true }).click();
+		await expect(page).toHaveURL(`${server.url}/`);
+		await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+		await finishRendering(page);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+		await expectTitles(page, change === 'type' ? ['Navidrome'] : originalTitles);
+		await searchInput(page).focus();
+		await expect(searchInput(page)).toBeFocused();
 	});
 }
 
-test('Enter with pending, zero or several results never imports details or activates stale results', async ({
+test('Enter with pending, zero or several results never activates stale details or fetches data', async ({
 	page
 }) => {
 	const delayed = await holdEngine(page);
@@ -418,7 +420,10 @@ test('Enter with pending, zero or several results never imports details or activ
 			page.getByRole('list', { name: 'Search results', exact: true }).getByRole('link').first()
 		).toBeFocused();
 		await expect(page.getByRole('dialog')).toHaveCount(0);
-		expect(requested).not.toContain(dialogScript);
+		await expect(page).toHaveURL(`${server.url}/`);
+		expect(requested.filter((path) => path === engineScript)).toHaveLength(1);
+		expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
+		expect(requested.filter((path) => path.includes('__data.json'))).toEqual([]);
 	} finally {
 		delayed.release();
 		await page.unrouteAll({ behavior: 'wait' });
@@ -460,7 +465,10 @@ test('IME and modified input keys leave activation, editing and clearing alone',
 	expect(await searchInput(page).evaluate((input: HTMLInputElement) => input.selectionStart)).toBe(
 		1
 	);
-	expect(requested).not.toContain(dialogScript);
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	await expect(page).toHaveURL(`${server.url}/`);
+	expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
+	expect(requested.filter((path) => path.includes('__data.json'))).toEqual([]);
 	await searchInput(page).press('Escape');
 	await expectTitles(page, originalTitles);
 	await expect(searchInput(page)).toHaveValue('');
@@ -612,8 +620,12 @@ for (const entry of ['grid', 'direct']) {
 			chunks++;
 			return route.abort();
 		});
-		if (entry === 'direct') await page.route(`**${dialogScript}`, (route) => route.abort());
 		await openGrid(page, `${server.url}/${entry === 'direct' ? '?link=navidrome' : ''}`);
+		if (entry === 'direct') {
+			await expect(page.getByRole('dialog', { name: 'Navidrome', exact: true })).toBeVisible();
+			await page.getByRole('button', { name: 'Close', exact: true }).click();
+			await expect(page).toHaveURL(`${server.url}/`);
+		}
 		await searchInput(page).fill('backup');
 		await expect(page.getByRole('status')).toHaveText('Search unavailable. Reload to try again.');
 		await expect(page.getByRole('list', { name: 'Search results', exact: true })).toHaveCount(0);
@@ -623,16 +635,9 @@ for (const entry of ['grid', 'direct']) {
 		await finishRendering(page);
 		expect(chunks).toBe(1);
 		expect(documents).toBe(1);
-		if (entry === 'direct') {
-			await expect(page.getByRole('region', { name: 'Navidrome', exact: true })).toBeVisible();
-			await expect(
-				page.getByRole('link', { name: 'Back to directory', exact: true })
-			).toBeVisible();
-		} else {
-			await page.locator('a[href="/?link=navidrome"]').click();
-			await expect(page.getByRole('dialog', { name: 'Navidrome', exact: true })).toBeVisible();
-			await page.getByRole('button', { name: 'Close', exact: true }).click();
-		}
+		await page.locator('a[href="/?link=navidrome"]').click();
+		await expect(page.getByRole('dialog', { name: 'Navidrome', exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Close', exact: true }).click();
 		const status = page.getByRole('status');
 		await status.evaluate((node) => {
 			const observer = new MutationObserver(() => {
@@ -690,6 +695,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
 						).toBeInViewport();
 					} else {
 						await expect(searchInput(page)).toBeDisabled();
+						await expect(
+							page.getByRole('button', { name: 'Switch to dark theme', exact: true })
+						).toBeDisabled();
 						await expectTitles(page, originalTitles);
 					}
 					expect(

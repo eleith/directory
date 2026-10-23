@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { dialogScript } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const configuration = `site:
@@ -271,8 +270,8 @@ test('resizing with details open preserves dialog focus, query, URL and return r
 	const href = await tile.getAttribute('href');
 	const originalTile = await tile.elementHandle();
 	await tile.click();
-	const close = page.getByRole('button', { name: 'Close', exact: true });
-	await expect(close).toBeFocused();
+	const external = page.getByRole('dialog').getByRole('link', { name: /^Open / });
+	await expect(external).toBeFocused();
 	await page.setViewportSize({ width: 360, height: 900 });
 	const hiddenResults = page.locator('.groups ul.link-grid');
 	await expect(hiddenResults.locator('li')).toHaveCount(13);
@@ -281,7 +280,7 @@ test('resizing with details open preserves dialog focus, query, URL and return r
 			hiddenResults.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
 		)
 		.toBe(3);
-	await expect(close).toBeFocused();
+	await expect(external).toBeFocused();
 	await expect(page).toHaveURL(server.url + href);
 	await expect(input(page)).toHaveValue('navigationfixture');
 	expect(await originalTile!.evaluate((node) => node.isConnected)).toBe(true);
@@ -292,7 +291,14 @@ test('resizing with details open preserves dialog focus, query, URL and return r
 	await expect(page).toHaveURL(`${server.url}/`);
 	await expect(input(page)).toHaveValue('navigationfixture');
 	await page.goForward();
-	await expect(close).toBeFocused();
+	await expect(external).toBeFocused();
+	const close = page.getByRole('button', { name: 'Close', exact: true });
+	const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
+	await expect(destination).toHaveJSProperty('readOnly', true);
+	for (const control of [close, destination, external]) {
+		await page.keyboard.press('Tab');
+		await expect(control).toBeFocused();
+	}
 	await page.goBack();
 	await expect(tile).toBeFocused();
 });
@@ -305,9 +311,9 @@ test('filtered links preserve modifier/middle new tabs and native Enter details'
 	const tile = resultList(page).getByRole('link').first();
 	const href = await tile.getAttribute('href');
 	await expect(tile).toHaveAttribute('data-sveltekit-preload-data', 'off');
-	const chunks: string[] = [];
+	const assets: string[] = [];
 	page.on('request', (request) => {
-		if (request.url().endsWith(dialogScript)) chunks.push(request.url());
+		if (['script', 'stylesheet'].includes(request.resourceType())) assets.push(request.url());
 	});
 	for (const options of [
 		{ modifiers: ['Control'] as ['Control'] },
@@ -321,11 +327,12 @@ test('filtered links preserve modifier/middle new tabs and native Enter details'
 		await expect(page).toHaveURL(`${server.url}/`);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
 	}
-	expect(chunks).toEqual([]);
+	expect(assets).toEqual([]);
 	await tile.focus();
 	await tile.press('Enter');
 	await expect(page).toHaveURL(server.url + href);
 	await expect(page.getByRole('dialog')).toBeVisible();
+	expect(assets).toEqual([]);
 	await page.keyboard.press('Escape');
 	await expect(tile).toBeFocused();
 	await expect(input(page)).toHaveValue('navigationfixture');

@@ -169,8 +169,8 @@ Sign-in uses the selected bytes through public `/logo` at 48px, with bundled ðŸ—
 default and one-time JavaScript fallback. No configured source URI enters public
 HTML or shared layout data. The site favicon remains independent.
 
-Details optionally pass `links.*.favicon_path` to the same `Logo` at 24px inside
-Open service, with `/bookmarks/<id>/logo` as its one-time JavaScript fallback.
+Details optionally pass `links.*.favicon_path` to the same `Logo` at 24px beside
+the destination URL, with `/bookmarks/<id>/logo` as its one-time JavaScript fallback.
 Omission renders no service icon. This instance is independent of the 64px primary
 `logo_path`; without JavaScript, a broken icon leaves the service link usable.
 Mounted service source URLs and prepared fallback endpoints remain private with
@@ -321,11 +321,10 @@ stays disabled.
 
 Every tile retains a real `/?link=<id>` URL with speculative preloading disabled.
 Direct entries render plain details and Back alongside the full grid, including
-without JavaScript. After mount, direct entries load Bits UI; grid visits load it
-only on an unmodified primary tile activation. The enhancement replaces, rather
-than duplicates, the plain details with a centered desktop dialog or phone sheet.
-A failed import leaves direct details usable; grid activation falls back to a
-full document navigation.
+without JavaScript. Dialog code is statically imported with the page, not fetched
+on first activation. After hydration, the enhancement replaces, rather than
+duplicates, plain details with a desktop dialog or phone sheet. With JavaScript
+disabled, the server-rendered links and plain details remain usable.
 
 Kit 2 `pushState`/`replaceState` and typed `page.state` carry only the selected ID
 and a grid-entry marker. Local opens, closes and Back/Forward use the loaded
@@ -368,7 +367,7 @@ wrapping at boundaries; Home/End move to the first/last result in the current ro
 CSS handles responsive wrapping without recreating links or their images. Escape
 from a result focuses Search and preserves the query; Escape in Search or Clear
 restores grouped browsing. IME composition and modified keys do not trigger these
-commands. Changing or clearing a query cancels a pending detail activation.
+commands. Detail activation is synchronous and uses the already-loaded dialog.
 Search is discovery, not access control: details always resolve against the full
 loaded directory. Shallow dialog history preserves query/results and returns
 focus to the activating tile, falling back to
@@ -680,7 +679,7 @@ For presentation review, use disposable fixture data with at least nine bookmark
 spaced and long unbroken titles, named groups and unassigned links. Check 360, 768
 and 1280px widths in both OS themes, with and without JavaScript: centered 6rem
 tiles, wrapped titles, no horizontal overflow, and distinct group/detail/footer
-spacing. Tab through tiles, Back and Open service to inspect the configured accent
+spacing. Tab through tiles, Back and Open to inspect the configured accent
 and visible focus. Capture phone/desktop light/dark screenshots outside the repo.
 Also review flat and empty directories; the empty state should explain how to add links.
 Use Tab, Enter and Space on the theme button, including at 360px beside Sign out.
@@ -744,7 +743,7 @@ dialog actions keep their loaded snapshot.
    Follow a bookmark to its `?link=<id>` details and close the dialog. Without
    JavaScript, return with Back to directory. Check Tab/Shift-Tab trapping, Escape,
    outside dismissal and return focus, then browser Back/Forward and a direct URL.
-   Throttle or block the dialog chunk to review the usable plain-details fallback.
+   Throttle or block page hydration scripts to review usable server-rendered details.
    Check that a generated logo renders without JavaScript and remains protected before sign-in,
    including HEAD and `/bookmarks/<id>/logo` opened as HTML. For a configured logo,
    use a disposable public directory and set `DIRECTORY_PUBLIC_DIR` to its absolute

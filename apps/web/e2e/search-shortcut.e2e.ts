@@ -166,12 +166,21 @@ test('an open details dialog keeps focus instead of activating Search', async ({
 	await expect(search(page)).toBeEnabled();
 	await page.getByRole('link', { name: 'Household archive', exact: true }).click();
 	await expect(page.getByRole('dialog')).toBeVisible();
+	const external = page.getByRole('link', {
+		name: 'Open Household archive (opens in a new tab)',
+		exact: true
+	});
+	await expect(external).toBeFocused();
 	const close = page.getByRole('button', { name: 'Close', exact: true });
-	await expect(close).toBeFocused();
-	await page.keyboard.press('Alt+/');
-	await expect(close).toBeFocused();
-	expect(await dispatchShortcut(page)).toBe(true);
-	await expect(close).toBeFocused();
+	const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
+	await expect(destination).toHaveJSProperty('readOnly', true);
+	for (const control of [external, close, destination]) {
+		await control.focus();
+		await page.keyboard.press('Alt+/');
+		await expect(control).toBeFocused();
+		expect(await dispatchShortcut(page)).toBe(true);
+		await expect(control).toBeFocused();
+	}
 });
 
 test('without JavaScript Search remains disabled and ordinary links still work', async ({

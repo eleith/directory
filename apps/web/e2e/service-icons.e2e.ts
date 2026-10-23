@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { dialogScript, navigateQuery } from './support/details.js';
+import { directoryScript, navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const sourceA = '/public/service-a.svg';
@@ -11,7 +11,11 @@ const icon =
 	'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
 const otherIcon =
 	'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24"/></svg>';
-const accessibleName = 'Open service (opens in a new tab)';
+const titles = {
+	provided: 'Provided icon',
+	other: 'Another icon',
+	omitted: 'No service icon'
+};
 let directory: string;
 let publicDir: string;
 let server: TestServer | undefined;
@@ -49,7 +53,31 @@ async function boot(source = sourceA, otherSource = sourceB, auth = false) {
 }
 
 function control(page: Page) {
-	return page.getByRole('link', { name: accessibleName, exact: true });
+	return page.getByRole('link', { name: /^Open / });
+}
+
+function serviceImage(page: Page) {
+	return page.locator('section.details .destination img');
+}
+
+async function expectControl(page: Page, id: keyof typeof titles) {
+	const external = control(page);
+	await expect(external).toBeVisible();
+	await expect(external).toHaveAccessibleName(`Open ${titles[id]} (opens in a new tab)`);
+	await expect(external).toHaveAttribute('href', `https://${id}.example.test`);
+	await expect(external).toHaveAttribute('target', '_blank');
+	await expect(external).toHaveAttribute('rel', 'noopener noreferrer');
+	await expect(external).toContainText('Open');
+	await expect(external.locator('img')).toHaveCount(0);
+	await expect(external.locator('svg')).toHaveCount(0);
+	const destination = page
+		.locator('section.details .destination')
+		.getByRole('textbox', { name: 'Destination', exact: true });
+	await expect(destination).toBeVisible();
+	await expect(destination).toHaveValue(`https://${id}.example.test`);
+	await expect(destination).toHaveAttribute('type', 'url');
+	await expect(destination).toHaveJSProperty('readOnly', true);
+	await expect(destination).toBeEnabled();
 }
 
 async function expectDecoded(image: Locator, source: string, naturalSize = 24) {
@@ -113,13 +141,9 @@ for (const javaScriptEnabled of [true, false]) {
 			] as const) {
 				if (javaScriptEnabled) await navigateQuery(page, `/?link=${id}`);
 				else await page.locator(`a[href="/?link=${id}"]`).click();
-				const external = control(page);
-				await expect(external).toHaveAccessibleName(accessibleName);
-				await expect(external).toHaveAttribute('href', `https://${id}.example.test`);
-				await expect(external).toHaveAttribute('target', '_blank');
-				await expect(external).toHaveAttribute('rel', 'noopener noreferrer');
-				if (source) await expectDecoded(external.locator('img'), source);
-				else await expect(external.locator('img')).toHaveCount(0);
+				await expectControl(page, id);
+				if (source) await expectDecoded(serviceImage(page), source);
+				else await expect(serviceImage(page)).toHaveCount(0);
 				const primary = page.locator('section.details img[width="64"]');
 				await expect(primary).toHaveAttribute('src', '/public/primary.svg');
 				await expect(primary).toHaveAttribute('height', '64');
@@ -136,7 +160,7 @@ for (const javaScriptEnabled of [true, false]) {
 }
 
 for (const abortFallback of [false, true]) {
-	test(`pre-hydration failure uses the same image and ${abortFallback ? 'stops after a failed fallback' : 'decodes one private fallback'}`, async ({
+	test(`pre-hydration failure ${abortFallback ? 'stops after a failed fallback' : 'decodes one private fallback'} after page hydration`, async ({
 		page
 	}) => {
 		await writeFile(join(publicDir, 'service-a.svg'), 'not an image');
@@ -146,35 +170,26 @@ for (const abortFallback of [false, true]) {
 			if (new URL(request.url()).pathname === '/bookmarks/provided/logo') fallbackRequests++;
 		});
 		if (abortFallback) await page.route('**/bookmarks/provided/logo', (route) => route.abort());
-		const scripts = Promise.withResolvers<void>();
-		const dialog = Promise.withResolvers<void>();
-		await page.route(`**${dialogScript}`, async (route) => {
-			await dialog.promise;
+		const hydration = Promise.withResolvers<void>();
+		let heldDirectoryScript = false;
+		await page.route(`**${directoryScript}`, async (route) => {
+			heldDirectoryScript = true;
+			await hydration.promise;
 			await route.continue();
-		});
-		let heldScripts = 0;
-		await page.route('**/_app/immutable/**', async (route) => {
-			if (route.request().resourceType() === 'script') {
-				heldScripts++;
-				await scripts.promise;
-			}
-			await route.fallback();
 		});
 		try {
 			await page.goto(`${app.url}/?link=provided`, { waitUntil: 'commit' });
-			const image = control(page).locator('img');
+			const image = serviceImage(page);
 			await expect(image).toHaveAttribute('src', sourceA);
 			await expectBroken(image);
-			await expect.poll(() => heldScripts).toBeGreaterThan(0);
-			const original = await image.elementHandle();
-			scripts.resolve();
-			await expect(image).toHaveAttribute('src', '/bookmarks/provided/logo');
-			if (abortFallback) await expectBroken(image);
-			else await expectDecoded(image, '/bookmarks/provided/logo', 64);
-			expect(await image.evaluate((node, previous) => node === previous, original)).toBe(true);
-			await original?.dispose();
-			dialog.resolve();
+			await expect.poll(() => heldDirectoryScript).toBe(true);
+			await expect(page.getByRole('dialog')).toHaveCount(0);
+			await expectControl(page, 'provided');
+			expect(fallbackRequests).toBe(0);
+			hydration.resolve();
 			await expect(page.getByRole('dialog')).toBeVisible();
+			await expectControl(page, 'provided');
+			await expect(image).toHaveAttribute('src', '/bookmarks/provided/logo');
 			if (abortFallback) await expectBroken(image);
 			else await expectDecoded(image, '/bookmarks/provided/logo', 64);
 			await page.evaluate(
@@ -183,10 +198,9 @@ for (const abortFallback of [false, true]) {
 						requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
 					)
 			);
-			expect(fallbackRequests).toBe(2);
+			expect(fallbackRequests).toBe(1);
 		} finally {
-			scripts.resolve();
-			dialog.resolve();
+			hydration.resolve();
 			await page.unrouteAll({ behavior: 'wait' });
 		}
 	});
@@ -199,7 +213,7 @@ test('source and selected identity changes recover in place through native Kit q
 	const app = await boot(sourceA, sourceA);
 	await page.goto(`${app.url}/?link=provided`);
 	await expect(page.getByRole('dialog')).toBeVisible();
-	const image = control(page).locator('img');
+	const image = serviceImage(page);
 	await expectDecoded(image, '/bookmarks/provided/logo', 64);
 	const original = await image.elementHandle();
 	await page.evaluate(() => Reflect.set(window, 'serviceIconNavigationMarker', true));
@@ -238,12 +252,12 @@ test('without JavaScript a broken service icon leaves the external control and n
 	try {
 		const page = await context.newPage();
 		await page.goto(`${app.url}/?link=provided`);
-		await expect(control(page).locator('img')).toHaveAttribute('src', sourceA);
-		await expectBroken(control(page).locator('img'));
-		await expect(control(page)).toHaveAttribute('href', 'https://provided.example.test');
-		await expect(control(page)).toBeVisible();
+		await expect(serviceImage(page)).toHaveAttribute('src', sourceA);
+		await expectBroken(serviceImage(page));
+		await expectControl(page, 'provided');
 		await page.locator('a[href="/?link=other"]').click();
-		await expectDecoded(control(page).locator('img'), sourceB);
+		await expectControl(page, 'other');
+		await expectDecoded(serviceImage(page), sourceB);
 		await page.getByRole('link', { name: 'Back to directory' }).click();
 		await expect(page).toHaveURL(`${app.url}/`);
 	} finally {
@@ -272,7 +286,8 @@ test('service source and default API remain private across real credentials sign
 	await page.getByLabel('Password').fill('icon-password');
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(page.getByRole('dialog')).toBeVisible();
-	await expectDecoded(control(page).locator('img'), sourceA);
+	await expectControl(page, 'provided');
+	await expectDecoded(serviceImage(page), sourceA);
 	for (const path of [sourceA, '/bookmarks/provided/logo']) {
 		expect((await page.request.get(`${app.url}${path}`)).status()).toBe(200);
 	}

@@ -313,8 +313,8 @@ that URI independently for omitted site fields; normalized site paths are requir
 strings for both web and CLI consumers. Bookmark image fields stay optional and
 mounted-only, with no bundled URI selection.
 
-`links.*.favicon_path` optionally renders a decorative 24×24 icon inside the details'
-Open service link. Omission renders no service icon. It is independent of the 64px
+`links.*.favicon_path` optionally renders a decorative 24×24 icon beside the
+destination URL in details. Omission renders no service icon. It is independent of the 64px
 primary `links.*.logo_path`: with JavaScript, a failed service icon switches once
 to `/bookmarks/<id>/logo`, not to the configured primary logo. A failed fallback
 stops. Source or selected-link changes reset the attempt in place; repairing bytes

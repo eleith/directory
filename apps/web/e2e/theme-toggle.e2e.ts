@@ -102,8 +102,12 @@ test('keyboard cycle, next-action icons, focus, persistence and Kit navigation',
 	await expectTheme(page, 'dark', 'dark');
 	const close = page.getByRole('button', { name: 'Close', exact: true });
 	await expect(page.getByRole('dialog')).toBeVisible();
+	await expect(
+		page.getByRole('link', { name: 'Open Household calendar (opens in a new tab)', exact: true })
+	).toBeFocused();
 	await page.keyboard.press('Tab');
-	await page.keyboard.press('Shift+Tab');
+	await expect(close).toBeFocused();
+	await expect(close).toHaveCSS('outline-style', 'solid');
 	await expect(close).toHaveCSS('outline-color', accents.dark);
 	await close.click();
 	await expect(page).toHaveURL(`${server.url}/`);
@@ -128,9 +132,12 @@ test('System alone follows OS changes; manual palettes and configured accents ov
 	const tile = page.locator('a[href="/?link=calendar"]');
 	const close = page.getByRole('button', { name: 'Close', exact: true });
 	await tile.click();
-	await expect(close).toBeFocused();
+	await expect(
+		page.getByRole('link', { name: 'Open Household calendar (opens in a new tab)', exact: true })
+	).toBeFocused();
 	await page.keyboard.press('Tab');
-	await page.keyboard.press('Shift+Tab');
+	await expect(close).toBeFocused();
+	await expect(close).toHaveCSS('outline-style', 'solid');
 	await expect(close).toHaveCSS('outline-color', accents.dark);
 	await close.click();
 	await page.emulateMedia({ colorScheme: 'dark' });
@@ -140,9 +147,12 @@ test('System alone follows OS changes; manual palettes and configured accents ov
 	await page.emulateMedia({ colorScheme: 'dark' });
 	await expectTheme(page, 'light', 'light');
 	await tile.click();
-	await expect(close).toBeFocused();
+	await expect(
+		page.getByRole('link', { name: 'Open Household calendar (opens in a new tab)', exact: true })
+	).toBeFocused();
 	await page.keyboard.press('Tab');
-	await page.keyboard.press('Shift+Tab');
+	await expect(close).toBeFocused();
+	await expect(close).toHaveCSS('outline-style', 'solid');
 	await expect(close).toHaveCSS('outline-color', accents.light);
 	await close.click();
 	await toggle.focus();

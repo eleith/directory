@@ -23,14 +23,12 @@
 		results = $bindable(null),
 		status = $bindable('idle'),
 		input = $bindable(),
-		onQueryChange,
 		onEnterResults
 	}: {
 		directory: DirectoryDisplay;
 		results: SearchResult[] | null;
 		status: 'idle' | 'loading' | 'ready' | 'failed';
 		input: HTMLInputElement | undefined;
-		onQueryChange: () => void;
 		onEnterResults: (activateSingle: boolean) => void;
 	} = $props();
 
@@ -76,7 +74,6 @@
 	}
 
 	function clearSearch() {
-		onQueryChange();
 		query = '';
 		input?.focus();
 	}
@@ -134,10 +131,7 @@
 			aria-keyshortcuts="Alt+/"
 			disabled={!mounted}
 			onfocus={() => (activated = true)}
-			oninput={() => {
-				onQueryChange();
-				activated = true;
-			}}
+			oninput={() => (activated = true)}
 			onkeydown={handleKeydown}
 		/>
 		{#if query}

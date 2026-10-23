@@ -351,6 +351,8 @@ for (const width of [360, 390, 768, 1280, 1920, 2560]) {
 				const title = await tile.locator('span').textContent();
 				await expect(dialog.getByRole('heading', { name: title!, exact: true })).toBeVisible();
 				await page.keyboard.press('Escape');
+				await expect(dialog).toHaveCount(0);
+				await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
 				await expect(tile).toBeFocused();
 				await page.keyboard.press('Tab');
 				await page.keyboard.press('Shift+Tab');

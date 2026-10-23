@@ -36,8 +36,8 @@ logos when no logo path is configured. With JavaScript, a failed configured book
 logo switches once to its prepared logo; a failed fallback stops without retrying.
 Without JavaScript, broken configured images stay broken, but text and links remain
 usable. After repairing an image at the same URL, refresh to try it again.
-Optional `links.*.favicon_path` adds a decorative 24px icon to the details' Open
-service link; omission shows no small icon. With JavaScript, failure switches once
+Optional `links.*.favicon_path` adds a decorative 24px icon beside the destination
+URL in details; omission shows no small icon. With JavaScript, failure switches once
 to the same private prepared bookmark logo, independently of the 64px primary
 `logo_path`; without JavaScript, a broken icon leaves the link usable. Service
 source URLs stay private with auth; service icon fields do not select public branding.
@@ -82,8 +82,9 @@ Run from the repository root and open `http://localhost:5173`. This starter is
 empty and has no authentication. For the populated, authenticated preview that
 leaves operator configuration and media untouched, use [demo/README.md](demo/README.md).
 Groups, bookmark titles and `?link=<id>` details also render without JavaScript.
-With JavaScript, details enhance on demand into a desktop dialog or phone sheet,
-with browser history and keyboard focus preserved.
+The desktop dialog and phone sheet code loads with the page, so opening details
+has no additional code-loading wait. Plain details remain available without
+JavaScript, with browser history and keyboard focus preserved after enhancement.
 `/healthz` returns generic readiness. Invalid auth environment settings stop startup
 with `auth_failed` and a fixed, value-free setting hint. Linux prerequisites,
 reload checks and shutdown are documented in [development](docs/development.md).

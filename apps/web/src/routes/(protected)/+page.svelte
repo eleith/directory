@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import IconSignOut from 'virtual:icons/ph/sign-out';
-	import { afterNavigate, beforeNavigate, pushState, replaceState } from '$app/navigation';
+	import { beforeNavigate, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import BookmarkLogo from '$lib/components/BookmarkLogo.svelte';
 	import DetailContent from '$lib/components/DetailContent.svelte';
+	import DetailDialog from '$lib/components/DetailDialog.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import Search from '$lib/components/Search.svelte';
@@ -19,10 +20,7 @@
 	let searchStatus = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
 	let searchInput = $state<HTMLInputElement>();
 	let resultList = $state<HTMLUListElement>();
-	let DetailDialog = $state<typeof import('$lib/components/DetailDialog.svelte').default>();
-	let dialogImport: Promise<typeof import('$lib/components/DetailDialog.svelte')> | undefined;
-	let mounted = false;
-	let openRequestVersion = 0;
+	let mounted = $state(false);
 	let closing = false;
 	let returnTile: HTMLAnchorElement | undefined;
 	let directoryHeading: HTMLHeadingElement | undefined = $state();
@@ -77,7 +75,7 @@
 		const slashKey = event.key === '/' || (event.code === 'Slash' && !event.shiftKey);
 		if (!slashKey) return;
 		if (!searchInput || searchInput.disabled) return;
-		if (selectedLink && DetailDialog) return;
+		if (selectedLink && mounted) return;
 		const editing = event
 			.composedPath()
 			.some(
@@ -91,57 +89,20 @@
 		searchInput.select();
 	}
 
-	function cancelPendingOpen() {
-		openRequestVersion++;
-		closing = false;
-	}
-
-	function loadDialog() {
-		dialogImport ??= import('$lib/components/DetailDialog.svelte').catch((error: unknown) => {
-			dialogImport = undefined;
-			throw error;
-		});
-		return dialogImport;
-	}
-
-	async function enhanceDirectDetails() {
-		if (!selectedLink || DetailDialog) return;
-		const requestVersion = ++openRequestVersion;
-		const snapshot = data.directory;
-		try {
-			const module = await loadDialog();
-			if (!mounted || openRequestVersion !== requestVersion || data.directory !== snapshot) return;
-			DetailDialog = module.default;
-		} catch {
-			// Keep the usable server-rendered section on a failed direct-entry enhancement.
-		}
-	}
-
-	async function openDetails(event: MouseEvent, id: string) {
+	function openDetails(event: MouseEvent, id: string) {
 		if (event.defaultPrevented || event.button !== 0) return;
 		if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		const tile = event.currentTarget as HTMLAnchorElement;
 		const href = tile.href;
 		event.preventDefault();
-		const requestVersion = ++openRequestVersion;
-		const snapshot = data.directory;
-		try {
-			const module = await loadDialog();
-			if (!mounted || openRequestVersion !== requestVersion || data.directory !== snapshot) return;
-			returnTile = tile;
-			closing = false;
-			DetailDialog = module.default;
-			// eslint-disable-next-line svelte/no-navigation-without-resolve -- This absolute href comes from the real tile anchor.
-			pushState(href, { ...page.state, directoryDetail: { id, fromGrid: true } });
-		} catch {
-			if (!mounted || openRequestVersion !== requestVersion || data.directory !== snapshot) return;
-			location.assign(href);
-		}
+		returnTile = tile;
+		closing = false;
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- This absolute href comes from the real tile anchor.
+		pushState(href, { ...page.state, directoryDetail: { id, fromGrid: true } });
 	}
 
 	function closeDetails() {
 		if (closing) return;
-		openRequestVersion++;
 		closing = true;
 		if (page.state.directoryDetail?.fromGrid) {
 			history.back();
@@ -164,25 +125,15 @@
 	}
 
 	beforeNavigate(() => {
-		cancelPendingOpen();
+		closing = false;
 		returnTile = undefined;
-	});
-	afterNavigate((navigation) => {
-		if (navigation.type !== 'enter') void enhanceDirectDetails();
 	});
 	onMount(() => {
 		mounted = true;
-		void enhanceDirectDetails();
-		window.addEventListener('popstate', cancelPendingOpen);
-		return () => {
-			mounted = false;
-			openRequestVersion++;
-			window.removeEventListener('popstate', cancelPendingOpen);
-		};
 	});
 </script>
 
-<svelte:window onkeydown={focusSearch} />
+<svelte:window onkeydown={focusSearch} onpopstate={() => (closing = false)} />
 
 <svelte:head>
 	<title>{data.directory.site.title}</title>
@@ -210,7 +161,6 @@
 			bind:results={searchResults}
 			bind:status={searchStatus}
 			bind:input={searchInput}
-			onQueryChange={cancelPendingOpen}
 			onEnterResults={enterResults}
 		/>
 		<div class="header-actions">
@@ -225,7 +175,7 @@
 		</div>
 	</header>
 
-	{#if selectedLink && DetailDialog}
+	{#if selectedLink && mounted}
 		<DetailDialog
 			link={selectedLink}
 			groupLabel={selectedGroup?.label}
@@ -468,7 +418,8 @@
 
 	.details {
 		margin-block-end: var(--space-9);
-		padding: var(--space-5);
+		padding: 0;
+		overflow: hidden;
 		background: var(--color-surface-card);
 		border: var(--border-width) solid var(--color-border-subtle);
 		border-radius: var(--radius-sm);
@@ -476,7 +427,9 @@
 
 	.back {
 		display: inline-block;
-		margin-block-end: var(--space-8);
+		margin-block-start: calc(var(--space-5) + var(--space-1) * 2);
+		margin-block-end: var(--space-4);
+		margin-inline: calc(var(--space-5) + var(--space-1) * 2);
 		color: var(--color-text);
 		text-underline-offset: 0.2em;
 		text-decoration-color: var(--color-primary);
@@ -538,10 +491,6 @@
 			column-gap: var(--link-column-gap);
 			justify-content: center;
 			padding: var(--space-9) var(--space-8);
-		}
-
-		.details {
-			padding: var(--space-8);
 		}
 	}
 </style>

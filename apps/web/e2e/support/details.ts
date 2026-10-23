@@ -10,7 +10,8 @@ export const clientManifest: Record<
 		'utf8'
 	)
 );
-export const dialogScript = '/' + clientManifest['src/lib/components/DetailDialog.svelte']!.file;
+export const directoryScript =
+	'/' + clientManifest['.svelte-kit/generated/client-optimized/nodes/2.js']!.file;
 
 export function staticClientFiles(entryKeys: readonly string[]) {
 	const files = new Set<string>();

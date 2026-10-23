@@ -136,39 +136,48 @@ for (const javaScriptEnabled of [true, false]) {
 					await expect(first).toHaveCSS('outline-color', accent);
 					await first.click();
 					await expect(page).toHaveURL(`${server.url}/?link=entry-0`);
+					const external = page.getByRole('link', {
+						name: `Open ${labels[0]} (opens in a new tab)`,
+						exact: true
+					});
+					const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
 					let dismiss = page.getByRole('link', { name: 'Back to directory', exact: true });
 					if (javaScriptEnabled) {
 						await expect(page.getByRole('dialog')).toBeVisible();
 						dismiss = page.getByRole('button', { name: 'Close', exact: true });
-						await expect(dismiss).toBeFocused();
+						await expect(external).toBeFocused();
 					} else {
 						await expect(dismiss).toHaveAttribute('href', '/');
 						await expect(dismiss).toHaveAttribute('data-sveltekit-preload-data', 'off');
 						await expect(dismiss).toHaveCSS('text-decoration-color', accent);
 					}
-					const external = page.getByRole('link', {
-						name: 'Open service (opens in a new tab)',
-						exact: true
-					});
 					await expect(external).toHaveAttribute(
 						'href',
 						'https://service.example.test/0?from=directory'
 					);
 					await expect(external).toHaveAttribute('target', '_blank');
 					await expect(external).toHaveAttribute('rel', 'noopener noreferrer');
-					await expect(external.locator('img[src="/public/service.svg"]')).toHaveCSS(
+					await expect(external).toHaveText('Open');
+					await expect(external.locator('img, svg')).toHaveCount(0);
+					await expect(page.locator('.destination img[src="/public/service.svg"]')).toHaveCSS(
 						'width',
 						'24px'
 					);
+					await expect(destination).toHaveValue('https://service.example.test/0?from=directory');
 					if (javaScriptEnabled) {
 						await page.keyboard.press('Shift+Tab');
-						await expect(external).toBeFocused();
+						await expect(destination).toBeFocused();
+						await page.keyboard.press('Shift+Tab');
+						await expect(dismiss).toBeFocused();
 					}
-					for (const link of [dismiss, external]) {
+					const controls = javaScriptEnabled
+						? [destination, external, dismiss]
+						: [dismiss, destination, external];
+					for (const control of controls) {
 						await page.keyboard.press('Tab');
-						await expect(link).toBeFocused();
-						await expect(link).toHaveCSS('outline-style', 'solid');
-						await expect(link).toHaveCSS('outline-color', accent);
+						await expect(control).toBeFocused();
+						await expect(control).toHaveCSS('outline-style', 'solid');
+						await expect(control).toHaveCSS('outline-color', accent);
 					}
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
@@ -249,11 +258,13 @@ test('public configured accents preserve the body palette and private directory 
 			const accent = colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)';
 			await expect(page.getByRole('dialog')).toBeVisible();
 			const close = page.getByRole('button', { name: 'Close', exact: true });
-			await expect(close).toBeFocused();
-			for (const control of [
-				close,
-				page.getByRole('link', { name: 'Open service (opens in a new tab)', exact: true })
-			]) {
+			const external = page.getByRole('link', {
+				name: `Open ${labels[0]} (opens in a new tab)`,
+				exact: true
+			});
+			const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
+			await expect(external).toBeFocused();
+			for (const control of [close, destination, external]) {
 				await control.focus();
 				await expect(control).toBeFocused();
 				await expect(control).toHaveCSS('outline-style', 'solid');

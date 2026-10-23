@@ -16,7 +16,7 @@
 		onReturnFocus: () => void;
 	} = $props();
 
-	let closeButton: HTMLButtonElement | undefined = $state();
+	let dialogElement: HTMLElement | undefined = $state();
 </script>
 
 <Dialog.Root
@@ -35,8 +35,10 @@
 		</Dialog.Overlay>
 		<Dialog.Content
 			onOpenAutoFocus={(event) => {
+				const action = dialogElement?.querySelector<HTMLAnchorElement>('.open-service');
+				if (!action) return;
 				event.preventDefault();
-				closeButton?.focus();
+				action.focus();
 			}}
 			onCloseAutoFocus={(event) => {
 				event.preventDefault();
@@ -44,14 +46,7 @@
 			}}
 		>
 			{#snippet child({ props })}
-				<section {...props} class="details">
-					<Dialog.Close>
-						{#snippet child({ props: closeProps })}
-							<button {...closeProps} bind:this={closeButton} class="close" aria-label="Close">
-								<IconX aria-hidden="true" focusable="false" />
-							</button>
-						{/snippet}
-					</Dialog.Close>
+				<section {...props} bind:this={dialogElement} class="details">
 					<div class="scroll-content">
 						<DetailContent {link} {groupLabel}>
 							{#snippet title(text)}
@@ -63,6 +58,13 @@
 							{/snippet}
 						</DetailContent>
 					</div>
+					<Dialog.Close>
+						{#snippet child({ props: closeProps })}
+							<button {...closeProps} class="close" aria-label="Close">
+								<IconX aria-hidden="true" focusable="false" />
+							</button>
+						{/snippet}
+					</Dialog.Close>
 				</section>
 			{/snippet}
 		</Dialog.Content>
@@ -75,6 +77,7 @@
 		inset: 0;
 		z-index: 10;
 		background: rgb(0 0 0 / 45%);
+		backdrop-filter: blur(3px);
 		animation: backdrop-fade-in 0.15s ease-out;
 	}
 
@@ -84,13 +87,14 @@
 		z-index: 11;
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-5);
 		max-height: calc(100dvh - var(--space-8));
-		padding: var(--space-5);
+		padding: 0;
 		color: var(--color-text);
 		background: var(--color-surface-card);
 		border: var(--border-width) solid var(--color-border-subtle);
-		border-radius: var(--space-5) var(--space-5) 0 0;
+		border-radius: 1.5rem 1.5rem 0 0;
+		box-shadow: 0 -8px 24px rgb(0 0 0 / 12%);
+		overflow: hidden;
 		overflow-wrap: anywhere;
 		animation: sheet-slide-up 0.2s ease-out;
 	}
@@ -99,12 +103,14 @@
 		min-height: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-		padding: var(--space-1);
+		padding: 0;
 	}
 
 	.close {
-		align-self: flex-end;
-		flex-shrink: 0;
+		position: absolute;
+		inset-block-start: var(--space-4);
+		inset-inline-end: var(--space-4);
+		z-index: 1;
 		min-width: 44px;
 		min-height: 44px;
 		display: grid;
@@ -112,10 +118,14 @@
 		padding: var(--space-4);
 		font-size: 1.25rem;
 		color: var(--color-text-muted);
-		background: transparent;
+		background: var(--color-surface-card);
 		border: 0;
 		border-radius: var(--radius-control);
 		cursor: pointer;
+	}
+
+	.scroll-content :global(.identity) {
+		padding-inline-end: 44px;
 	}
 
 	.close:hover {
@@ -130,10 +140,10 @@
 	@media (min-width: 48rem) {
 		.details {
 			inset: 50% auto auto 50%;
-			width: min(var(--content-max-width), calc(100vw - var(--space-8)));
+			width: min(32rem, calc(100vw - var(--space-8)));
 			transform: translate(-50%, -50%);
-			border-radius: var(--radius-sm);
-			padding: var(--space-8);
+			border-radius: var(--radius-card);
+			box-shadow: 0 1rem 3rem rgb(0 0 0 / 18%);
 			animation: none;
 		}
 	}

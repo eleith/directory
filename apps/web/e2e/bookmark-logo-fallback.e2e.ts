@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator } from '@playwright/test';
-import { dialogScript, navigateQuery } from './support/details.js';
+import { directoryScript, navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 let directory: string;
@@ -88,19 +88,12 @@ for (const view of ['card', 'details'] as const) {
 	test(`a ${view} primary that fails before hydration switches to its decoded fallback`, async ({
 		page
 	}) => {
-		const scripts = Promise.withResolvers<void>();
-		const dialog = Promise.withResolvers<void>();
-		await page.route(`**${dialogScript}`, async (route) => {
-			await dialog.promise;
+		const hydration = Promise.withResolvers<void>();
+		let heldDirectoryScript = false;
+		await page.route(`**${directoryScript}`, async (route) => {
+			heldDirectoryScript = true;
+			await hydration.promise;
 			await route.continue();
-		});
-		let heldScripts = 0;
-		await page.route('**/_app/immutable/**', async (route) => {
-			if (route.request().resourceType() === 'script') {
-				heldScripts++;
-				await scripts.promise;
-			}
-			await route.fallback();
 		});
 		try {
 			await page.goto(`${server.url}/${view === 'details' ? '?link=broken' : ''}`, {
@@ -109,23 +102,24 @@ for (const view of ['card', 'details'] as const) {
 			const image =
 				view === 'card'
 					? page.locator('a[href="/?link=broken"] img')
-					: page.getByRole('region', { name: 'Broken primary', exact: true }).locator('img');
+					: page.locator('section.details img[width="64"]');
 			await expect(image).toHaveAttribute('src', '/public/primary-a.svg');
 			await expectBroken(image);
-			await expect.poll(() => heldScripts).toBeGreaterThan(0);
-			const ssrImage = await image.elementHandle();
-			scripts.resolve();
-			await expectDecoded(image, '/bookmarks/broken/logo');
-			expect(await image.evaluate((node, previous) => node === previous, ssrImage)).toBe(true);
-			await ssrImage?.dispose();
-			dialog.resolve();
-			if (view === 'details') {
-				await expect(page.getByRole('dialog')).toBeVisible();
-				await expectDecoded(page.locator('section.details img'), '/bookmarks/broken/logo');
+			await expect.poll(() => heldDirectoryScript).toBe(true);
+			await expect(page.getByRole('dialog')).toHaveCount(0);
+			const ssrImage = view === 'card' ? await image.elementHandle() : null;
+			try {
+				hydration.resolve();
+				if (view === 'details') await expect(page.getByRole('dialog')).toBeVisible();
+				await expectDecoded(image, '/bookmarks/broken/logo');
+				if (ssrImage) {
+					expect(await image.evaluate((node, previous) => node === previous, ssrImage)).toBe(true);
+				}
+			} finally {
+				await ssrImage?.dispose();
 			}
 		} finally {
-			scripts.resolve();
-			dialog.resolve();
+			hydration.resolve();
 			await page.unrouteAll({ behavior: 'wait' });
 		}
 	});
@@ -278,10 +272,21 @@ test('without JavaScript, good images decode and broken images leave card and de
 			'household',
 			'photos'
 		]);
-		const destination = details.locator('a[href="https://broken.example.test"]');
+		const destination = details.getByRole('link', {
+			name: 'Open Broken primary (opens in a new tab)',
+			exact: true
+		});
+		await expect(destination).toBeVisible();
+		await expect(destination).toHaveAttribute('href', 'https://broken.example.test');
 		await expect(destination).toHaveAttribute('target', '_blank');
 		await expect(destination).toHaveAttribute('rel', 'noopener noreferrer');
-		await expect(destination).toHaveAccessibleName(/opens in a new tab/i);
+		await expect(destination).toContainText('Open');
+		await expect(destination.locator('img')).toHaveCount(0);
+		await expect(destination.locator('svg')).toHaveCount(0);
+		const url = details.getByRole('textbox', { name: 'Destination', exact: true });
+		await expect(url).toBeVisible();
+		await expect(url).toHaveValue('https://broken.example.test');
+		await expect(url).toHaveJSProperty('readOnly', true);
 		await page.locator('a[href="/?link=valid"]').click();
 		await expectDecoded(page.locator('section.details img'), '/public/valid.svg');
 		await page.locator('a[href="/?link=default"]').click();

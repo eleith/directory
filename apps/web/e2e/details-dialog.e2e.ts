@@ -1,5 +1,11 @@
-import { expect, test, type Page, type Request } from '@playwright/test';
-import { dialogScript, eagerClientFiles, navigateQuery } from './support/details.js';
+import { readFileSync } from 'node:fs';
+import { expect, test, type Page } from '@playwright/test';
+import {
+	directoryScript,
+	eagerClientFiles,
+	navigateQuery,
+	staticClientFiles
+} from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const longCopy =
@@ -41,37 +47,35 @@ async function hydrated(page: Page) {
 	).toBeEnabled();
 }
 
-async function holdDialog(page: Page) {
+async function holdHydration(page: Page) {
 	const requested = Promise.withResolvers<void>();
 	const release = Promise.withResolvers<void>();
-	const settled = Promise.withResolvers<void>();
-	function markSettled(request: Request) {
-		if (request.url().endsWith(dialogScript)) settled.resolve();
-	}
-	page.on('requestfinished', markSettled);
-	page.on('requestfailed', markSettled);
-	await page.route(`**${dialogScript}`, async (route) => {
+	await page.route(`**${directoryScript}`, async (route) => {
 		requested.resolve();
 		await release.promise;
 		await route.continue();
 	});
-	return { requested: requested.promise, settled: settled.promise, release: release.resolve };
+	return { requested: requested.promise, release: release.resolve };
 }
 
-test('direct SSR and first hydration retain the plain section until the delayed dialog is ready', async ({
+async function finishRendering(page: Page) {
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+			)
+	);
+}
+
+test('direct SSR retains the plain section while page hydration is delayed, then enhances once', async ({
 	page
 }) => {
-	const scripts = Promise.withResolvers<void>();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	page.on('console', (message) => {
 		if (/hydration/i.test(message.text())) errors.push(message.text());
 	});
-	await page.route('**/_app/**/*.js', async (route) => {
-		if (!route.request().url().endsWith(dialogScript)) await scripts.promise;
-		await route.continue();
-	});
-	const delayed = await holdDialog(page);
+	const delayed = await holdHydration(page);
 	try {
 		const response = await page.goto(`${server.url}/?link=alpha`, { waitUntil: 'commit' });
 		const html = await response!.text();
@@ -81,24 +85,29 @@ test('direct SSR and first hydration retain the plain section until the delayed 
 		await expect(section).toBeVisible();
 		await expect(page.locator('.tile')).toHaveCount(2);
 		const baseline = await section.elementHandle();
-		scripts.resolve();
-		await hydrated(page);
 		await delayed.requested;
+		await finishRendering(page);
 		expect(await section.evaluate((node, previous) => node === previous, baseline)).toBe(true);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
+		await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeDisabled();
 		delayed.release();
+		await hydrated(page);
 		await expect(page.getByRole('dialog', { name: 'Alpha service', exact: true })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Alpha service', exact: true })).toHaveCount(1);
 		await expect(page.getByRole('link', { name: 'Back to directory' })).toHaveCount(0);
-		await expect(page.getByRole('list', { name: 'Tags' }).getByRole('listitem')).toHaveText([
+		const tags = page.getByRole('list', { name: 'Tags' });
+		await expect(tags).toHaveCount(1);
+		await expect(tags.getByRole('listitem')).toHaveText([
+			'login',
+			'internal',
+			'admin',
 			'photos',
 			'backup'
 		]);
-		await expect(
-			page.getByRole('list', { name: 'Service information' }).getByRole('listitem')
-		).toHaveText(['Requires authentication', 'Internal only', 'Admin only']);
+		await expect(tags.getByRole('listitem').nth(2)).toHaveAccessibleName('admin only');
+		await expect(page.getByRole('list', { name: 'Service information' })).toHaveCount(0);
 		const external = page.getByRole('link', {
-			name: 'Open service (opens in a new tab)',
+			name: 'Open Alpha service (opens in a new tab)',
 			exact: true
 		});
 		await expect(external).toHaveAttribute(
@@ -109,35 +118,47 @@ test('direct SSR and first hydration retain the plain section until the delayed 
 		await expect(external).toHaveAttribute('rel', 'noopener noreferrer');
 		expect(errors).toEqual([]);
 	} finally {
-		scripts.resolve();
 		delayed.release();
 		await page.unrouteAll({ behavior: 'wait' });
 	}
 });
 
-test('grid has no eager dialog imports or speculative requests; activation reuses one chunk and loaded snapshot', async ({
+test('dialog is in the initial page graph; hover, focus and first activation fetch no additional JS, CSS or data', async ({
 	page
 }) => {
+	const directoryFiles = staticClientFiles(['.svelte-kit/generated/client-optimized/nodes/2.js']);
+	const directorySource = [...directoryFiles]
+		.map((file) =>
+			readFileSync(new URL(`../.svelte-kit/output/client/${file}`, import.meta.url), 'utf8')
+		)
+		.join('\n');
+	expect(directorySource).toContain('scroll-content');
 	const requested: string[] = [];
 	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
-	expect(eagerClientFiles.has(dialogScript.slice(1))).toBe(false);
 	await page.goto(server.url);
 	await hydrated(page);
+	for (const file of directoryFiles) {
+		expect(eagerClientFiles.has(file)).toBe(true);
+		expect(requested).toContain('/' + file);
+	}
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	const before = requested.length;
 	const tile = page.locator('a[href="/?link=alpha"]');
 	await tile.hover();
 	await tile.focus();
+	await expect(tile).toHaveAttribute('href', '/?link=alpha');
 	await expect(tile).toHaveAttribute('data-sveltekit-preload-data', 'off');
-	expect(requested).not.toContain(dialogScript);
-	const before = requested.length;
 	await tile.click();
 	await expect(page.getByRole('dialog', { name: 'Alpha service' })).toBeVisible();
 	await page.getByRole('button', { name: 'Close', exact: true }).click();
 	await expect(page).toHaveURL(`${server.url}/`);
 	await page.locator('a[href="/?link=beta"]').click();
 	await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
-	expect(requested.filter((path) => path === dialogScript)).toHaveLength(1);
+	await finishRendering(page);
 	expect(
-		requested.slice(before).filter((path) => path.includes('__data.json') || path === '/')
+		requested
+			.slice(before)
+			.filter((path) => /\.(?:js|css)$/.test(path) || path.includes('__data.json') || path === '/')
 	).toEqual([]);
 });
 
@@ -149,22 +170,31 @@ test('controlled focus trap, Escape, outside dismissal, close, history and retur
 	const tile = page.locator('a[href="/?link=beta"]');
 	const close = page.getByRole('button', { name: 'Close', exact: true });
 	const external = page.getByRole('link', {
-		name: 'Open service (opens in a new tab)',
+		name: 'Open Beta service (opens in a new tab)',
 		exact: true
 	});
+	const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
 	await tile.click();
+	await expect(external).toBeFocused();
+	await page.keyboard.press('Tab');
+	await expect(close).toBeFocused();
+	await page.keyboard.press('Tab');
+	await expect(destination).toBeFocused();
+	await page.keyboard.press('Tab');
+	await expect(external).toBeFocused();
+	await page.keyboard.press('Shift+Tab');
+	await expect(destination).toBeFocused();
+	await page.keyboard.press('Shift+Tab');
 	await expect(close).toBeFocused();
 	await page.keyboard.press('Shift+Tab');
 	await expect(external).toBeFocused();
 	await page.keyboard.press('Tab');
 	await expect(close).toBeFocused();
-	await page.keyboard.press('Tab');
-	await expect(external).toBeFocused();
 	await page.keyboard.press('Escape');
 	await expect(page).toHaveURL(`${server.url}/`);
 	await expect(tile).toBeFocused();
 	await page.goForward();
-	await expect(close).toBeFocused();
+	await expect(external).toBeFocused();
 	await page.goBack();
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	await expect(tile).toBeFocused();
@@ -201,22 +231,30 @@ test('direct close safely replaces the URL, keeps the baseline dismissed, and re
 });
 
 for (const entry of ['grid', 'direct']) {
-	test(`failed chunk: ${entry} uses only its safe SSR fallback`, async ({ page }) => {
+	test(`blocked client boot: ${entry} retains disabled controls and native SSR detail navigation`, async ({
+		page
+	}) => {
 		let documents = 0;
 		let chunks = 0;
 		page.on('request', (request) => {
 			if (request.isNavigationRequest()) documents++;
 		});
-		await page.route(`**${dialogScript}`, (route) => {
+		await page.route('**/*.js', (route) => {
 			chunks++;
 			return route.abort();
 		});
 		await page.goto(`${server.url}/${entry === 'direct' ? '?link=beta' : ''}`);
-		await hydrated(page);
+		await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeDisabled();
+		await expect(
+			page.getByRole('button', { name: 'Switch to dark theme', exact: true })
+		).toBeDisabled();
 		if (entry === 'grid') await page.locator('a[href="/?link=beta"]').click();
 		await expect(page.getByRole('region', { name: 'Beta service', exact: true })).toBeVisible();
-		await hydrated(page);
-		await expect.poll(() => chunks).toBe(entry === 'grid' ? 2 : 1);
+		await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeDisabled();
+		await expect(
+			page.getByRole('button', { name: 'Switch to dark theme', exact: true })
+		).toBeDisabled();
+		expect(chunks).toBeGreaterThan(0);
 		await page.evaluate(
 			() =>
 				new Promise<void>((resolve) =>
@@ -225,23 +263,47 @@ for (const entry of ['grid', 'direct']) {
 		);
 		expect(documents).toBe(entry === 'grid' ? 2 : 1);
 		await expect(page.getByRole('dialog')).toHaveCount(0);
-		await expect(page.getByRole('link', { name: 'Back to directory' })).toHaveAttribute(
-			'href',
-			'/'
-		);
+		const back = page.getByRole('link', { name: 'Back to directory' });
+		await expect(back).toHaveAttribute('href', '/');
+		await expect(
+			page.getByRole('link', { name: 'Open Beta service (opens in a new tab)', exact: true })
+		).toHaveAttribute('href', 'https://beta.example.test/');
+		await back.click();
+		await expect(page).toHaveURL(`${server.url}/`);
+		await expect(page.getByRole('region', { name: 'Beta service', exact: true })).toHaveCount(0);
+		expect(documents).toBe(entry === 'grid' ? 3 : 2);
 	});
 }
+
+test('a failed eager route module uses the generic native error page without a reload loop', async ({
+	page
+}) => {
+	let documents = 0;
+	page.on('request', (request) => {
+		if (request.isNavigationRequest()) documents++;
+	});
+	await page.route(`**${directoryScript}`, (route) => route.abort());
+	await page.goto(server.url);
+	await expect(page.getByRole('heading', { name: '500', exact: true })).toBeVisible();
+	await expect(page.getByText('Internal Error', { exact: true })).toBeVisible();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	await expect(page.locator('body')).not.toContainText(
+		'Failed to fetch dynamically imported module'
+	);
+	await finishRendering(page);
+	expect(documents).toBe(1);
+});
 
 test('modifier and middle activation preserve real new-tab navigation without enhancing the original grid', async ({
 	page,
 	context
 }) => {
-	const chunks: string[] = [];
-	page.on('request', (request) => {
-		if (request.url().endsWith(dialogScript)) chunks.push(request.url());
-	});
 	await page.goto(server.url);
 	await hydrated(page);
+	const assets: string[] = [];
+	page.on('request', (request) => {
+		if (['script', 'stylesheet'].includes(request.resourceType())) assets.push(request.url());
+	});
 	for (const options of [
 		{ modifiers: ['Control'] as ['Control'] },
 		{ button: 'middle' as const }
@@ -252,8 +314,9 @@ test('modifier and middle activation preserve real new-tab navigation without en
 		await expect(opened).toHaveURL(`${server.url}/?link=beta`);
 		await opened.close();
 		await expect(page).toHaveURL(`${server.url}/`);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
 	}
-	expect(chunks).toEqual([]);
+	expect(assets).toEqual([]);
 });
 
 for (const width of [360, 1280]) {
@@ -267,6 +330,7 @@ for (const width of [360, 1280]) {
 			const dialog = page.getByRole('dialog', { name: 'Beta service', exact: true });
 			const overlay = page.locator('[data-dialog-overlay]');
 			await expect(dialog).toBeVisible();
+			await expect(overlay).toHaveCSS('backdrop-filter', 'blur(3px)');
 			if (reducedMotion === 'reduce') {
 				await expect(overlay).toHaveCSS('animation-name', 'none');
 				await expect(dialog).toHaveCSS('animation-name', 'none');
@@ -305,8 +369,12 @@ for (const width of [360, 1280]) {
 			const dialog = page.getByRole('dialog', { name: 'Alpha service' });
 			await expect(dialog).toBeVisible();
 			const close = dialog.getByRole('button', { name: 'Close', exact: true });
-			await expect(close).toBeFocused();
-			await expect(close).toHaveCSS(
+			const external = dialog.getByRole('link', {
+				name: 'Open Alpha service (opens in a new tab)',
+				exact: true
+			});
+			await expect(external).toBeFocused();
+			await expect(external).toHaveCSS(
 				'outline-color',
 				colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)'
 			);
@@ -326,7 +394,12 @@ for (const width of [360, 1280]) {
 			await scroll.evaluate((node) => {
 				node.scrollTop = node.scrollHeight;
 			});
-			await expect(dialog.getByRole('link', { name: /Open service/ })).toBeInViewport();
+			await expect(
+				dialog.getByRole('link', {
+					name: 'Open Alpha service (opens in a new tab)',
+					exact: true
+				})
+			).toBeInViewport();
 			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 				true
 			);
@@ -367,28 +440,28 @@ test('local details keep the loaded snapshot until real native navigation accept
 	}
 });
 
-test('a native snapshot replacement cancels the earlier delayed tile intent', async ({ page }) => {
+test('a native snapshot replacement supersedes an already active tile without reopening stale details', async ({
+	page
+}) => {
 	const app = await startServer({ configuration, secret: null, origin: null });
-	const delayed = await holdDialog(page);
 	try {
 		await app.ready();
 		await page.goto(app.url);
 		await hydrated(page);
 		await page.locator('a[href="/?link=alpha"]').click();
-		await delayed.requested;
+		await expect(page.getByRole('dialog', { name: 'Alpha service', exact: true })).toBeVisible();
 		await app.replace(configuration.replace('Beta service', 'Replacement beta'));
 		await expect.poll(async () => (await app.fetch('/')).text()).toContain('Replacement beta');
 		await navigateQuery(page, '/?link=beta');
-		await expect(page.getByRole('region', { name: 'Replacement beta' })).toBeVisible();
-		delayed.release();
 		await expect(page.getByRole('dialog', { name: 'Replacement beta' })).toBeVisible();
+		await finishRendering(page);
+		await expect(page.getByRole('dialog')).toHaveCount(1);
+		await expect(page.getByRole('heading', { name: 'Alpha service', exact: true })).toHaveCount(0);
 		await expect(page).toHaveURL(`${app.url}/?link=beta`);
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
 		await expect(page).toHaveURL(`${app.url}/`);
 		await expect(page.locator('section.details')).toHaveCount(0);
 	} finally {
-		delayed.release();
-		await page.unrouteAll({ behavior: 'wait' });
 		expect(await app.stop()).toEqual({ code: 0, signal: null });
 	}
 });
@@ -435,86 +508,98 @@ test('a disconnected tile returns focus to the directory heading', async ({ page
 });
 
 for (const dismissal of ['Close', 'Escape', 'outside']) {
-	test(`delayed direct details remain controlled after opening another tile and ${dismissal}`, async ({
+	test(`hydrated direct details remain controlled after selecting another tile and ${dismissal}`, async ({
 		page
 	}) => {
-		const delayed = await holdDialog(page);
-		try {
-			await page.goto(`${server.url}/?link=alpha`);
-			await hydrated(page);
-			await delayed.requested;
-			await page.locator('a[href="/?link=beta"]').click();
-			delayed.release();
-			await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
-			if (dismissal === 'Close') {
-				await page.getByRole('button', { name: 'Close', exact: true }).click();
-			} else if (dismissal === 'Escape') {
-				await page.keyboard.press('Escape');
-			} else {
-				await page.locator('[data-dialog-overlay]').click({ position: { x: 5, y: 5 } });
-			}
-			await expect(page).toHaveURL(`${server.url}/?link=alpha`);
-			await expect(page.getByRole('dialog', { name: 'Alpha service' })).toBeVisible();
+		await page.goto(`${server.url}/?link=alpha`);
+		await hydrated(page);
+		await expect(page.getByRole('dialog', { name: 'Alpha service' })).toBeVisible();
+		// Exercise a controlled selection change; the modal correctly makes the grid inert to users.
+		await page.locator('a[href="/?link=beta"]').evaluate((tile: HTMLAnchorElement) => tile.click());
+		await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
+		if (dismissal === 'Close') {
 			await page.getByRole('button', { name: 'Close', exact: true }).click();
-			await expect(page).toHaveURL(`${server.url}/`);
-			await expect(page.getByRole('dialog')).toHaveCount(0);
-			await page.locator('a[href="/?link=beta"]').click();
-			await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
-		} finally {
-			delayed.release();
-			await page.unrouteAll({ behavior: 'wait' });
+		} else if (dismissal === 'Escape') {
+			await page.keyboard.press('Escape');
+		} else {
+			await page.locator('[data-dialog-overlay]').click({ position: { x: 5, y: 5 } });
 		}
+		await expect(page).toHaveURL(`${server.url}/?link=alpha`);
+		await expect(page.getByRole('dialog', { name: 'Alpha service' })).toBeVisible();
+		await page.getByRole('button', { name: 'Close', exact: true }).click();
+		await expect(page).toHaveURL(`${server.url}/`);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+		await page.locator('a[href="/?link=beta"]').click();
+		await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
 	});
 }
 
-test('rapid A then B activation accepts only the latest delayed intent', async ({ page }) => {
-	const delayed = await holdDialog(page);
+test('rapid A then B activation synchronously records both URLs and leaves B controlled', async ({
+	page
+}) => {
+	await page.goto(server.url);
+	await hydrated(page);
+	const locations = await page.evaluate(() => {
+		document.querySelector<HTMLAnchorElement>('a[href="/?link=alpha"]')!.click();
+		const first = location.search;
+		document.querySelector<HTMLAnchorElement>('a[href="/?link=beta"]')!.click();
+		return [first, location.search];
+	});
+	expect(locations).toEqual(['?link=alpha', '?link=beta']);
+	await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
+	await expect(page.getByRole('dialog')).toHaveCount(1);
+	await page.getByRole('button', { name: 'Close', exact: true }).click();
+	await expect(page).toHaveURL(`${server.url}/?link=alpha`);
+	await expect(page.getByRole('dialog', { name: 'Alpha service' })).toBeVisible();
+	await page.getByRole('button', { name: 'Close', exact: true }).click();
+	await expect(page).toHaveURL(`${server.url}/`);
+	await finishRendering(page);
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('baseline Back remains native while hydration is pending and cannot reopen details afterward', async ({
+	page
+}) => {
+	const delayed = await holdHydration(page);
 	try {
-		await page.goto(server.url);
-		await hydrated(page);
-		await page.locator('a[href="/?link=alpha"]').click();
+		await page.goto(`${server.url}/?link=alpha`, { waitUntil: 'commit' });
 		await delayed.requested;
-		await page.locator('a[href="/?link=beta"]').click();
+		await expect(page.getByRole('region', { name: 'Alpha service', exact: true })).toBeVisible();
+		await Promise.all([
+			page.waitForURL(`${server.url}/`, { waitUntil: 'commit' }),
+			page
+				.getByRole('link', { name: 'Back to directory', exact: true })
+				.click({ noWaitAfter: true })
+		]);
 		delayed.release();
-		await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
-		await expect(page).toHaveURL(`${server.url}/?link=beta`);
-		await page.getByRole('button', { name: 'Close', exact: true }).click();
-		await expect(page).toHaveURL(`${server.url}/`);
+		await hydrated(page);
+		await finishRendering(page);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+		await expect(page.locator('section.details')).toHaveCount(0);
 	} finally {
 		delayed.release();
 		await page.unrouteAll({ behavior: 'wait' });
 	}
 });
 
-for (const cancellation of ['back', 'baseline Back', 'native navigation', 'unmount']) {
-	test(`delayed enhancement cannot reopen after ${cancellation}`, async ({ page }) => {
-		const delayed = await holdDialog(page);
-		try {
-			await page.goto(server.url);
-			await hydrated(page);
-			if (cancellation === 'back' || cancellation === 'baseline Back')
-				await navigateQuery(page, '/?link=alpha');
-			else await page.locator('a[href="/?link=alpha"]').click();
-			await delayed.requested;
-			if (cancellation === 'back') await page.goBack();
-			if (cancellation === 'baseline Back')
-				await page.getByRole('link', { name: 'Back to directory' }).click();
-			if (cancellation === 'native navigation') await navigateQuery(page, '/');
-			if (cancellation === 'unmount') await navigateQuery(page, '/missing');
-			delayed.release();
-			await delayed.settled;
-			await page.unrouteAll({ behavior: 'wait' });
-			await page.evaluate(
-				() =>
-					new Promise<void>((resolve) =>
-						requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-					)
-			);
-			await expect(page.getByRole('dialog')).toHaveCount(0);
-			await expect(page).toHaveURL(`${server.url}${cancellation === 'unmount' ? '/missing' : '/'}`);
-		} finally {
-			delayed.release();
-			await page.unrouteAll({ behavior: 'wait' });
+for (const cancellation of ['back', 'native navigation', 'unmount']) {
+	test(`active details stay dismissed after ${cancellation} without a pending reopen`, async ({
+		page
+	}) => {
+		await page.goto(server.url);
+		await hydrated(page);
+		await page.locator('a[href="/?link=alpha"]').click();
+		await expect(page.getByRole('dialog', { name: 'Alpha service' })).toBeVisible();
+		if (cancellation === 'back') await page.goBack();
+		if (cancellation === 'native navigation') await navigateQuery(page, '/');
+		if (cancellation === 'unmount') await navigateQuery(page, '/missing');
+		await finishRendering(page);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+		await expect(page).toHaveURL(`${server.url}${cancellation === 'unmount' ? '/missing' : '/'}`);
+		if (cancellation === 'unmount') {
+			await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
+		} else {
+			await expect(page.locator('section.details')).toHaveCount(0);
 		}
 	});
 }
