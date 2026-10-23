@@ -431,6 +431,15 @@ focus to the activating tile, falling back to the directory heading when that re
 is no longer present. Chip selection instead returns focus to Search with the new
 query. Access flags remain advisory; filtering does not enforce service access.
 
+### Navigation error recovery
+
+Kit navigation errors use a centered, themed page with the HTTP status, a fixed
+heading and a native Back to home link. That link requests a full page load at `/`,
+so recovery does not depend on a failed client route module.
+The page does not render raw error messages, stacks or requested URLs, and makes
+no automatic retry. Authentication redirects and plain API denials remain owned
+by the access gate; this page does not bypass or replace them.
+
 ### Authentication boundary
 
 The running application owns its directory and one boot-created Auth.js instance

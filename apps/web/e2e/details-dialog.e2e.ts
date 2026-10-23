@@ -279,23 +279,32 @@ for (const entry of ['grid', 'direct']) {
 	});
 }
 
-test('a failed eager route module uses the generic native error page without a reload loop', async ({
-	page
-}) => {
+test('a failed eager route module offers safe recovery without a reload loop', async ({ page }) => {
 	let documents = 0;
 	page.on('request', (request) => {
 		if (request.isNavigationRequest()) documents++;
 	});
 	await page.route(`**${directoryScript}`, (route) => route.abort());
 	await page.goto(server.url);
-	await expect(page.getByRole('heading', { name: '500', exact: true })).toBeVisible();
-	await expect(page.getByText('Internal Error', { exact: true })).toBeVisible();
+	await expect(page.getByText('500', { exact: true })).toBeVisible();
+	await expect(
+		page.getByRole('heading', { name: 'Something went wrong', exact: true })
+	).toBeVisible();
+	const recovery = page.getByRole('link', { name: 'Back to home', exact: true });
+	await expect(recovery).toHaveAttribute('href', '/');
+	await expect(recovery).toHaveAttribute('data-sveltekit-reload', 'true');
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	await expect(page.locator('body')).not.toContainText(
 		'Failed to fetch dynamically imported module'
 	);
 	await finishRendering(page);
 	expect(documents).toBe(1);
+	await page.unroute(`**${directoryScript}`);
+	await recovery.click();
+	await expect(page).toHaveURL(`${server.url}/`);
+	await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeEnabled();
+	await expect(page.locator('.tile')).toHaveCount(2);
+	expect(documents).toBe(2);
 });
 
 test('modifier and middle activation preserve real new-tab navigation without enhancing the original grid', async ({
@@ -603,7 +612,10 @@ for (const cancellation of ['back', 'native navigation', 'unmount']) {
 		await expect(page.getByRole('dialog')).toHaveCount(0);
 		await expect(page).toHaveURL(`${server.url}${cancellation === 'unmount' ? '/missing' : '/'}`);
 		if (cancellation === 'unmount') {
-			await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
+			await expect(
+				page.getByRole('heading', { name: 'Page not found', exact: true })
+			).toBeVisible();
+			await expect(page.getByText('404', { exact: true })).toBeVisible();
 		} else {
 			await expect(page.locator('section.details')).toHaveCount(0);
 		}

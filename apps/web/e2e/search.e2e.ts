@@ -601,7 +601,8 @@ test('unmount discards a pending search completion', async ({ page }) => {
 		delayed.release();
 		await delayed.settled;
 		await finishRendering(page);
-		await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible();
+		await expect(page.getByText('404', { exact: true })).toBeVisible();
 		await expect(page.getByRole('status')).toHaveCount(0);
 		expect(errors).toEqual([]);
 	} finally {
