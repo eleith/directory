@@ -1,15 +1,11 @@
 import { validateConfig } from '@directory/config';
-import type { DirectoryLink, DirectorySite } from '@directory/config/types';
+import type { DirectoryLink } from '@directory/config/types';
 import { describe, expect, it } from 'vitest';
 import { getGroups } from './groups.js';
 
-function directory(
-	links: Record<string, Pick<DirectoryLink, 'title'> & Partial<DirectoryLink>>,
-	order: DirectorySite['order'] = 'configured'
-) {
+function directory(links: Record<string, Pick<DirectoryLink, 'title'> & Partial<DirectoryLink>>) {
 	const config = validateConfig(
 		{
-			site: { order },
 			links: Object.fromEntries(
 				Object.entries(links).map(([id, link]) => [id, { url: 'https://example.com', ...link }])
 			)
@@ -108,57 +104,48 @@ describe('prepared directory groups', () => {
 		expect(new Set(allIds).size).toBe(5);
 	});
 
-	it('sorts flat link titles alphabetically with numeric order and stable base-sensitive ties', () => {
-		const display = directory(
-			{
-				ten: { title: 'Tool 10' },
-				two: { title: 'Tool 2' },
-				accent: { title: 'Éclair' },
-				lower: { title: 'eclair' },
-				upper: { title: 'ECLAIR' }
-			},
-			'alphabetical'
-		);
+	it('preserves authored flat order regardless of numeric titles, accents or case', () => {
+		const display = directory({
+			ten: { title: 'Tool 10' },
+			two: { title: 'Tool 2' },
+			accent: { title: 'Éclair' },
+			lower: { title: 'eclair' },
+			upper: { title: 'ECLAIR' }
+		});
 		expect(display.grouped).toBe(false);
 		expect(display.groups[0]).not.toHaveProperty('label');
-		expect(groupLinkIds(display)).toEqual([['accent', 'lower', 'upper', 'two', 'ten']]);
+		expect(groupLinkIds(display)).toEqual([['ten', 'two', 'accent', 'lower', 'upper']]);
 	});
 
-	it('sorts named groups and their links but leaves the missing-group bucket last', () => {
-		const display = directory(
-			{
-				'missing-z': { title: 'Zebra' },
-				'tool-ten': { title: 'Tool 10', group: 'Shelf 10' },
-				'tool-two': { title: 'Tool 2', group: 'Shelf 10' },
-				'shelf-two': { title: 'Shelf', group: 'Shelf 2' },
-				other: { title: 'Other', group: 'Other' },
-				'missing-a': { title: 'Alpha' }
-			},
-			'alphabetical'
-		);
+	it('keeps authored group and link order with ungrouped links last', () => {
+		const display = directory({
+			'missing-z': { title: 'Zebra' },
+			'tool-ten': { title: 'Tool 10', group: 'Shelf 10' },
+			'tool-two': { title: 'Tool 2', group: 'Shelf 10' },
+			'shelf-two': { title: 'Shelf', group: 'Shelf 2' },
+			other: { title: 'Other', group: 'Other' },
+			'missing-a': { title: 'Alpha' }
+		});
 		expect(display.groups.map((group) => group.id)).toEqual([
-			'named:Other',
-			'named:Shelf 2',
 			'named:Shelf 10',
+			'named:Shelf 2',
+			'named:Other',
 			'ungrouped'
 		]);
 		expect(groupLinkIds(display)).toEqual([
-			['other'],
+			['tool-ten', 'tool-two'],
 			['shelf-two'],
-			['tool-two', 'tool-ten'],
-			['missing-a', 'missing-z']
+			['other'],
+			['missing-z', 'missing-a']
 		]);
 	});
 
-	it('preserves declaration order for equal group labels under the collator', () => {
-		const display = directory(
-			{
-				accent: { title: 'First', group: 'Éclair' },
-				lower: { title: 'Second', group: 'eclair' },
-				upper: { title: 'Third', group: 'ECLAIR' }
-			},
-			'alphabetical'
-		);
+	it('keeps distinct group labels without normalizing accents or case', () => {
+		const display = directory({
+			accent: { title: 'First', group: 'Éclair' },
+			lower: { title: 'Second', group: 'eclair' },
+			upper: { title: 'Third', group: 'ECLAIR' }
+		});
 		expect(display.groups.map((group) => group.id)).toEqual([
 			'named:Éclair',
 			'named:eclair',

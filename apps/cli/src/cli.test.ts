@@ -15,7 +15,6 @@ const configuration: DirectoryConfiguration = {
 		title: 'DO_NOT_PRINT_SITE',
 		description: '',
 		footer: '',
-		order: 'configured',
 		logo_path: '/favicon.svg',
 		favicon_path: '/favicon.svg'
 	},

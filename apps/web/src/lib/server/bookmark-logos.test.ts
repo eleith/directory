@@ -129,7 +129,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 		expect(background(logos.photos!)).toBe(background(logos.backup!));
 	});
 
-	it('keeps colors stable through group insertion, declaration reordering and sorting', () => {
+	it('keeps colors stable through group insertion, declaration reordering and accent changes', () => {
 		const config = configuration({
 			photos: { title: 'Photos', group: 'Family' },
 			files: { title: 'Files' },
@@ -142,7 +142,6 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 			files: config.links.files!,
 			photos: config.links.photos!
 		});
-		reordered.site.order = 'alphabetical';
 		reordered.appearance.primary_light_color = '#000000';
 		reordered.appearance.primary_dark_color = '#ffffff';
 		const updated = getBookmarkLogos(reordered);

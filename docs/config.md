@@ -135,7 +135,7 @@ For example:
 
 ```yaml
 site:
-  order: '${DIRECTORY_ORDER:-configured}'
+  title: '${DIRECTORY_TITLE:-Home}'
 links:
   photos:
     title: Photos
@@ -157,9 +157,8 @@ secrets stay outside its display model. The validator prints neither kind.
 | Field                                 | Contract                                                                                                                                                                                                                                                    |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version`                             | Only `1`; defaults to `1`. This is the file format, not the app release.                                                                                                                                                                                    |
-| `site`                                | Optional object. Defaults: title `Directory`, description/footer empty, order `configured`.                                                                                                                                                                 |
+| `site`                                | Optional object. Defaults: title `Directory`, description/footer empty.                                                                                                                                                                                     |
 | `site.logo_path`, `site.favicon_path` | Independent site images, normalized by the shared loader to bundled `/favicon.svg` when omitted. Explicit `/favicon.svg` is also valid. Header and sign-in show the logo at 48px. Mounted selections publish bytes at `/logo` and `/favicon` independently. |
-| `site.order`                          | `configured` or `alphabetical`; defaults to `configured`.                                                                                                                                                                                                   |
 | `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                                                                                                        |
 | `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                                                                                                        |
 | `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `''` and the three advisory booleans default to `false`.                                                                               |
@@ -203,9 +202,10 @@ validation leave the original string alone.
 `group` is an optional nonblank display label, independent of tags. If every link
 omits it, the planned directory is flat. If any link has a group, ungrouped links
 appear under Other. No category collection or global `group_by` selector is
-needed. Configured ordering preserves declaration order; alphabetical sorts group
-labels/link titles with stable ties, with the ungrouped Other bucket last. A real
-group named Other remains distinct from that missing-group bucket.
+needed. Groups follow their first appearance in the YAML, and links within each
+group keep their declaration order. The ungrouped Other bucket stays last. A real
+group named Other remains distinct from that missing-group bucket. There is no
+sorting setting; remove `site.order` from older configurations.
 
 The three booleans are **informational service hints only** and default to false:
 

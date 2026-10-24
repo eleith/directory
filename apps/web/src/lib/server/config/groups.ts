@@ -1,12 +1,9 @@
-import type { DirectoryConfiguration, DirectoryLink, DirectorySite } from '@directory/config/types';
+import type { DirectoryConfiguration, DirectoryLink } from '@directory/config/types';
 import type { DirectoryDisplay, DisplayGroup, DisplayLink } from '../../display/types.js';
-
-const alphabeticalOrder = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
 
 export function getGroups(
 	config: DirectoryConfiguration
 ): Pick<DirectoryDisplay, 'grouped' | 'groups'> {
-	const order = config.site.order;
 	const namedGroups = new Map<string, { id: string; label: string; links: DisplayLink[] }>();
 	const ungroupedLinks: DisplayLink[] = [];
 
@@ -26,20 +23,16 @@ export function getGroups(
 	}
 
 	const grouped = namedGroups.size > 0;
-	const orderedNamedGroups = Array.from(namedGroups.values());
-	if (order === 'alphabetical') {
-		orderedNamedGroups.sort((left, right) => alphabeticalOrder.compare(left.label, right.label));
-	}
-	const groups: DisplayGroup[] = orderedNamedGroups.map((group) => ({
+	const groups: DisplayGroup[] = Array.from(namedGroups.values()).map((group) => ({
 		id: group.id,
 		label: group.label,
-		links: orderDisplayLinks(group.links, order)
+		links: group.links
 	}));
 
 	if (ungroupedLinks.length > 0) {
 		const ungrouped: { id: string; label?: string; links: readonly DisplayLink[] } = {
 			id: 'ungrouped',
-			links: orderDisplayLinks(ungroupedLinks, order)
+			links: ungroupedLinks
 		};
 		if (grouped) ungrouped.label = 'Other';
 		groups.push(ungrouped);
@@ -70,15 +63,4 @@ function getTagLabels(link: DirectoryLink): string[] {
 		.split(',')
 		.map((tag) => tag.trim())
 		.filter((tag) => tag.length > 0);
-}
-
-function orderDisplayLinks(
-	links: readonly DisplayLink[],
-	order: DirectorySite['order']
-): DisplayLink[] {
-	const orderedLinks = [...links];
-	if (order === 'alphabetical') {
-		orderedLinks.sort((left, right) => alphabeticalOrder.compare(left.title, right.title));
-	}
-	return orderedLinks;
 }

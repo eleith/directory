@@ -26,7 +26,6 @@ const fieldNames = new Set([
 	'logo_path',
 	'favicon_path',
 	'footer',
-	'order',
 	'primary_light_color',
 	'primary_dark_color',
 	'oidc',

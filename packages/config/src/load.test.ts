@@ -65,7 +65,6 @@ describe('default, interpolate, then validate', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			order: 'configured',
 			logo_path: '/favicon.svg',
 			favicon_path: '/favicon.svg'
 		});
@@ -110,7 +109,6 @@ describe('default, interpolate, then validate', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			order: 'configured',
 			logo_path: '/favicon.svg',
 			favicon_path: '/favicon.svg',
 			...site
@@ -149,10 +147,10 @@ describe('default, interpolate, then validate', () => {
 		expect(createEditorSchema()).toEqual(editor);
 	});
 
-	it('validates expanded URLs, paths, colors and enum values without converting types', () => {
+	it('validates expanded URLs, paths and colors without converting types', () => {
 		const config = validateConfig(
 			{
-				site: { order: '${ORDER}' },
+				site: { title: '${TITLE}' },
 				appearance: { primary_light_color: '${COLOR}' },
 				links: {
 					photos: {
@@ -165,14 +163,14 @@ describe('default, interpolate, then validate', () => {
 			},
 			{
 				env: {
-					ORDER: 'alphabetical',
+					TITLE: 'Family',
 					COLOR: '#123456',
 					URL: 'https://photos.example.com',
 					LOGO: 'photos.svg'
 				}
 			}
 		);
-		expect(config.site.order).toBe('alphabetical');
+		expect(config.site.title).toBe('Family');
 		expect(config.appearance.primary_light_color).toBe('#123456');
 		expect(config.links.photos).toMatchObject({
 			logo_path: '/public/photos.svg',
@@ -302,7 +300,6 @@ describe('YAML file loader', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			order: 'configured',
 			logo_path: '/favicon.svg',
 			favicon_path: '/favicon.svg'
 		});

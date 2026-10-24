@@ -7,7 +7,6 @@ site:
   title: Home Server
   description: Useful things running at home.
   footer: Something not working? Ask your household maintainer.
-  order: configured # Or alphabetical.
 
 appearance:
   primary_light_color: '#0f766e'

@@ -30,7 +30,7 @@ function accepts(value: unknown): boolean {
 }
 
 describe('configuration defaults and inferred types', () => {
-	it('fills nested objects, the ordering union, and each link map value', () => {
+	it('fills nested objects and each link map value', () => {
 		const value = defaultFixture({ links: { photos: link, router: { ...link, title: 'Router' } } });
 		expect(Value.Check(DirectoryConfigurationSchema, configurationReferences, value)).toBe(true);
 		expect(value).toEqual({
@@ -39,7 +39,6 @@ describe('configuration defaults and inferred types', () => {
 				title: 'Directory',
 				description: '',
 				footer: '',
-				order: 'configured',
 				logo_path: '/favicon.svg',
 				favicon_path: '/favicon.svg'
 			},
@@ -61,7 +60,7 @@ describe('configuration defaults and inferred types', () => {
 
 	it('keeps groups, comma-separated tags, multiline descriptions and advisory flags independent', () => {
 		const value = defaultFixture({
-			site: { title: 'Home', order: 'alphabetical' },
+			site: { title: 'Home' },
 			appearance: { primary_light_color: '#abc' },
 			links: {
 				photos: {
@@ -103,9 +102,6 @@ describe('configuration defaults and inferred types', () => {
 		expectTypeOf<DirectoryConfiguration['site']['favicon_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryLink['logo_path']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryLink['favicon_path']>().toEqualTypeOf<string | undefined>();
-		expectTypeOf<DirectoryConfiguration['site']['order']>().toEqualTypeOf<
-			'configured' | 'alphabetical'
-		>();
 		expectTypeOf<DirectoryConfiguration['auth']>().toBeNullable();
 		expectTypeOf<DirectoryLink['tags']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryLink['group']>().toEqualTypeOf<string | undefined>();
@@ -204,6 +200,10 @@ describe('strict configuration boundary', () => {
 		);
 	});
 
+	it.each(['configured', 'alphabetical'])('rejects removed site.order value %s', (order) => {
+		expect(accepts({ ...raw, site: { order } })).toBe(false);
+	});
+
 	it.each([
 		{ ...raw, extra: true },
 		{ ...raw, version: 2 },
@@ -233,7 +233,7 @@ describe('strict configuration boundary', () => {
 			for (const value of [
 				JSON.parse(`{"links":{},"${key}":{}}`) as unknown,
 				JSON.parse(
-					`{"links":{"${key}":{"title":"Bad","url":"https://example.com","tags":"","requires_auth":false,"internal_only":false,"admin_only":false}},"version":1,"site":{"title":"Directory","description":"","footer":"","order":"configured"},"appearance":{"primary_light_color":"#fff","primary_dark_color":"#000"}}`
+					`{"links":{"${key}":{"title":"Bad","url":"https://example.com","tags":"","requires_auth":false,"internal_only":false,"admin_only":false}},"version":1,"site":{"title":"Directory","description":"","footer":""},"appearance":{"primary_light_color":"#fff","primary_dark_color":"#000"}}`
 				) as unknown
 			]) {
 				expect(Value.Check(DirectoryConfigurationSchema, configurationReferences, value)).toBe(

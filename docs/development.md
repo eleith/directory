@@ -192,9 +192,9 @@ random UUIDs, not hashes of configuration or credentials.
 
 `prepareDirectory` builds the browser data through `getSite(config)` and
 `getGroups(config)`. These helpers select public fields, prepare comma-split tag
-labels, and group/order links. Alphabetical ordering uses an English,
-base-sensitive, numeric collator on the server, preserving declaration-order ties.
-Group identities keep a configured Other separate from the missing-group bucket.
+labels, and group links in YAML declaration order. Named groups follow their first
+appearance, with ungrouped links last. Group identities keep a configured Other
+separate from the missing-group bucket.
 
 `loadDirectory(path?, { env, report }?)` in
 `apps/web/src/lib/server/config/load-directory.ts` loads and prepares the first

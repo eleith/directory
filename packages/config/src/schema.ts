@@ -93,11 +93,7 @@ export const SiteSchema = Type.Object(
 		description: Type.String({ default: '' }),
 		logo_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
 		favicon_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
-		footer: Type.String({ default: '' }),
-		order: Type.Union([Type.Literal('configured'), Type.Literal('alphabetical')], {
-			default: 'configured',
-			description: 'Ordering of groups and links; the ungrouped Other bucket stays last.'
-		})
+		footer: Type.String({ default: '' })
 	},
 	{ $id: 'Site', additionalProperties: false }
 );

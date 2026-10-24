@@ -152,33 +152,7 @@
 				"description": { "default": "", "type": "string" },
 				"logo_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
 				"favicon_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
-				"footer": { "default": "", "type": "string" },
-				"order": {
-					"default": "configured",
-					"description": "Ordering of groups and links; the ungrouped Other bucket stays last.",
-					"anyOf": [
-						{
-							"type": "string",
-							"anyOf": [
-								{ "type": "string", "const": "configured" },
-								{
-									"type": "string",
-									"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
-								}
-							]
-						},
-						{
-							"type": "string",
-							"anyOf": [
-								{ "type": "string", "const": "alphabetical" },
-								{
-									"type": "string",
-									"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
-								}
-							]
-						}
-					]
-				}
+				"footer": { "default": "", "type": "string" }
 			}
 		},
 		"Appearance": {

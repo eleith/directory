@@ -20,8 +20,7 @@ describe('prepareDirectory', () => {
 					description: 'Welcome\nEveryone',
 					footer: 'At home',
 					logo_path: '/public/site.svg',
-					favicon_path: '/public/site.png',
-					order: 'alphabetical'
+					favicon_path: '/public/site.png'
 				},
 				appearance: { primary_light_color: '#123', primary_dark_color: '#abcdef' },
 				links: {
@@ -213,7 +212,6 @@ describe('prepareDirectory', () => {
 		expect(display).toEqual(prepareDirectory(publicConfig, 'redacted'));
 		expect(JSON.stringify(display)).not.toContain(sentinel);
 		expect(display).not.toHaveProperty('auth');
-		expect(display.site).not.toHaveProperty('order');
 	});
 
 	it('deeply freezes only its own DTO without mutating or freezing input', () => {

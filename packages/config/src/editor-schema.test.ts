@@ -8,7 +8,6 @@ import {
 	HexColorSchema,
 	HttpUrlSchema,
 	LocalImagePathSchema,
-	SiteSchema,
 	DirectoryConfigurationSchema
 } from './schema.js';
 
@@ -41,6 +40,7 @@ describe('default-aware editor schema', () => {
 			});
 		}
 		expect(object(definition(editor, 'Site').properties)).not.toHaveProperty('group_by');
+		expect(object(definition(editor, 'Site').properties)).not.toHaveProperty('order');
 		expect(definition(editor, 'CredentialsAuth').required).toEqual(['username', 'password']);
 		expect(definition(editor, 'OidcAuth').required).toEqual([
 			'issuer',
@@ -175,17 +175,23 @@ describe('default-aware editor schema', () => {
 			expect(adapted.format).toBeUndefined();
 			expect(adapted.description).toBe(canonical.description);
 		}
-		const order = property(definition(editor, 'Site'), 'order');
-		expect(order.default).toBe('configured');
-		expect(order.description).toBe(SiteSchema.properties.order.description);
-		const choices = order.anyOf as ObjectSchema[];
-		expect(choices.map((choice) => (choice.anyOf as ObjectSchema[])[0])).toEqual([
-			{ type: 'string', const: 'configured' },
-			{ type: 'string', const: 'alphabetical' }
+		const fixture = Type.Object({
+			choice: Type.Union([Type.Literal('first'), Type.Literal('second')], {
+				default: 'first',
+				description: 'A string choice.'
+			})
+		});
+		const choice = property(createEditorSchema(fixture, []), 'choice');
+		expect(choice.default).toBe('first');
+		expect(choice.description).toBe('A string choice.');
+		const choices = choice.anyOf as ObjectSchema[];
+		expect(choices.map((branch) => (branch.anyOf as ObjectSchema[])[0])).toEqual([
+			{ type: 'string', const: 'first' },
+			{ type: 'string', const: 'second' }
 		]);
-		for (const choice of choices) {
-			expect(choice.const).toBeUndefined();
-			expect(interpolationPattern(choice).test('${ORDER:-configured}')).toBe(true);
+		for (const branch of choices) {
+			expect(branch.const).toBeUndefined();
+			expect(interpolationPattern(branch).test('${CHOICE:-first}')).toBe(true);
 		}
 	});
 
@@ -317,8 +323,6 @@ describe('default-aware editor schema', () => {
 		expect(Value.Check(LocalImagePathSchema, '/public/logo.svg')).toBe(true);
 		expect(Value.Check(HexColorSchema, 'red')).toBe(false);
 		expect(Value.Check(HexColorSchema, '#abc')).toBe(true);
-		expect(Value.Check(SiteSchema.properties.order, '${ORDER}')).toBe(false);
-		expect(Value.Check(SiteSchema.properties.order, 'alphabetical')).toBe(true);
 	});
 
 	it('rejects missing/duplicate IDs and dangling references', () => {
