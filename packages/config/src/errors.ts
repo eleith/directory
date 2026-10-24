@@ -1,3 +1,6 @@
+import { TypeGuard, type TSchema } from '@sinclair/typebox';
+import { configurationReferences, DirectoryConfigurationSchema } from './schema.js';
+
 const issueMessages = {
 	file_unreadable: 'Unable to read the configuration file.',
 	invalid_yaml: 'Invalid YAML document.',
@@ -15,69 +18,57 @@ export interface ConfigIssue {
 
 type IssueLocation = Pick<ConfigIssue, 'code' | 'path'>;
 
-const fieldNames = new Set([
-	'version',
-	'site',
-	'appearance',
-	'auth',
-	'links',
-	'title',
-	'description',
-	'logo_path',
-	'favicon_path',
-	'footer',
-	'primary_light_color',
-	'primary_dark_color',
-	'oidc',
-	'credentials',
-	'issuer',
-	'client_id',
-	'client_secret',
-	'username',
-	'password',
-	'url',
-	'tags',
-	'group',
-	'requires_auth',
-	'internal_only',
-	'admin_only'
-]);
+const schemaFieldNames = new Set(
+	[DirectoryConfigurationSchema, ...configurationReferences].flatMap(getSchemaFieldNames)
+);
 
 export class ConfigError extends Error {
 	readonly issues: readonly ConfigIssue[];
 
 	constructor(locations: readonly IssueLocation[]) {
-		const issues = locations.map(createSafeIssue);
-		super(
-			`Configuration is invalid.\n${issues.map((issue) => `  ${issue.path}: ${issue.message} (${issue.code})`).join('\n')}`
-		);
+		const issues = locations.map(redactIssue);
+		const details = issues
+			.map((issue) => `  ${issue.path}: ${issue.message} (${issue.code})`)
+			.join('\n');
+		super(`Configuration is invalid.\n${details}`);
 		this.name = 'ConfigError';
 		this.issues = Object.freeze(issues);
 	}
 }
 
-function createSafeIssue(location: IssueLocation): ConfigIssue {
+function getSchemaFieldNames(schema: TSchema): string[] {
+	if (TypeGuard.IsObject(schema)) {
+		const directNames = Object.keys(schema.properties);
+		const nestedNames = Object.values(schema.properties).flatMap(getSchemaFieldNames);
+		return [...directNames, ...nestedNames];
+	}
+	if (TypeGuard.IsUnion(schema)) {
+		return schema.anyOf.flatMap(getSchemaFieldNames);
+	}
+	return [];
+}
+
+function redactIssue(location: IssueLocation): ConfigIssue {
 	let code = location.code;
 	if (!Object.hasOwn(issueMessages, code)) code = 'invalid_value';
 	return Object.freeze({
 		code,
-		path: safeIssuePath(location.path),
+		path: redactIssuePath(location.path),
 		message: issueMessages[code]
 	});
 }
 
-function safeIssuePath(path: string): string {
+function redactIssuePath(path: string): string {
 	if (path === '' || path === '/') return '/';
-	const parts = path.split('/').slice(1);
-	const safeParts: string[] = [];
-	for (const [index, part] of parts.entries()) {
-		const isLinkIdentifier = index === 1 && parts[0] === 'links';
-		if (isLinkIdentifier) {
-			safeParts.push('*');
+	const segments = path.split('/').slice(1);
+	const redactedSegments: string[] = [];
+	for (const [index, segment] of segments.entries()) {
+		const isLinkIdentifier = index === 1 && segments[0] === 'links';
+		if (isLinkIdentifier || !schemaFieldNames.has(segment)) {
+			redactedSegments.push('*');
 			continue;
 		}
-		if (fieldNames.has(part)) safeParts.push(part);
-		else safeParts.push('*');
+		redactedSegments.push(segment);
 	}
-	return safeParts.length === 0 ? '/' : `/${safeParts.join('/')}`;
+	return `/${redactedSegments.join('/')}`;
 }
