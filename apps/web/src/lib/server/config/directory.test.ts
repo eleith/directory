@@ -1,7 +1,8 @@
 import { validateConfig } from '@directory/config';
 import type { DirectoryConfiguration } from '@directory/config/types';
-import { describe, expect, it } from 'vitest';
-import { prepareDirectory } from './directory.js';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { DisplaySite } from '../../display/types.js';
+import { getSite, prepareDirectory } from './directory.js';
 
 const destination = { title: 'Photos', url: 'https://photos.example.com' };
 
@@ -46,7 +47,8 @@ describe('prepareDirectory', () => {
 				description: 'Welcome\nEveryone',
 				footer: 'At home',
 				logo_path: '/public/site.svg',
-				favicon_path: '/public/site.png'
+				favicon_path: '/public/site.png',
+				open_links_in_new_tab: true
 			},
 			appearance: { primary_light_color: '#123', primary_dark_color: '#abcdef' },
 			grouped: true,
@@ -81,7 +83,8 @@ describe('prepareDirectory', () => {
 				description: '',
 				footer: '',
 				logo_path: '/favicon.svg',
-				favicon_path: '/favicon.svg'
+				favicon_path: '/favicon.svg',
+				open_links_in_new_tab: true
 			},
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 			grouped: false,
@@ -107,6 +110,7 @@ describe('prepareDirectory', () => {
 			'favicon_path',
 			'footer',
 			'logo_path',
+			'open_links_in_new_tab',
 			'title'
 		]);
 		expect(Object.keys(display.groups[0]!.links[0]!).sort()).toEqual([
@@ -120,6 +124,24 @@ describe('prepareDirectory', () => {
 			'url'
 		]);
 	});
+
+	it.each([true, false])(
+		'projects the normalized global link target preference %s directly',
+		(open_links_in_new_tab) => {
+			const config = validateConfig(
+				{ site: { open_links_in_new_tab }, links: { photos: destination } },
+				{ env: {} }
+			);
+			const before = structuredClone(config);
+			const site = getSite(config);
+			expectTypeOf<DisplaySite['open_links_in_new_tab']>().toEqualTypeOf<boolean>();
+			expect(site.open_links_in_new_tab).toBe(open_links_in_new_tab);
+			const display = prepareDirectory(config, 'link-target');
+			expect(display.site).toEqual(site);
+			expect(display.groups[0]!.links[0]!).not.toHaveProperty('open_links_in_new_tab');
+			expect(config).toEqual(before);
+		}
+	);
 
 	it('preserves empty descriptions and primary logos independently of site images', () => {
 		const config = validateConfig(

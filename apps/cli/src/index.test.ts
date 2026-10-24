@@ -32,6 +32,31 @@ interface ValidationCase {
 
 const validationCases: ValidationCase[] = [
 	{ name: 'minimal YAML', yaml: 'links: {}\n', valid: true },
+	...[true, false].map(
+		(value): ValidationCase => ({
+			name: `global link target preference ${value}`,
+			yaml: `site: {open_links_in_new_tab: ${value}}\nlinks: {}\n`,
+			valid: true
+		})
+	),
+	...['"true"', '"false"', '0', 'null'].map(
+		(value): ValidationCase => ({
+			name: `invalid global link target preference ${value}`,
+			yaml: `site: {open_links_in_new_tab: ${value}}\nlinks: {}\n`,
+			valid: false
+		})
+	),
+	{
+		name: 'environment-expanded link target string is not a boolean',
+		yaml: "site: {open_links_in_new_tab: '${DIRECTORY_CLI_FLAG}'}\nlinks: {}\n",
+		env: { DIRECTORY_CLI_FLAG: 'false' },
+		valid: false
+	},
+	{
+		name: 'per-bookmark link target preference is an unknown field',
+		yaml: 'links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, open_links_in_new_tab: false}\n',
+		valid: false
+	},
 	{
 		name: 'YAML tag list with an interpolated label and literal comma',
 		yaml: "links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, tags: ['${TAG}', 'family, photos']}\n",

@@ -154,7 +154,12 @@
 				"description": { "default": "", "type": "string" },
 				"logo_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
 				"favicon_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
-				"footer": { "default": "", "type": "string" }
+				"footer": { "default": "", "type": "string" },
+				"open_links_in_new_tab": {
+					"default": true,
+					"description": "Open service links in a new tab instead of the current tab.",
+					"type": "boolean"
+				}
 			}
 		},
 		"Appearance": {

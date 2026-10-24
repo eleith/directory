@@ -42,6 +42,16 @@ describe('default-aware editor schema', () => {
 				default: false
 			});
 		}
+		expect(property(definition(editor, 'Site'), 'open_links_in_new_tab')).toMatchObject({
+			type: 'boolean',
+			default: true
+		});
+		expect(property(definition(editor, 'Site'), 'open_links_in_new_tab')).not.toHaveProperty(
+			'anyOf'
+		);
+		expect(object(definition(editor, 'Link').properties)).not.toHaveProperty(
+			'open_links_in_new_tab'
+		);
 		expect(object(definition(editor, 'Site').properties)).not.toHaveProperty('group_by');
 		expect(object(definition(editor, 'Site').properties)).not.toHaveProperty('order');
 		expect(definition(editor, 'CredentialsAuth').required).toEqual(['username', 'password']);

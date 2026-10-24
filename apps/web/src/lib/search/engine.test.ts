@@ -24,7 +24,8 @@ function directory(groups: readonly DisplayGroup[]): DirectoryDisplay {
 			description: '',
 			footer: '',
 			logo_path: '/favicon.svg',
-			favicon_path: '/favicon.svg'
+			favicon_path: '/favicon.svg',
+			open_links_in_new_tab: true
 		}),
 		appearance: Object.freeze({ primary_light_color: '#111', primary_dark_color: '#eee' }),
 		grouped: true,

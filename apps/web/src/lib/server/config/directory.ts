@@ -28,6 +28,7 @@ export function getSite(config: DirectoryConfiguration): DisplaySite {
 		description: site.description,
 		footer: site.footer,
 		logo_path: site.logo_path,
-		favicon_path: site.favicon_path
+		favicon_path: site.favicon_path,
+		open_links_in_new_tab: site.open_links_in_new_tab
 	};
 }

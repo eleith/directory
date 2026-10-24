@@ -9,12 +9,14 @@
 	let {
 		link,
 		groupLabel,
+		openLinksInNewTab,
 		onClose,
 		onReturnFocus,
 		onTagSearch
 	}: {
 		link?: DisplayLink | undefined;
 		groupLabel?: string | undefined;
+		openLinksInNewTab: boolean;
 		onClose: () => void;
 		onReturnFocus: () => void;
 		onTagSearch: (query: string) => void;
@@ -73,6 +75,7 @@
 									<DetailContent
 										link={details.link}
 										groupLabel={details.groupLabel}
+										{openLinksInNewTab}
 										headingAttributes={titleProps}
 										reserveCloseSpace
 										{onTagSearch}

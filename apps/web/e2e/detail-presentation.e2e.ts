@@ -21,6 +21,15 @@ links:
     title: Books
     url: https://books.example.test
 `;
+function configurationWithLinkTarget(openLinksInNewTab?: boolean) {
+	return openLinksInNewTab === undefined
+		? configuration
+		: configuration.replace(
+				'  title: Detail presentation fixture',
+				`  title: Detail presentation fixture\n  open_links_in_new_tab: ${openLinksInNewTab}`
+			);
+}
+
 let server: TestServer;
 
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
@@ -520,6 +529,117 @@ test('long unbroken tags wrap within the phone scrollport and keep actions reach
 		expect(await app.stop()).toEqual({ code: 0, signal: null });
 	}
 });
+
+for (const javaScriptEnabled of [true, false]) {
+	test.describe(`native Open links with JavaScript ${javaScriptEnabled ? 'enabled' : 'disabled'}`, () => {
+		test.use({ javaScriptEnabled });
+
+		for (const openLinksInNewTab of [undefined, true, false]) {
+			test(`site.open_links_in_new_tab: ${openLinksInNewTab ?? 'omitted'}`, async ({
+				page,
+				context
+			}) => {
+				const app = await startServer({
+					configuration: configurationWithLinkTarget(openLinksInNewTab),
+					secret: null,
+					origin: null
+				});
+				try {
+					await app.ready();
+					const serviceRequestURL = new URL(serviceURL);
+					serviceRequestURL.hash = '';
+					await context.route(
+						(url) => url.href === serviceRequestURL.href,
+						(route) =>
+							route.fulfill({
+								contentType: 'text/html',
+								body: '<!doctype html><title>Service fixture</title><h1>Service fixture</h1>'
+							})
+					);
+					const directoryURL = `${app.url}/?q=archive`;
+					const detailURL = `${app.url}/?link=archive&q=archive`;
+					await page.goto(directoryURL);
+					const tile = page.getByRole('link').filter({
+						has: page.getByText('Family archive', { exact: true })
+					});
+					await expect(tile).toHaveAttribute('href', '/?link=archive&q=archive');
+					if (javaScriptEnabled) {
+						await expect(page.getByRole('searchbox')).toBeEnabled();
+						await tile.click();
+					} else {
+						await page.keyboard.press('Tab');
+						await expect(tile).toBeFocused();
+						await page.keyboard.press('Enter');
+					}
+					await expect(page).toHaveURL(detailURL);
+					const content = javaScriptEnabled
+						? page.getByRole('dialog', { name: 'Family archive', exact: true })
+						: page.locator('section.details');
+					if (!javaScriptEnabled) {
+						await expect(page.getByRole('dialog')).toHaveCount(0);
+						const back = content.getByRole('link', { name: 'Back to directory', exact: true });
+						await expect(back).toHaveAttribute('href', '/?q=archive');
+						await back.click();
+						await expect(page).toHaveURL(directoryURL);
+						await page.keyboard.press('Tab');
+						await expect(tile).toBeFocused();
+						await page.keyboard.press('Enter');
+						await expect(page).toHaveURL(detailURL);
+						await page.keyboard.press('Tab');
+						await expect(back).toBeFocused();
+						await page.keyboard.press('Tab');
+						await expect(
+							content.getByRole('textbox', { name: 'Destination', exact: true })
+						).toBeFocused();
+						await page.keyboard.press('Tab');
+					}
+					const opensNewTab = openLinksInNewTab !== false;
+					const action = content.locator('a.open-service');
+					await expect(action).toHaveAccessibleName(
+						opensNewTab ? 'Open Family archive (opens in a new tab)' : 'Open Family archive'
+					);
+					await expect(action).toHaveText('Open');
+					await expect(action).toHaveAttribute('href', serviceURL);
+					await expect(action).toHaveAttribute('target', opensNewTab ? '_blank' : '_self');
+					await expect(action).toHaveAttribute('rel', 'noopener noreferrer');
+					await expect(action).toBeFocused();
+					if (!opensNewTab) {
+						const popupPromise = context.waitForEvent('page');
+						await action.click({ button: 'middle' });
+						const popup = await popupPromise;
+						await expect(popup).toHaveURL(serviceURL);
+						await expect(
+							popup.getByRole('heading', { name: 'Service fixture', exact: true })
+						).toBeVisible();
+						await expect(page).toHaveURL(detailURL);
+						await popup.close();
+						await expect(action).toBeFocused();
+					}
+					if (opensNewTab) {
+						const popupPromise = context.waitForEvent('page');
+						await page.keyboard.press('Enter');
+						const popup = await popupPromise;
+						await expect(popup).toHaveURL(serviceURL);
+						await expect(
+							popup.getByRole('heading', { name: 'Service fixture', exact: true })
+						).toBeVisible();
+						await expect(page).toHaveURL(detailURL);
+						await popup.close();
+					} else {
+						await page.keyboard.press('Enter');
+						await expect(page).toHaveURL(serviceURL);
+						await expect(
+							page.getByRole('heading', { name: 'Service fixture', exact: true })
+						).toBeVisible();
+					}
+					expect(context.pages()).toEqual([page]);
+				} finally {
+					expect(await app.stop()).toEqual({ code: 0, signal: null });
+				}
+			});
+		}
+	});
+}
 
 test('plain details share the presentation and action without JavaScript', async ({ browser }) => {
 	const context = await browser.newContext({

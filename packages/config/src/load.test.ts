@@ -71,7 +71,8 @@ describe('default, interpolate, then validate', () => {
 			description: '',
 			footer: '',
 			logo_path: '/favicon.svg',
-			favicon_path: '/favicon.svg'
+			favicon_path: '/favicon.svg',
+			open_links_in_new_tab: true
 		});
 		expect(config.appearance).toEqual({
 			primary_light_color: '#0f766e',
@@ -140,6 +141,7 @@ describe('default, interpolate, then validate', () => {
 			footer: '',
 			logo_path: '/favicon.svg',
 			favicon_path: '/favicon.svg',
+			open_links_in_new_tab: true,
 			...site
 		});
 		expect(config.links.photos).not.toHaveProperty('logo_path');
@@ -150,6 +152,47 @@ describe('default, interpolate, then validate', () => {
 		);
 		expect(raw).toEqual(before);
 	});
+
+	it.each([true, false])(
+		'preserves the authored global link target preference %s',
+		(open_links_in_new_tab) => {
+			const raw = { site: { open_links_in_new_tab }, links: { photos: link } };
+			const before = structuredClone(raw);
+			const config = validateConfig(raw, { env: {} });
+			expect(config.site.open_links_in_new_tab).toBe(open_links_in_new_tab);
+			expect(config.links.photos).not.toHaveProperty('open_links_in_new_tab');
+			config.site.open_links_in_new_tab = !open_links_in_new_tab;
+			expect(validateConfig(raw, { env: {} }).site.open_links_in_new_tab).toBe(
+				open_links_in_new_tab
+			);
+			expect(raw).toEqual(before);
+		}
+	);
+
+	it.each(
+		['false', 'true', 0, 1, null, '', [], {}].map((open_links_in_new_tab) => ({
+			open_links_in_new_tab
+		}))
+	)('rejects non-boolean target preference', ({ open_links_in_new_tab }) => {
+		expect(() =>
+			validateConfig({ site: { open_links_in_new_tab }, links: {} }, { env: {} })
+		).toThrow(ConfigError);
+	});
+
+	it.each(['true', 'false'])('does not coerce the link target environment string %s', (FLAG) => {
+		expect(() =>
+			validateConfig({ site: { open_links_in_new_tab: '${FLAG}' }, links: {} }, { env: { FLAG } })
+		).toThrow(ConfigError);
+	});
+
+	it.each([true, false])(
+		'rejects per-bookmark link target preference %s',
+		(open_links_in_new_tab) => {
+			expect(() =>
+				validateConfig({ links: { photos: { ...link, open_links_in_new_tab } } }, { env: {} })
+			).toThrow(ConfigError);
+		}
+	);
 
 	it('interpolates site image selections before applying the strict image boundary', () => {
 		const raw = { site: { logo_path: '${LOGO}', favicon_path: '${ICON}' }, links: {} };
@@ -338,6 +381,24 @@ describe('default, interpolate, then validate', () => {
 });
 
 describe('YAML file loader', () => {
+	it.each([
+		{ site: '', expected: true },
+		{ site: 'site: {open_links_in_new_tab: true}\n', expected: true },
+		{ site: 'site: {open_links_in_new_tab: false}\n', expected: false }
+	])('normalizes the YAML global link target preference: $site', async ({ site, expected }) => {
+		const config = await loadYaml(`${site}links: {}\n`);
+		expect(config.site.open_links_in_new_tab).toBe(expected);
+	});
+
+	it.each(['"false"', '"true"', '0', '1', 'null', '[]', '{}'])(
+		'rejects non-boolean YAML global link target preference %s',
+		async (value) => {
+			await expect(
+				loadYaml(`site: {open_links_in_new_tab: ${value}}\nlinks: {}\n`)
+			).rejects.toBeInstanceOf(ConfigError);
+		}
+	);
+
 	it('validates the minimal production starter with defaults and no auth', async () => {
 		const path = fileURLToPath(
 			new URL('../../../apps/web/config/directory.example.yml', import.meta.url)
@@ -351,7 +412,8 @@ describe('YAML file loader', () => {
 			description: '',
 			footer: '',
 			logo_path: '/favicon.svg',
-			favicon_path: '/favicon.svg'
+			favicon_path: '/favicon.svg',
+			open_links_in_new_tab: true
 		});
 		expect(config.appearance).toEqual({
 			primary_light_color: '#0f766e',

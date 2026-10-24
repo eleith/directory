@@ -231,6 +231,7 @@
 		<DetailDialog
 			link={selectedLink}
 			groupLabel={selectedGroup?.label}
+			openLinksInNewTab={data.directory.site.open_links_in_new_tab}
 			onClose={closeDetails}
 			onReturnFocus={returnFocus}
 			onTagSearch={searchByTag}
@@ -240,7 +241,11 @@
 			<section class="details" aria-labelledby="link-details-title">
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 				<a class="back" href={directoryURL} data-sveltekit-preload-data="off">Back to directory</a>
-				<DetailContent link={selectedLink} groupLabel={selectedGroup?.label} />
+				<DetailContent
+					link={selectedLink}
+					groupLabel={selectedGroup?.label}
+					openLinksInNewTab={data.directory.site.open_links_in_new_tab}
+				/>
 			</section>
 		</noscript>
 	{/if}

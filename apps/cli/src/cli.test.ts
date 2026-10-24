@@ -16,7 +16,8 @@ const configuration: DirectoryConfiguration = {
 		description: '',
 		footer: '',
 		logo_path: '/favicon.svg',
-		favicon_path: '/favicon.svg'
+		favicon_path: '/favicon.svg',
+		open_links_in_new_tab: true
 	},
 	appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 	links: {}

@@ -165,6 +165,20 @@ secrets stay outside its display model. The validator prints neither kind.
 | `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                                                                                                        |
 | `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `[]` and the three advisory booleans default to `false`.                                                                               |
 
+`site.open_links_in_new_tab` is a global boolean, defaulting to `true`. It controls
+only the external **Open** links in bookmark details. Use `false` to open services
+in the current tab:
+
+```yaml
+site:
+  open_links_in_new_tab: false
+```
+
+There is no per-bookmark override. Bookmark tiles still open details; Back links,
+search and other application navigation are unchanged. Native modifier-click,
+middle-click and browser context-menu actions remain available. The setting works
+with JavaScript enabled or disabled.
+
 Appearance colors are public branding: they accent keyboard focus, the directory's
 Back-link underline and the filled sign-in action. Server-owned appearance emits
 only these validated colors and derived readable foregrounds as semantic CSS in

@@ -21,6 +21,7 @@ describe('@directory/config compiled public module', () => {
 		expectTypeOf<DirectoryConfiguration['version']>().toEqualTypeOf<1>();
 		expectTypeOf<DirectorySite['logo_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectorySite['favicon_path']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectorySite['open_links_in_new_tab']>().toEqualTypeOf<boolean>();
 	});
 
 	it('keeps the types entry free of runtime schema, format registration and loader imports', () => {

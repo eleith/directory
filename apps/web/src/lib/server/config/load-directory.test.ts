@@ -209,7 +209,8 @@ links:
 			description: '',
 			footer: '',
 			logo_path: '/public/boot.svg',
-			favicon_path: '/favicon.svg'
+			favicon_path: '/favicon.svg',
+			open_links_in_new_tab: true
 		});
 		expect(boot.display.groups[0]?.links[0]?.tags).toEqual(['photos', 'backup']);
 		expect(boot.assets.brandingPaths).toEqual(['/public/boot.svg']);

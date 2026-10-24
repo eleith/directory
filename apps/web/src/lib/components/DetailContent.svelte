@@ -9,12 +9,14 @@
 	let {
 		link,
 		groupLabel,
+		openLinksInNewTab,
 		headingAttributes = {},
 		reserveCloseSpace = false,
 		onTagSearch
 	}: {
 		link: DisplayLink;
 		groupLabel?: string | undefined;
+		openLinksInNewTab: boolean;
 		headingAttributes?: HTMLAttributes<HTMLHeadingElement>;
 		reserveCloseSpace?: boolean;
 		onTagSearch?: (query: string) => void;
@@ -81,9 +83,11 @@
 				<ButtonLink
 					class="open-service"
 					href={link.url}
-					target="_blank"
+					target={openLinksInNewTab ? '_blank' : '_self'}
 					rel="noopener noreferrer"
-					aria-label={`Open ${link.title} (opens in a new tab)`}>Open</ButtonLink
+					aria-label={openLinksInNewTab
+						? `Open ${link.title} (opens in a new tab)`
+						: `Open ${link.title}`}>Open</ButtonLink
 				>
 			</div>
 		</div>

@@ -12,6 +12,7 @@ export interface DisplaySite {
 	readonly footer: string;
 	readonly logo_path: string;
 	readonly favicon_path: string;
+	readonly open_links_in_new_tab: boolean;
 }
 
 export interface DisplayAppearance {

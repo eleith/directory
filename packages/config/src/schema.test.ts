@@ -12,7 +12,7 @@ import {
 	LinkSchema,
 	DirectoryConfigurationSchema
 } from './schema.js';
-import type { DirectoryConfiguration, DirectoryLink } from './types.js';
+import type { DirectoryConfiguration, DirectoryLink, DirectorySite } from './types.js';
 
 const link = { title: 'Photos', url: 'https://photos.example.com' };
 const raw = { links: { photos: link } };
@@ -40,7 +40,8 @@ describe('configuration defaults and inferred types', () => {
 				description: '',
 				footer: '',
 				logo_path: '/favicon.svg',
-				favicon_path: '/favicon.svg'
+				favicon_path: '/favicon.svg',
+				open_links_in_new_tab: true
 			},
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
 			links: {
@@ -101,6 +102,7 @@ describe('configuration defaults and inferred types', () => {
 		expectTypeOf<DirectoryConfiguration['site']['title']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryConfiguration['site']['logo_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryConfiguration['site']['favicon_path']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectorySite['open_links_in_new_tab']>().toEqualTypeOf<boolean>();
 		expectTypeOf<DirectoryLink['logo_path']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryConfiguration['auth']>().toBeNullable();
 		expectTypeOf<DirectoryLink['tags']>().toEqualTypeOf<string[]>();
@@ -123,6 +125,33 @@ describe('configuration defaults and inferred types', () => {
 });
 
 describe('strict configuration boundary', () => {
+	it.each([true, false])(
+		'accepts the global link target preference %s',
+		(open_links_in_new_tab) => {
+			const value = { ...raw, site: { open_links_in_new_tab } };
+			expect(accepts(value)).toBe(true);
+			expect(defaultFixture(value)).toHaveProperty(
+				'site.open_links_in_new_tab',
+				open_links_in_new_tab
+			);
+		}
+	);
+
+	it.each(
+		['false', 'true', 0, 1, null, '', [], {}].map((open_links_in_new_tab) => ({
+			open_links_in_new_tab
+		}))
+	)('rejects non-boolean target preference', ({ open_links_in_new_tab }) => {
+		expect(accepts({ ...raw, site: { open_links_in_new_tab } })).toBe(false);
+	});
+
+	it.each([true, false])(
+		'rejects per-bookmark link target preference %s',
+		(open_links_in_new_tab) => {
+			expect(accepts({ links: { photos: { ...link, open_links_in_new_tab } } })).toBe(false);
+		}
+	);
+
 	it.each(
 		[
 			{},

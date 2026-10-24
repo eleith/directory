@@ -347,7 +347,10 @@ a current search is preserved as `q`. Dialog code is statically imported with th
 page, not fetched on first activation. JavaScript-enabled direct entries show the
 directory before the dialog's entrance, rather than a wide detail preview. Plain
 details and Back live in native `noscript` content and remain usable when JavaScript
-is disabled.
+is disabled. The server-prepared global `site.open_links_in_new_tab` preference
+reaches both render paths: Open uses native `_blank` by default, or `_self` when
+false, with matching accessible text. Both retain `noopener noreferrer`; no click
+handler replaces browser navigation.
 
 Kit 2 `pushState`/`replaceState` and typed `page.state` carry the selected ID,
 grid-entry marker and current query. Local opens, closes and Back/Forward use the

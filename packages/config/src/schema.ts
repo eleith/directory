@@ -91,7 +91,11 @@ export const SiteSchema = Type.Object(
 		description: Type.String({ default: '' }),
 		logo_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
 		favicon_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
-		footer: Type.String({ default: '' })
+		footer: Type.String({ default: '' }),
+		open_links_in_new_tab: Type.Boolean({
+			default: true,
+			description: 'Open service links in a new tab instead of the current tab.'
+		})
 	},
 	{ $id: 'Site', additionalProperties: false }
 );

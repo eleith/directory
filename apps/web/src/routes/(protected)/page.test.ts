@@ -63,7 +63,8 @@ describe('directory page data', () => {
 		expect(data.directory.site).toMatchObject({
 			title: 'Home Server',
 			description: 'Useful things running at home.',
-			footer: 'Ask the household for help.'
+			footer: 'Ask the household for help.',
+			open_links_in_new_tab: true
 		});
 		expect(data.directory.groups.map((group) => group.id)).toEqual([
 			'named:Other',
@@ -81,6 +82,22 @@ describe('directory page data', () => {
 			internal_only: false,
 			admin_only: false
 		});
+	});
+
+	it('returns the captured same-tab preference without replacing it with a default', () => {
+		const event = eventFor('?link=photos');
+		const configuration = validateConfig(
+			{
+				...event.locals.snapshot.configuration,
+				site: { ...event.locals.snapshot.configuration.site, open_links_in_new_tab: false }
+			},
+			{ env: {} }
+		);
+		event.locals.snapshot = prepareSnapshot(configuration);
+		const data = load(event);
+		expect(data.directory).toBe(event.locals.snapshot.display);
+		expect(data.directory.site.open_links_in_new_tab).toBe(false);
+		expect(data.selectedLinkId).toBe('photos');
 	});
 
 	it('includes authorized bookmark metadata but not credentials, identities, assets or root paths', () => {
