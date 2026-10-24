@@ -203,7 +203,9 @@ directory.stop();
 - `currentSnapshot()` returns a complete immutable snapshot. Replacements change
   one private reference; earlier captures keep their complete version.
 - `reload()` runs one attempt at a time. Requests during loading or preparation
-  coalesce into one follow-up. Load/preparation failures retain the current
+  coalesce into one follow-up. Identical loaded values and bookmark declaration
+  order keep the current snapshot and revision without preparing logos again.
+  Load/preparation failures retain the current
   snapshot and report a safe issue. Auth differences from the initial snapshot
   report `restart_required` and reject the entire candidate, including display
   edits. Restoring the original auth permits later display reloads.

@@ -105,8 +105,10 @@ The web server polls inode, modification time and size approximately once per
 second. Mount the config directory rather than a single file so editor atomic
 rename saves remain visible. Invalid edits and deletion keep the previous
 snapshot; a later valid replacement recovers automatically. Ordinary requests do
-not read YAML or prepare snapshots. `/healthz` stays generic and ready while a
-last-good snapshot is serving.
+not read YAML or prepare snapshots. Reloads with the same loaded values and
+bookmark declaration order retain the existing snapshot and revision; comments
+and formatting alone do not create an update. `/healthz` stays generic and ready
+while a last-good snapshot is serving.
 
 An auth change rejects the entire replacement and reports `restart_required`,
 including changes that enable or disable auth. It never partially accepts the

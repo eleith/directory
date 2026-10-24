@@ -116,6 +116,7 @@ async function reloadSnapshot(state: DirectoryState): Promise<void> {
 			reportIssue(state, Object.freeze({ code: 'restart_required' }));
 			return;
 		}
+		if (isSameConfiguration(config, state.currentSnapshot.configuration)) return;
 		code = 'prepare_failed';
 		const snapshot = await prepareSnapshot(config);
 		if (state.stopped) return;
@@ -123,6 +124,15 @@ async function reloadSnapshot(state: DirectoryState): Promise<void> {
 	} catch (error) {
 		if (!state.stopped) reportIssue(state, safeIssue(code, error));
 	}
+}
+
+function isSameConfiguration(
+	next: PreparedSnapshot['configuration'],
+	current: PreparedSnapshot['configuration']
+): boolean {
+	const sameValues = isDeepStrictEqual(next, current);
+	const sameLinkOrder = isDeepStrictEqual(Object.keys(next.links), Object.keys(current.links));
+	return sameValues && sameLinkOrder;
 }
 
 function safeIssue(code: DirectoryIssue['code'], error: unknown): DirectoryIssue {

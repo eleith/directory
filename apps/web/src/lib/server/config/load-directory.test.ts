@@ -216,6 +216,16 @@ links:
 		expect(boot.assets.brandingPaths).toEqual(['/public/boot.svg']);
 		expect(JSON.stringify(boot.display)).not.toContain(sentinel);
 
+		await writeFile(
+			configPath,
+			'# Same values, different formatting.\n' +
+				source.replace('tags: [photos, backup]', 'tags:\n      - photos\n      - backup')
+		);
+		await directory.reload();
+		expect(directory.currentSnapshot()).toBe(boot);
+		expect(mocks.prepare).toHaveBeenCalledOnce();
+		expect(report).not.toHaveBeenCalled();
+
 		await writeFile(configPath, `site: [\n${sentinel}`);
 		await directory.reload();
 		expect(directory.currentSnapshot()).toBe(boot);
@@ -247,6 +257,119 @@ links:
 });
 
 describe('owned snapshot reloads', () => {
+	it('keeps the snapshot and revision when independently loaded values are unchanged', async () => {
+		const report = vi.fn();
+		const directory = await loadDirectory(undefined, { report });
+		const current = directory.currentSnapshot();
+		mocks.load.mockResolvedValueOnce(configuration());
+		await directory.reload();
+		expect(mocks.load).toHaveBeenCalledTimes(2);
+		expect(mocks.prepare).toHaveBeenCalledOnce();
+		expect(directory.currentSnapshot()).toBe(current);
+		expect(directory.currentSnapshot().display.snapshotId).toBe(current.display.snapshotId);
+		expect(report).not.toHaveBeenCalled();
+	});
+
+	it('compares unchanged values with the latest accepted snapshot, not just boot', async () => {
+		const directory = await loadDirectory();
+		mocks.load.mockResolvedValueOnce(configuration('next'));
+		await directory.reload();
+		const current = directory.currentSnapshot();
+		mocks.load.mockResolvedValueOnce(configuration('next'));
+		await directory.reload();
+		expect(directory.currentSnapshot()).toBe(current);
+		expect(mocks.prepare).toHaveBeenCalledTimes(2);
+	});
+
+	it('ignores site mapping-key order when values are unchanged', async () => {
+		const directory = await loadDirectory();
+		const current = directory.currentSnapshot();
+		const reordered = configuration();
+		reordered.site = Object.fromEntries(
+			Object.entries(reordered.site).reverse()
+		) as DirectoryConfiguration['site'];
+		mocks.load.mockResolvedValueOnce(reordered);
+		await directory.reload();
+		expect(directory.currentSnapshot()).toBe(current);
+		expect(mocks.prepare).toHaveBeenCalledOnce();
+	});
+
+	it('publishes a flat bookmark reorder even when all field values are equal', async () => {
+		const initial = validateConfig(
+			{
+				links: {
+					zebra: { title: 'Zebra', url: 'https://zebra.example.com' },
+					alpha: { title: 'Alpha', url: 'https://alpha.example.com' }
+				}
+			},
+			{ env: {} }
+		);
+		mocks.load.mockResolvedValueOnce(initial);
+		const directory = await loadDirectory();
+		const current = directory.currentSnapshot();
+		const reordered = {
+			...initial,
+			links: { alpha: initial.links.alpha!, zebra: initial.links.zebra! }
+		};
+		expect(reordered).toEqual(initial);
+		mocks.load.mockResolvedValueOnce(reordered);
+		await directory.reload();
+		const next = directory.currentSnapshot();
+		expect(next).not.toBe(current);
+		expect(next.display.snapshotId).not.toBe(current.display.snapshotId);
+		expect(next.display.groups[0]!.links.map((link) => link.id)).toEqual(['alpha', 'zebra']);
+		expect(current.display.groups[0]!.links.map((link) => link.id)).toEqual(['zebra', 'alpha']);
+		expect(mocks.prepare).toHaveBeenCalledTimes(2);
+	});
+
+	it('publishes group and within-group order changes derived from bookmark declarations', async () => {
+		const initial = validateConfig(
+			{
+				links: {
+					zebra: { title: 'Zebra', url: 'https://zebra.example.com', group: 'Tools' },
+					alpha: { title: 'Alpha', url: 'https://alpha.example.com', group: 'Family' },
+					beta: { title: 'Beta', url: 'https://beta.example.com', group: 'Tools' }
+				}
+			},
+			{ env: {} }
+		);
+		mocks.load.mockResolvedValueOnce(initial);
+		const directory = await loadDirectory();
+		const current = directory.currentSnapshot();
+		const reordered = {
+			...initial,
+			links: {
+				alpha: initial.links.alpha!,
+				beta: initial.links.beta!,
+				zebra: initial.links.zebra!
+			}
+		};
+		expect(reordered).toEqual(initial);
+		mocks.load.mockResolvedValueOnce(reordered);
+		await directory.reload();
+		const next = directory.currentSnapshot();
+		expect(next).not.toBe(current);
+		expect(next.display.groups.map((group) => group.label)).toEqual(['Family', 'Tools']);
+		expect(next.display.groups.map((group) => group.links.map((link) => link.id))).toEqual([
+			['alpha'],
+			['beta', 'zebra']
+		]);
+		expect(mocks.prepare).toHaveBeenCalledTimes(2);
+	});
+
+	it('retains the last-good revision when a rejected edit is restored to the same values', async () => {
+		const report = vi.fn();
+		const directory = await loadDirectory(undefined, { report });
+		const current = directory.currentSnapshot();
+		mocks.load.mockRejectedValueOnce(new ConfigError([{ code: 'invalid_yaml', path: '/' }]));
+		await directory.reload();
+		mocks.load.mockResolvedValueOnce(configuration());
+		await directory.reload();
+		expect(directory.currentSnapshot()).toBe(current);
+		expect(mocks.prepare).toHaveBeenCalledOnce();
+		expect(report).toHaveBeenCalledTimes(1);
+	});
+
 	it('serializes load and preparation, coalescing bursts into one pending follow-up', async () => {
 		const directory = await loadDirectory();
 		const boot = directory.currentSnapshot();
@@ -282,6 +405,29 @@ describe('owned snapshot reloads', () => {
 		expect(mocks.load).toHaveBeenCalledTimes(3);
 		expect(mocks.prepare).toHaveBeenCalledTimes(3);
 		expect(directory.currentSnapshot().display.site.title).toBe('two');
+	});
+
+	it('processes a queued unchanged follow-up without preparing or publishing again', async () => {
+		const directory = await loadDirectory();
+		const firstLoad = Promise.withResolvers<DirectoryConfiguration>();
+		const secondLoad = Promise.withResolvers<DirectoryConfiguration>();
+		const loadingAgain = Promise.withResolvers<void>();
+		mocks.load.mockReturnValueOnce(firstLoad.promise).mockImplementationOnce(() => {
+			loadingAgain.resolve();
+			return secondLoad.promise;
+		});
+		const run = directory.reload();
+		await Promise.resolve();
+		expect(directory.reload()).toBe(run);
+		firstLoad.resolve(configuration('next'));
+		await loadingAgain.promise;
+		const current = directory.currentSnapshot();
+		expect(current.display.site.title).toBe('next');
+		secondLoad.resolve(configuration('next'));
+		await run;
+		expect(directory.currentSnapshot()).toBe(current);
+		expect(mocks.load).toHaveBeenCalledTimes(3);
+		expect(mocks.prepare).toHaveBeenCalledTimes(2);
 	});
 
 	it('keeps complete old captures while replacing private configuration, display and assets together', async () => {
@@ -326,6 +472,7 @@ describe('owned snapshot reloads', () => {
 		await directory.reload();
 		expect(directory.currentSnapshot()).toBe(captured);
 		expect(report).toHaveBeenLastCalledWith({ code: 'load_failed', issues: invalid.issues });
+		mocks.load.mockResolvedValueOnce(configuration('preparation-fails'));
 		mocks.prepare.mockImplementationOnce(() => {
 			throw Object.assign(new Error(sentinel), { filename: sentinel, value: sentinel });
 		});
@@ -463,6 +610,7 @@ describe('terminal stop', () => {
 		const boot = directory.currentSnapshot();
 		const pending = Promise.withResolvers<PreparedSnapshot>();
 		const entered = Promise.withResolvers<void>();
+		mocks.load.mockResolvedValueOnce(configuration('pending'));
 		mocks.prepare.mockImplementationOnce(() => {
 			entered.resolve();
 			return pending.promise;
@@ -487,6 +635,7 @@ describe('terminal stop', () => {
 			const boot = directory.currentSnapshot();
 			const pending = Promise.withResolvers<never>();
 			const entered = Promise.withResolvers<void>();
+			if (stage === 'prepare') mocks.load.mockResolvedValueOnce(configuration('pending'));
 			mocks[stage].mockImplementationOnce(() => {
 				entered.resolve();
 				return pending.promise;
