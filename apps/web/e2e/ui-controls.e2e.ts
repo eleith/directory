@@ -18,7 +18,7 @@ links:
   archive:
     title: Controls archive
     url: ${destinationURL}
-    favicon_path: /public/controls-service.svg
+    logo_path: /public/controls-logo.svg
     tags: ${JSON.stringify(literalTag)}
     requires_auth: true
   notebook:
@@ -174,8 +174,8 @@ test.setTimeout(60_000);
 test.beforeAll(async () => {
 	publicDir = await mkdtemp(join(tmpdir(), 'directory-ui-controls-'));
 	await writeFile(
-		join(publicDir, 'controls-service.svg'),
-		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#369" d="M0 0h24v24H0z"/></svg>'
+		join(publicDir, 'controls-logo.svg'),
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#369" d="M0 0h64v64H0z"/></svg>'
 	);
 	server = await startServer({ configuration, publicDir });
 	await server.ready();
@@ -337,32 +337,54 @@ test('Open preserves contrast in every state and native modifier/middle tabs; Bi
 	}
 });
 
-test('destination hover includes the independent favicon; omission leaves no leading gutter', async ({
+test('destination keeps native geometry and whole-frame states without a leading icon or gutter', async ({
 	page
 }) => {
 	for (const colorScheme of ['light', 'dark'] as const) {
 		await page.emulateMedia({ colorScheme });
 		await page.goto(`${server.url}/?link=archive`);
 		await expect(openAction(page)).toBeFocused();
-		await page
-			.getByRole('dialog')
-			.evaluate((node) => Promise.all(node.getAnimations().map((animation) => animation.finished)));
-		const destination = page.getByRole('textbox', { name: 'Destination', exact: true });
+		const dialog = page.getByRole('dialog');
+		await dialog.evaluate((node) =>
+			Promise.all(node.getAnimations().map((animation) => animation.finished))
+		);
+		const destination = dialog.getByRole('textbox', { name: 'Destination', exact: true });
 		const frame = destination.locator('..');
-		const icon = frame.locator('.ui-input__leading img');
-		await expect(icon).toHaveCSS('width', '24px');
-		await expect(icon).toHaveCSS('height', '24px');
+		await expect(frame.locator('.ui-input__leading, img')).toHaveCount(0);
+		await expect(destination).toHaveCSS('padding-inline-start', '12px');
+		const primary = dialog.locator('.identity img');
+		await expect(primary).toHaveAttribute('src', '/public/controls-logo.svg');
+		await expect(primary).toHaveCSS('width', '64px');
+		await expect(primary).toHaveCSS('height', '64px');
 		await expect
-			.poll(() => icon.evaluate((node: HTMLImageElement) => node.naturalWidth))
+			.poll(() => primary.evaluate((node: HTMLImageElement) => node.naturalWidth))
 			.toBeGreaterThan(0);
-		const box = await frame.boundingBox();
-		const image = await icon.elementHandle();
-		await icon.hover();
+		const box = (await frame.boundingBox())!;
+		const nativeBox = (await destination.boundingBox())!;
+		expect(box.height).toBeGreaterThanOrEqual(48);
+		expect(nativeBox.height).toBeGreaterThanOrEqual(44);
+		expect(nativeBox.x).toBeCloseTo(box.x + 1, 1);
+		expect(nativeBox.x + nativeBox.width).toBeCloseTo(box.x + box.width - 1, 1);
+		const point = { x: nativeBox.x + 2, y: nativeBox.y + nativeBox.height / 2 };
+		expect(
+			await destination.evaluate(
+				(node, point) => document.elementFromPoint(point.x, point.y) === node,
+				point
+			)
+		).toBe(true);
+		await page.mouse.move(point.x, point.y);
 		await expectBackground(frame, hoverBackground);
 		await page.keyboard.press('Shift+Tab');
 		await expect(destination).toBeFocused();
 		await expectBackground(frame, focusBackground);
+		await expectInsetFocus(
+			frame,
+			colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)'
+		);
 		await expect(destination).toHaveCSS('outline-style', 'none');
+		await expect(destination).toHaveJSProperty('tagName', 'INPUT');
+		await expect(destination).toHaveAttribute('type', 'url');
+		await expect(destination).toBeEnabled();
 		await expect(destination).toHaveJSProperty('readOnly', true);
 		await page.keyboard.press('ControlOrMeta+A');
 		expect(
@@ -374,14 +396,15 @@ test('destination hover includes the independent favicon; omission leaves no lea
 		await page.keyboard.type('unchanged');
 		await expect(destination).toHaveValue(destinationURL);
 		expect(await frame.boundingBox()).toEqual(box);
-		expect(await icon.evaluate((node, original) => node === original, image)).toBe(true);
+		expect(await destination.boundingBox()).toEqual(nativeBox);
+		await expectSharedControls(page);
 		await page.keyboard.press('Escape');
 		await page.getByRole('link', { name: 'Controls notebook', exact: true }).click();
 		await expect(
 			page.getByRole('link', { name: 'Open Controls notebook (opens in a new tab)', exact: true })
 		).toBeFocused();
 		const bare = page.getByRole('textbox', { name: 'Destination', exact: true });
-		await expect(bare.locator('..').locator('.ui-input__leading')).toHaveCount(0);
+		await expect(bare.locator('..').locator('.ui-input__leading, img')).toHaveCount(0);
 		await expect(bare).toHaveCSS('padding-inline-start', '12px');
 		await expect(bare).toHaveValue('https://controls.example.test/notebook');
 	}

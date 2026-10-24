@@ -169,14 +169,6 @@ Sign-in uses the selected bytes through public `/logo` at 48px, with bundled ðŸ—
 default and one-time JavaScript fallback. No configured source URI enters public
 HTML or shared layout data. The site favicon remains independent.
 
-Details optionally pass `links.*.favicon_path` to the same `Logo` at 24px beside
-the destination URL, with `/bookmarks/<id>/logo` as its one-time JavaScript fallback.
-Omission renders no service icon. This instance is independent of the 64px primary
-`logo_path`; without JavaScript, a broken icon leaves the service link usable.
-Mounted service source URLs and prepared fallback endpoints remain private with
-auth. Selecting those mounted bytes via `site.logo_path` or `site.favicon_path`
-deliberately publishes them through the corresponding public alias only.
-
 `Logo` makes one JavaScript fallback attempt. Its mount check catches image failures
 before hydration; fallback failures stop, including when primary and fallback
 are the same. Changing the source/fallback pair resets the attempt in place,

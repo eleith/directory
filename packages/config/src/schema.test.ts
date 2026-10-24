@@ -69,7 +69,6 @@ describe('configuration defaults and inferred types', () => {
 					tags: 'photos, videos, backup',
 					group: 'Photos & files',
 					logo_path: '/public/photos.svg',
-					favicon_path: '/public/icon.png',
 					requires_auth: true,
 					internal_only: false,
 					admin_only: false
@@ -101,7 +100,6 @@ describe('configuration defaults and inferred types', () => {
 		expectTypeOf<DirectoryConfiguration['site']['logo_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryConfiguration['site']['favicon_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryLink['logo_path']>().toEqualTypeOf<string | undefined>();
-		expectTypeOf<DirectoryLink['favicon_path']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryConfiguration['auth']>().toBeNullable();
 		expectTypeOf<DirectoryLink['tags']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryLink['group']>().toEqualTypeOf<string | undefined>();
@@ -192,7 +190,8 @@ describe('strict configuration boundary', () => {
 			{ ...link, works_from: 'Anywhere' },
 			{ ...link, good_to_know: 'Redundant' },
 			{ ...link, category: 'Family' },
-			{ ...link, screenshot_path: '/public/screen.png' }
+			{ ...link, screenshot_path: '/public/screen.png' },
+			{ ...link, favicon_path: '/public/icon.png' }
 		].map((entry) => ({ entry }))
 	)('rejects invalid link fields before defaulting', ({ entry }) => {
 		expect(Value.Check(LinkSchema, configurationReferences, { ...linkDefaults, ...entry })).toBe(
@@ -322,11 +321,11 @@ describe('URL, image and color constraints', () => {
 			}
 		}
 	});
-	it('accepts the bundled mark only for site images, not bookmark images', () => {
+	it('accepts the bundled mark only for site images, not bookmark logos', () => {
 		for (const field of ['logo_path', 'favicon_path']) {
 			expect(accepts({ ...raw, site: { [field]: '/favicon.svg' } })).toBe(true);
-			expect(accepts({ links: { photos: { ...link, [field]: '/favicon.svg' } } })).toBe(false);
 		}
+		expect(accepts({ links: { photos: { ...link, logo_path: '/favicon.svg' } } })).toBe(false);
 	});
 	it.each(['#fff', '#0f766e', '#ABCDEF'])('accepts hex color %s', (color) => {
 		expect(Value.Check(HexColorSchema, color)).toBe(true);

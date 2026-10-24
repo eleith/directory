@@ -133,6 +133,15 @@ describe('default, interpolate, then validate', () => {
 		expect(() => validateConfig(raw, { env: {} })).toThrow(ConfigError);
 	});
 
+	it.each(['/public/icon.png', '/public/icons/service.svg'])(
+		'rejects removed bookmark favicon selection %s',
+		(favicon_path) => {
+			expect(() =>
+				validateConfig({ links: { photos: { ...link, favicon_path } } }, { env: {} })
+			).toThrow(ConfigError);
+		}
+	);
+
 	it('leaves canonical references intact for later validation and editor generation', () => {
 		const references = [...configurationReferences];
 		const canonical = JSON.stringify([DirectoryConfigurationSchema, configurationReferences]);

@@ -65,7 +65,6 @@ export const LinkSchema = Type.Object(
 		url: ref(HttpUrlSchema),
 		description: Type.Optional(Type.String({ description: 'Plain text; multiline is supported.' })),
 		logo_path: Type.Optional(ref(LocalImagePathSchema)),
-		favicon_path: Type.Optional(ref(LocalImagePathSchema)),
 		tags: ref(TagsSchema, { default: '' }),
 		group: Type.Optional(
 			Type.String({ ...nonEmptyText, description: 'Optional display group label.' })

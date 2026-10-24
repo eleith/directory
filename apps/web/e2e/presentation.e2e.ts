@@ -34,8 +34,7 @@ ${labels
 		(title, index) => `  entry-${index}:
     title: ${title}
     url: https://service.example.test/${index}?from=directory
-${index < 4 ? '    logo_path: /public/bookmark.svg\n' : ''}    favicon_path: /public/service.svg
-${grouped && index < 8 ? `    group: ${index < 6 ? group : 'House projects'}\n` : ''}`
+${index < 4 ? '    logo_path: /public/bookmark.svg\n' : ''}${grouped && index < 8 ? `    group: ${index < 6 ? group : 'House projects'}\n` : ''}`
 	)
 	.join('')}`;
 }
@@ -54,9 +53,7 @@ for (const javaScriptEnabled of [true, false]) {
 			const svg =
 				'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#369" d="M0 0h64v64H0z"/></svg>';
 			await Promise.all(
-				['header', 'bookmark', 'service'].map((name) =>
-					writeFile(join(publicDir, `${name}.svg`), svg)
-				)
+				['header', 'bookmark'].map((name) => writeFile(join(publicDir, `${name}.svg`), svg))
 			);
 			const server = await startServer({
 				configuration: configuration(),
@@ -193,10 +190,6 @@ for (const javaScriptEnabled of [true, false]) {
 					await expect(external).toHaveAttribute('rel', 'noopener noreferrer');
 					await expect(external).toHaveText('Open');
 					await expect(external.locator('img, svg')).toHaveCount(0);
-					await expect(page.locator('.destination img[src="/public/service.svg"]')).toHaveCSS(
-						'width',
-						'24px'
-					);
 					await expect(destination).toHaveValue('https://service.example.test/0?from=directory');
 					if (javaScriptEnabled) {
 						await page.keyboard.press('Shift+Tab');
@@ -252,13 +245,7 @@ test('public configured accents preserve the body palette and private directory 
 			const response = await server.fetch(path);
 			expect(response.status).toBe(path === '/__data.json' ? 401 : 200);
 			const text = await response.text();
-			for (const value of [
-				username,
-				password,
-				'/public/header.svg',
-				'/public/bookmark.svg',
-				'/public/service.svg'
-			])
+			for (const value of [username, password, '/public/header.svg', '/public/bookmark.svg'])
 				expect(text).not.toContain(value);
 			if (path === '/signin') {
 				expect(text).toContain(`--color-primary:light-dark(${light},${dark})`);

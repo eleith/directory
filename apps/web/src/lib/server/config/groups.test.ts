@@ -35,10 +35,10 @@ describe('prepared directory groups', () => {
 		expect(groupLinkIds(display)).toEqual([['zebra', 'alpha']]);
 	});
 
-	it('preserves a configured logo path and resolves omissions independently of favicons', () => {
+	it('preserves configured primary logos and resolves omissions without bookmark favicons', () => {
 		const display = directory({
 			'photo-album': { title: 'Photos', logo_path: '/public/photos.svg' },
-			files: { title: 'Files', favicon_path: '/public/files.png', group: 'Tools' },
+			files: { title: 'Files', group: 'Tools' },
 			plain: { title: 'No configured image' }
 		});
 		const links = Object.fromEntries(
@@ -46,7 +46,9 @@ describe('prepared directory groups', () => {
 		);
 		expect(links['photo-album']!.logo_path).toBe('/public/photos.svg');
 		expect(links.files!.logo_path).toBe('/bookmarks/files/logo');
-		expect(links.files!.favicon_path).toBe('/public/files.png');
+		for (const link of Object.values(links)) {
+			expect(link).not.toHaveProperty('favicon_path');
+		}
 		expect(links.plain!.logo_path).toBe('/bookmarks/plain/logo');
 		expect(Object.keys(links.plain!).sort()).toEqual([
 			'admin_only',

@@ -12,7 +12,7 @@ function expectDeeplyFrozen(value: unknown): void {
 }
 
 describe('prepareDirectory', () => {
-	it('copies only public fields and preserves independent images and multiline text', () => {
+	it('copies only public fields and preserves site images, primary logos and multiline text', () => {
 		const config = validateConfig(
 			{
 				site: {
@@ -28,7 +28,6 @@ describe('prepareDirectory', () => {
 						...destination,
 						description: 'First line\n\nSecond line\n',
 						logo_path: '/public/photos.svg',
-						favicon_path: '/public/photos.png',
 						tags: ' photos, backup ',
 						group: 'Family',
 						requires_auth: true,
@@ -61,7 +60,6 @@ describe('prepareDirectory', () => {
 							...destination,
 							description: 'First line\n\nSecond line\n',
 							logo_path: '/public/photos.svg',
-							favicon_path: '/public/photos.png',
 							tags: ['photos', 'backup'],
 							requires_auth: true,
 							internal_only: true,
@@ -123,7 +121,7 @@ describe('prepareDirectory', () => {
 		]);
 	});
 
-	it('preserves empty optional descriptions and images independently', () => {
+	it('preserves empty descriptions and primary logos independently of site images', () => {
 		const config = validateConfig(
 			{
 				site: { favicon_path: '/public/site.png' },
@@ -131,13 +129,26 @@ describe('prepareDirectory', () => {
 			},
 			{ env: {} }
 		);
+		const original = structuredClone(config);
 		const display = prepareDirectory(config, 'independent');
+		expect(config).toEqual(original);
 		expect(display.site).toHaveProperty('favicon_path', '/public/site.png');
 		expect(display.site).toHaveProperty('logo_path', '/favicon.svg');
 		const link = display.groups[0]!.links[0]!;
 		expect(link).toHaveProperty('description', '');
 		expect(link).toHaveProperty('logo_path', '/public/photo.svg');
 		expect(link).not.toHaveProperty('favicon_path');
+		expect(Object.keys(link).sort()).toEqual([
+			'admin_only',
+			'description',
+			'id',
+			'internal_only',
+			'logo_path',
+			'requires_auth',
+			'tags',
+			'title',
+			'url'
+		]);
 	});
 
 	it.each([

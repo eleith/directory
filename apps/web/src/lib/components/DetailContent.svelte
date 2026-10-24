@@ -2,7 +2,6 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import BookmarkLogo from './BookmarkLogo.svelte';
-	import Logo from './Logo.svelte';
 	import ButtonLink from './ui/ButtonLink.svelte';
 	import Chip from './ui/Chip.svelte';
 	import Input from './ui/Input.svelte';
@@ -30,12 +29,6 @@
 		aria-label={onTagSearch ? `Filter by ${filterKind}: ${label}` : undefined}
 		onclick={onTagSearch ? () => onTagSearch?.(query) : undefined}>{label}</Chip
 	>
-{/snippet}
-
-{#snippet serviceIcon()}
-	{#if link.favicon_path !== undefined}
-		<Logo source={link.favicon_path} fallback={`/bookmarks/${link.id}/logo`} size={24} />
-	{/if}
 {/snippet}
 
 <div class="details">
@@ -84,7 +77,6 @@
 					value={link.url}
 					readonly
 					spellcheck="false"
-					leading={link.favicon_path !== undefined ? serviceIcon : undefined}
 				/>
 				<ButtonLink
 					class="open-service"

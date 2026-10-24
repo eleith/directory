@@ -42,9 +42,8 @@ export function getGroups(
 
 function prepareLink(id: string, link: DirectoryLink): DisplayLink {
 	const logoPath = link.logo_path ?? `/bookmarks/${id}/logo`;
-	const optionalFields: Pick<DirectoryLink, 'description' | 'favicon_path'> = {};
+	const optionalFields: Pick<DirectoryLink, 'description'> = {};
 	if (link.description !== undefined) optionalFields.description = link.description;
-	if (link.favicon_path !== undefined) optionalFields.favicon_path = link.favicon_path;
 	return {
 		id,
 		logo_path: logoPath,

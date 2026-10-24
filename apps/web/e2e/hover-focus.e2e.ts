@@ -18,7 +18,7 @@ links:
     url: ${serviceURL}
     group: Shared references
     tags: interactionfixture
-    favicon_path: /public/service.svg
+    logo_path: /public/service.svg
   notebook:
     title: Notebook
     url: https://interaction.example.test/notebook
@@ -32,7 +32,7 @@ test.beforeAll(async () => {
 	publicDir = await mkdtemp(join(tmpdir(), 'directory-hover-focus-'));
 	await writeFile(
 		join(publicDir, 'service.svg'),
-		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#369" d="M0 0h24v24H0z"/></svg>'
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#369" d="M0 0h64v64H0z"/></svg>'
 	);
 	server = await startServer({ configuration, publicDir, secret: null, origin: null });
 	await server.ready();
@@ -241,7 +241,7 @@ test('Search distinguishes hover from mouse and keyboard focus without moving co
 	}
 });
 
-test('readonly destination highlights the whole favicon wrapper and stays selectable', async ({
+test('readonly destination highlights the whole native input wrapper and stays selectable', async ({
 	page,
 	context
 }) => {
@@ -259,15 +259,12 @@ test('readonly destination highlights the whole favicon wrapper and stays select
 		});
 		const wrapper = dialog.locator('.destination-value');
 		const destination = dialog.getByRole('textbox', { name: 'Destination', exact: true });
-		const favicon = wrapper.locator('img');
-		await expect(favicon).toHaveCSS('width', '24px');
-		await expect
-			.poll(() => favicon.evaluate((node: HTMLImageElement) => node.naturalWidth))
-			.toBeGreaterThan(0);
+		await expect(wrapper.locator('img, .ui-input__leading')).toHaveCount(0);
+		await expect(destination).toHaveCSS('padding-inline-start', '12px');
 		const palette = await fieldPalette(wrapper);
 		const wrapperBox = (await wrapper.boundingBox())!;
-		const faviconBox = (await favicon.boundingBox())!;
-		await favicon.hover();
+		const inputBox = (await destination.boundingBox())!;
+		await destination.hover({ position: { x: 2, y: inputBox.height / 2 } });
 		await expectBackground(wrapper, palette.hover);
 		await expect(wrapper).toHaveCSS('border-color', palette.strong);
 		await page.keyboard.press('Shift+Tab');
@@ -278,8 +275,9 @@ test('readonly destination highlights the whole favicon wrapper and stays select
 		await expect(destination).toHaveCSS('outline-style', 'none');
 		await expect(destination).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 		expect(await wrapper.boundingBox()).toEqual(wrapperBox);
-		expect(faviconBox.x).toBeGreaterThan(wrapperBox.x);
-		expect(faviconBox.x + faviconBox.width).toBeLessThan(wrapperBox.x + wrapperBox.width);
+		expect(await destination.boundingBox()).toEqual(inputBox);
+		expect(inputBox.x).toBeGreaterThan(wrapperBox.x);
+		expect(inputBox.x + inputBox.width).toBeLessThan(wrapperBox.x + wrapperBox.width);
 		await expect(destination).toHaveJSProperty('tagName', 'INPUT');
 		await expect(destination).toBeEnabled();
 		await expect(destination).toHaveJSProperty('readOnly', true);

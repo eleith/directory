@@ -104,7 +104,6 @@
 				"url": { "$ref": "#/$defs/HttpUrl" },
 				"description": { "description": "Plain text; multiline is supported.", "type": "string" },
 				"logo_path": { "$ref": "#/$defs/LocalImagePath" },
-				"favicon_path": { "$ref": "#/$defs/LocalImagePath" },
 				"tags": { "default": "", "$ref": "#/$defs/Tags" },
 				"group": {
 					"description": "Optional display group label.",

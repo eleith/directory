@@ -31,7 +31,6 @@ export interface DisplayLink {
 	readonly title: string;
 	readonly url: string;
 	readonly description?: string;
-	readonly favicon_path?: string;
 	readonly tags: readonly string[];
 	readonly requires_auth: boolean;
 	readonly internal_only: boolean;

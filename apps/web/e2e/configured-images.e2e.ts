@@ -39,10 +39,13 @@ links:
     description: PRIVATE_BOOKMARK_DESCRIPTION
     group: Family
     logo_path: /public/photo.svg
-    favicon_path: /public/photo.png
   router:
     title: Router
     url: http://router.example.test
+  thumbnail:
+    title: Photo thumbnail
+    url: https://thumbnail.example.test
+    logo_path: /public/photo.png
 ${auth}`;
 }
 
@@ -197,12 +200,18 @@ test('open mode serves only exact contained image references, with MIME and body
     title: Extra
     url: https://extra.example.test
     logo_path: /public/escape.svg
-    favicon_path: /public/not-image.png
+  invalid-image:
+    title: Invalid image
+    url: https://invalid-image.example.test
+    logo_path: /public/not-image.png
   inside:
     title: Inside
     url: https://inside.example.test
     logo_path: /public/inside.svg
-    favicon_path: /public/家 icon.svg
+  unicode:
+    title: Unicode image
+    url: https://unicode.example.test
+    logo_path: /public/家 icon.svg
 `;
 	const server = await startServer({
 		configuration: configuration('') + extra,
@@ -407,7 +416,8 @@ test('existing SSR cards and details render mounted logos and omitted-path bookm
 		await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 		for (const [id, path] of [
 			['photos', '/public/photo.svg'],
-			['router', '/bookmarks/router/logo']
+			['router', '/bookmarks/router/logo'],
+			['thumbnail', '/public/photo.png']
 		] as const) {
 			const image = page.locator(`a[href="/?link=${id}"] img`);
 			await expect(image).toHaveAttribute('src', path);

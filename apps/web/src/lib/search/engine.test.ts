@@ -339,7 +339,6 @@ describe('weighted full-build token search', () => {
 		const bookmark = Object.freeze({
 			...link('ordinary'),
 			logo_path: '/public/velvetlogo.svg',
-			favicon_path: '/public/zephyrfavicon.png',
 			auth: { password: 'secretquokka' },
 			unknown: 'hiddenwombat',
 			filesystem: '/private/saffronvault',
@@ -353,7 +352,6 @@ describe('weighted full-build token search', () => {
 		const search = createSearch(snapshot);
 		for (const query of [
 			'velvetlogo',
-			'zephyrfavicon',
 			'secretquokka',
 			'hiddenwombat',
 			'saffronvault',

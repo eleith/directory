@@ -3,6 +3,7 @@ import { isHttpError, isRedirect, redirect, type Handle, type RequestEvent } fro
 import type { Session, SvelteKitAuthConfig } from '@auth/sveltekit';
 import { validateConfig } from '@directory/config';
 import { prepareSnapshot } from '../config/snapshot.js';
+import { GET as mountedImage } from '../../../routes/(protected)/(endpoints)/public/[...file]/+server.js';
 import { createAuthentication } from './index.js';
 
 const mocks = vi.hoisted(() => ({
@@ -36,8 +37,7 @@ const snapshot = prepareSnapshot(
 				photos: {
 					title: 'Photos',
 					url: 'https://photos.example',
-					logo_path: '/public/logos/photos.svg',
-					favicon_path: '/public/bookmark-favicon.svg'
+					logo_path: '/public/logos/photos.svg'
 				}
 			}
 		},
@@ -190,6 +190,27 @@ describe('mounted image access', () => {
 				expect((await responseFor(event)).status).toBe(401);
 			}
 			expect(mocks.resolve).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each(['GET', 'HEAD'])(
+		'keeps an unreferenced former bookmark favicon private, then returns 404 after sign-in for %s',
+		async (method) => {
+			const path = '/public/bookmark-favicon.svg';
+			expect(snapshot.assets.referencedPaths).not.toContain(path);
+			const event = eventFor(path, {
+				method,
+				routeId: '/(protected)/(endpoints)/public/[...file]'
+			});
+			event.params = { file: 'bookmark-favicon.svg' };
+			mocks.resolve.mockImplementation((current: RequestEvent) =>
+				mountedImage(current as Parameters<typeof mountedImage>[0])
+			);
+			expect((await responseFor(event)).status).toBe(401);
+			expect(mocks.resolve).not.toHaveBeenCalled();
+			mocks.session.mockResolvedValueOnce(signedIn);
+			expect((await responseFor(event)).status).toBe(404);
+			expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith(event);
 		}
 	);
 

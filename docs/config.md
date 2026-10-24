@@ -173,8 +173,8 @@ Without JavaScript, colors follow the OS scheme. Refresh the document after
 configuration reloads to update branding inputs.
 
 Site copy and optional link `description` are plain strings. Description supports
-multiline guidance; there is no separate `good_to_know` field. Logo and favicon
-are independent optional fields too. Unknown structural fields are errors, not
+multiline guidance; there is no separate `good_to_know` field. Bookmarks have one
+optional `logo_path`; the site logo and favicon remain independent. Unknown structural fields are errors, not
 ignored extras; the old `site.group_by`, `sign_in` and `works_from` fields are not
 supported.
 
@@ -310,19 +310,9 @@ escapes, backslashes, queries, fragments and control characters are not. This is
 syntactic validation, not filesystem access or MIME inspection. Site logo and favicon
 fields also accept the exact bundled `/favicon.svg` URI. The shared loader supplies
 that URI independently for omitted site fields; normalized site paths are required
-strings for both web and CLI consumers. Bookmark image fields stay optional and
-mounted-only, with no bundled URI selection.
-
-`links.*.favicon_path` optionally renders a decorative 24×24 icon beside the
-destination URL in details. Omission renders no service icon. It is independent of the 64px
-primary `links.*.logo_path`: with JavaScript, a failed service icon switches once
-to `/bookmarks/<id>/logo`, not to the configured primary logo. A failed fallback
-stops. Source or selected-link changes reset the attempt in place; repairing bytes
-at an unchanged URL requires refresh. Without JavaScript, a broken icon stays
-broken but the service link remains usable. Mounted source URLs and prepared
-fallback endpoints require a session when auth is enabled. This field does not
-select public branding; only `site.logo_path` and `site.favicon_path` publish
-selected bytes through their separate public aliases.
+strings for both web and CLI consumers. `links.*.logo_path` stays optional and
+mounted-only, with no bundled URI selection. `links.*.favicon_path` is no longer
+supported; remove it from older configurations. The site favicon is unchanged.
 
 `site.logo_path` renders a decorative, eager 48×48 image beside the directory title
 and description. Omission uses bundled `/favicon.svg` directly in server-rendered
@@ -350,7 +340,7 @@ change the selected bytes without changing the alias; invalid or auth-changing
 candidates retain the last good selection. No auth hook exceptions are involved.
 
 The mounted-file endpoint serves only exact `assets.referencedPaths` from the request's
-captured snapshot: mounted site and bookmark logo/favicon paths, not bundled URIs or an
+captured snapshot: mounted site logo/favicon and bookmark logo paths, not bundled URIs or an
 arbitrary directory listing or static file tree. GET and HEAD use private,
 no-store and nosniff headers; HEAD has the same status/headers without a body.
 There are no range or conditional-cache responses. Missing, unreferenced,

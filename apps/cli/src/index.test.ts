@@ -47,13 +47,28 @@ const validationCases: ValidationCase[] = [
 			name: `invalid bundled site ${field}`,
 			yaml: `site: {${field}: /favicon.svg/DO_NOT_PRINT.svg}\nlinks: {}\n`,
 			valid: false
-		},
-		{
-			name: `bundled path is not a bookmark ${field}`,
-			yaml: `links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, ${field}: /favicon.svg}\n`,
-			valid: false
 		}
 	]),
+	{
+		name: 'bundled path is not a bookmark logo',
+		yaml: 'links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, logo_path: /favicon.svg}\n',
+		valid: false
+	},
+	{
+		name: 'mounted bookmark primary logo',
+		yaml: 'links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, logo_path: /public/DO_NOT_PRINT.svg}\n',
+		valid: true
+	},
+	{
+		name: 'invalid mounted bookmark primary logo',
+		yaml: 'links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, logo_path: /public/../DO_NOT_PRINT.svg}\n',
+		valid: false
+	},
+	{
+		name: 'valid-looking mounted bookmark favicon is an unknown field',
+		yaml: 'links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, favicon_path: /public/DO_NOT_PRINT.png}\n',
+		valid: false
+	},
 	{
 		name: 'configured data and credentials expanded after YAML parsing',
 		yaml: `site:

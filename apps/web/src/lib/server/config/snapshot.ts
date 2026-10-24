@@ -34,9 +34,7 @@ function collectAssetPaths(
 	}
 	const referencedPaths = new Set(brandingPaths);
 	for (const link of Object.values(config.links)) {
-		for (const path of [link.logo_path, link.favicon_path]) {
-			if (path !== undefined) referencedPaths.add(path);
-		}
+		if (link.logo_path !== undefined) referencedPaths.add(link.logo_path);
 	}
 	return { referencedPaths: [...referencedPaths], brandingPaths: [...brandingPaths] };
 }

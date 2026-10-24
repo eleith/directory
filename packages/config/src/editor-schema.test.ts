@@ -61,10 +61,11 @@ describe('default-aware editor schema', () => {
 				$ref: '#/$defs/SiteImagePath',
 				default: '/favicon.svg'
 			});
-			expect(property(definition(editor, 'Link'), field)).toEqual({
-				$ref: '#/$defs/LocalImagePath'
-			});
 		}
+		expect(property(definition(editor, 'Link'), 'logo_path')).toEqual({
+			$ref: '#/$defs/LocalImagePath'
+		});
+		expect(object(definition(editor, 'Link').properties)).not.toHaveProperty('favicon_path');
 		const choices = definition(editor, 'SiteImagePath').anyOf as ObjectSchema[];
 		expect(choices[0]).toEqual({ $ref: '#/$defs/LocalImagePath' });
 		expect((choices[1]!.anyOf as ObjectSchema[])[0]).toEqual({

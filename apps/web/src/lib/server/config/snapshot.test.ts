@@ -14,15 +14,23 @@ function configuration() {
 				photos: {
 					...service,
 					tags: ' photos, backup ',
-					logo_path: '/public/photos.svg',
-					favicon_path: '/public/photos-icon.png'
+					logo_path: '/public/photos.svg'
 				},
 				files: {
 					...service,
 					title: 'Files',
 					logo_path: '/public/shared.png',
-					favicon_path: '/public/home.svg',
 					admin_only: true
+				},
+				album: {
+					...service,
+					title: 'Album',
+					logo_path: '/public/photos-icon.png'
+				},
+				home: {
+					...service,
+					title: 'Home',
+					logo_path: '/public/home.svg'
 				}
 			}
 		},
@@ -62,21 +70,29 @@ describe('private prepared snapshots', () => {
 		expect(Reflect.set(snapshot.configuration.site, 'title', 'Changed')).toBe(false);
 	});
 
-	it('collects exact referenced assets and branding exceptions without filesystem access', () => {
+	it('collects only site images and primary logos, deduplicating shared branding references', () => {
 		const snapshot = prepareSnapshot(configuration());
 		expect(snapshot.assets.brandingPaths).toEqual(['/public/home.svg', '/public/site-icon.png']);
 		expect(snapshot.assets.referencedPaths).toEqual([
 			'/public/home.svg',
 			'/public/site-icon.png',
 			'/public/photos.svg',
-			'/public/photos-icon.png',
-			'/public/shared.png'
+			'/public/shared.png',
+			'/public/photos-icon.png'
 		]);
 		const links = snapshot.display.groups.flatMap((group) => group.links);
-		expect(links).toHaveLength(2);
-		expect(Object.keys(snapshot.assets.bookmarkLogos)).toEqual(['photos', 'files']);
+		expect(links).toHaveLength(4);
+		expect(Object.keys(snapshot.assets.bookmarkLogos)).toEqual([
+			'photos',
+			'files',
+			'album',
+			'home'
+		]);
+		expect(snapshot.assets.brandingPaths).not.toContain('/public/shared.png');
+		expect(snapshot.assets.brandingPaths).not.toContain('/public/photos-icon.png');
 		for (const link of links) {
 			expect(link.logo_path).toBe(snapshot.configuration.links[link.id]!.logo_path);
+			expect(link).not.toHaveProperty('favicon_path');
 			expect(snapshot.assets.bookmarkLogos[link.id]).toMatch(/^<svg\b/u);
 		}
 	});
@@ -143,13 +159,17 @@ describe('private prepared snapshots', () => {
 			validateConfig(
 				{
 					site: { logo_path: '/favicon.svg', favicon_path: '/public/site.png' },
-					links: { photos: { ...service, favicon_path: '/public/photos.png' } }
+					links: {
+						photos: { ...service, logo_path: '/public/photos.png' },
+						plain: service
+					}
 				},
 				{ env: {} }
 			)
 		);
 		expect(snapshot.assets.brandingPaths).toEqual(['/public/site.png']);
 		expect(snapshot.assets.referencedPaths).toEqual(['/public/site.png', '/public/photos.png']);
-		expect(snapshot.display.groups[0]?.links[0]?.logo_path).toBe('/bookmarks/photos/logo');
+		expect(snapshot.display.groups[0]?.links[0]?.logo_path).toBe('/public/photos.png');
+		expect(snapshot.display.groups[0]?.links[1]?.logo_path).toBe('/bookmarks/plain/logo');
 	});
 });
