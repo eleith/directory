@@ -1,8 +1,10 @@
 import { inspect } from 'node:util';
+import { Type } from '@sinclair/typebox';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createEditorSchema } from './editor-schema.js';
 import { ConfigError } from './errors.js';
 import type { ConfigEnvironment } from './types.js';
-import { interpolate } from './interpolate.js';
+import { createInterpolationMatcher, interpolate } from './interpolate.js';
 
 function missingEnvironmentError(node: unknown, env: ConfigEnvironment = {}): ConfigError {
 	try {
@@ -12,6 +14,12 @@ function missingEnvironmentError(node: unknown, env: ConfigEnvironment = {}): Co
 		throw error;
 	}
 	throw new Error('Expected missing environment variables');
+}
+
+function editorTokenMatcher(): RegExp {
+	const schema = createEditorSchema(Type.String({ minLength: 1 }), []);
+	const tokenBranch = (schema.anyOf as { pattern: string }[])[1]!;
+	return new RegExp(tokenBranch.pattern);
 }
 
 describe('interpolate', () => {
@@ -171,5 +179,57 @@ describe('interpolate', () => {
 			'private-prefix ${SECRET_DEFINED} ${SECRET_UNDEFINED}'
 		);
 		expect(env.SECRET_DEFINED).toBe('private-environment-marker');
+	});
+});
+
+describe('shared interpolation syntax', () => {
+	const environment = { HOST: 'home.example', _HOST_2: 'backup.example', EMPTY: '' };
+
+	it.each([
+		{ input: '${HOST}', output: 'home.example', hasToken: true },
+		{ input: '${_HOST_2}', output: 'backup.example', hasToken: true },
+		{ input: 'prefix ${HOST} suffix', output: 'prefix home.example suffix', hasToken: true },
+		{ input: '${MISSING:-fallback}', output: 'fallback', hasToken: true },
+		{ input: '${MISSING:-}', output: '', hasToken: true },
+		{ input: '${EMPTY:-fallback}', output: '', hasToken: true },
+		{ input: '${MISSING:-line one\nline two}', output: 'line one\nline two', hasToken: true },
+		{ input: '${MISSING:-${HOST}}', output: '${HOST}', hasToken: true },
+		{ input: '${HOST}${HOST}', output: 'home.examplehome.example', hasToken: true },
+		{ input: '$$', output: '$', hasToken: false },
+		{ input: '$${HOST}', output: '${HOST}', hasToken: false },
+		{ input: '$$${HOST}', output: '$home.example', hasToken: true },
+		{ input: '$$$${HOST}', output: '$${HOST}', hasToken: false },
+		{ input: '$$$$${HOST}', output: '$$home.example', hasToken: true },
+		{ input: '$${ESCAPED} then ${HOST}', output: '${ESCAPED} then home.example', hasToken: true },
+		{ input: '${host}', output: '${host}', hasToken: false },
+		{ input: '${HOST-NAME}', output: '${HOST-NAME}', hasToken: false },
+		{ input: '${HOST:-unterminated', output: '${HOST:-unterminated', hasToken: false },
+		{ input: '$HOST', output: '$HOST', hasToken: false }
+	])(
+		'aligns runtime replacement and editor recognition for $input',
+		({ input, output, hasToken }) => {
+			expect(interpolate(input, environment)).toBe(output);
+			expect(editorTokenMatcher().test(input)).toBe(hasToken);
+		}
+	);
+
+	it('keeps missing recognized variables as errors', () => {
+		expect(editorTokenMatcher().test('${MISSING}')).toBe(true);
+		expect(() => interpolate('${MISSING}', {})).toThrow(ConfigError);
+	});
+
+	it('captures runtime values without sharing mutable matcher state', () => {
+		const matcher = createInterpolationMatcher();
+		const matches = Array.from('${HOST} $$ ${MISSING:-fallback}'.matchAll(matcher), (match) => [
+			match[0],
+			match[1],
+			match[2]
+		]);
+		expect(matches).toEqual([
+			['${HOST}', 'HOST', undefined],
+			['$$', undefined, undefined],
+			['${MISSING:-fallback}', 'MISSING', 'fallback']
+		]);
+		expect(createInterpolationMatcher()).not.toBe(matcher);
 	});
 });
