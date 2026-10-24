@@ -21,6 +21,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function inspectValue(value: unknown, path: string, ancestors: Set<object>): void {
 	if (typeof value === 'string' || typeof value === 'boolean') return;
 	if (typeof value === 'number' && Number.isFinite(value)) return;
+	if (Array.isArray(value)) {
+		inspectArray(value, path, ancestors);
+		return;
+	}
 	if (!isPlainObject(value) || ancestors.has(value)) {
 		throw new ConfigError([{ code: 'invalid_shape', path }]);
 	}
@@ -31,6 +35,27 @@ function inspectValue(value: unknown, path: string, ancestors: Set<object>): voi
 		const childPath = `${path}/${key.replaceAll('~', '~0').replaceAll('/', '~1')}`;
 		const descriptor = descriptors[key];
 		if (unsafeKeys.has(key) || !descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+			throw new ConfigError([{ code: 'invalid_shape', path: childPath }]);
+		}
+		inspectValue(descriptor.value, childPath, ancestors);
+	}
+	ancestors.delete(value);
+}
+
+function inspectArray(value: unknown[], path: string, ancestors: Set<object>): void {
+	if (Object.getPrototypeOf(value) !== Array.prototype || ancestors.has(value)) {
+		throw new ConfigError([{ code: 'invalid_shape', path }]);
+	}
+	const descriptors = Object.getOwnPropertyDescriptors(value);
+	// Dense arrays have only their entries and the built-in length property.
+	if (Reflect.ownKeys(descriptors).length !== value.length + 1) {
+		throw new ConfigError([{ code: 'invalid_shape', path }]);
+	}
+	ancestors.add(value);
+	for (let index = 0; index < value.length; index++) {
+		const childPath = `${path}/${index}`;
+		const descriptor = descriptors[String(index)];
+		if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
 			throw new ConfigError([{ code: 'invalid_shape', path: childPath }]);
 		}
 		inspectValue(descriptor.value, childPath, ancestors);

@@ -21,7 +21,7 @@ links:
     url: https://alpha.example.test/path?from=directory
     group: Household
     description: ${JSON.stringify(longCopy)}
-    tags: photos, backup
+    tags: [photos, backup]
     requires_auth: true
     internal_only: true
     admin_only: true

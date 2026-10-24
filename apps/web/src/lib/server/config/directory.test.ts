@@ -28,7 +28,7 @@ describe('prepareDirectory', () => {
 						...destination,
 						description: 'First line\n\nSecond line\n',
 						logo_path: '/public/photos.svg',
-						tags: ' photos, backup ',
+						tags: [' photos ', ' backup '],
 						group: 'Family',
 						requires_auth: true,
 						internal_only: true,
@@ -151,17 +151,29 @@ describe('prepareDirectory', () => {
 		]);
 	});
 
-	it.each([
-		['', []],
-		[' ,  ,,, ', []],
-		[' photos, , backup,,photos, ', ['photos', 'backup', 'photos']],
-		[' "family, photos", backup ', ['"family', 'photos"', 'backup']]
-	])('splits every comma in tags %j without a quoted CSV dialect', (tags, expected) => {
-		const config = validateConfig({ links: { photos: { ...destination, tags } } }, { env: {} });
-		const display = prepareDirectory(config, 'tags');
-		expect(display.groups[0]!.links[0]!.tags).toEqual(expected);
-		expect(config.links.photos!.tags).toBe(tags);
-	});
+	it.each<{ tags: string[]; expected: string[] }>([
+		{ tags: [], expected: [] },
+		{ tags: ['', '  ', '    '], expected: [] },
+		{
+			tags: [' photos ', ' ', ' backup ', '', 'photos'],
+			expected: ['photos', 'backup', 'photos']
+		},
+		{ tags: ['Photos', 'photos', 'PHOTOS'], expected: ['Photos', 'photos', 'PHOTOS'] },
+		{ tags: [' family, photos ', 'backup'], expected: ['family, photos', 'backup'] }
+	])(
+		'trims tags and drops blanks while preserving order, duplicates, case and commas: $tags',
+		({ tags, expected }) => {
+			const original = [...tags];
+			const config = validateConfig({ links: { photos: { ...destination, tags } } }, { env: {} });
+			const display = prepareDirectory(config, 'tags');
+			const displayTags = display.groups[0]!.links[0]!.tags;
+			expect(displayTags).toEqual(expected);
+			expect(displayTags).not.toBe(config.links.photos!.tags);
+			expect(displayTags).not.toBe(tags);
+			expect(config.links.photos!.tags).toEqual(original);
+			expect(tags).toEqual(original);
+		}
+	);
 
 	it('retains every link exactly once for all eight advisory flag combinations', () => {
 		const links: DirectoryConfiguration['links'] = {};
@@ -171,7 +183,7 @@ describe('prepareDirectory', () => {
 				for (const admin_only of [false, true]) {
 					links[`flags-${index}`] = {
 						...destination,
-						tags: '',
+						tags: [],
 						requires_auth,
 						internal_only,
 						admin_only
@@ -228,7 +240,7 @@ describe('prepareDirectory', () => {
 	it('deeply freezes only its own DTO without mutating or freezing input', () => {
 		const config = validateConfig(
 			{
-				links: { photos: { ...destination, group: 'Family', tags: 'photos,backup' } }
+				links: { photos: { ...destination, group: 'Family', tags: ['photos', 'backup'] } }
 			},
 			{ env: {} }
 		);
@@ -241,16 +253,22 @@ describe('prepareDirectory', () => {
 			config.site,
 			config.appearance,
 			config.links,
-			config.links.photos
+			config.links.photos,
+			config.links.photos!.tags
 		]) {
 			expect(Object.isFrozen(value)).toBe(false);
 		}
 		expect(display.site).not.toBe(config.site);
 		expect(display.appearance).not.toBe(config.appearance);
+		const displayTags = display.groups[0]!.links[0]!.tags;
+		expect(displayTags).not.toBe(config.links.photos!.tags);
+		expect(Reflect.set(displayTags, '0', 'Changed')).toBe(false);
 		expect(Reflect.set(display.site, 'title', 'Changed')).toBe(false);
 		config.site.title = 'Input changed';
 		config.links.photos!.title = 'Input link changed';
+		config.links.photos!.tags.push('Input tag added');
 		expect(display.site.title).toBe('Directory');
 		expect(display.groups[0]!.links[0]!.title).toBe('Photos');
+		expect(displayTags).toEqual(['photos', 'backup']);
 	});
 });

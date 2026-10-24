@@ -183,10 +183,11 @@ in `src/lib/display/types.ts` contain no server imports. Snapshot IDs are fresh
 random UUIDs, not hashes of configuration or credentials.
 
 `prepareDirectory` builds the browser data through `getSite(config)` and
-`getGroups(config)`. These helpers select public fields, prepare comma-split tag
-labels, and group links in YAML declaration order. Named groups follow their first
-appearance, with ungrouped links last. Group identities keep a configured Other
-separate from the missing-group bucket.
+`getGroups(config)`. These helpers select public fields, trim each YAML-list tag
+and drop blank labels, and group links in YAML declaration order. Tag order,
+duplicates and case are preserved; commas inside a tag remain literal. Named
+groups follow their first appearance, with ungrouped links last. Group identities
+keep a configured Other separate from the missing-group bucket.
 
 `loadDirectory(path?, { env, report }?)` in
 `apps/web/src/lib/server/config/load-directory.ts` loads and prepares the first

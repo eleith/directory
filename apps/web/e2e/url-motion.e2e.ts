@@ -11,18 +11,18 @@ links:
     title: Family archive
     url: https://archive.example.test/
     group: Media
-    tags: family photos, backup
+    tags: [family photos, backup]
     requires_auth: true
   travel:
     title: Travel albums
     url: https://travel.example.test/
     group: Media
-    tags: travel
+    tags: [travel]
   shared:
     title: Shared albums
     url: https://shared.example.test/
     group: Records
-    tags: family photos
+    tags: [family photos]
 `;
 let server: TestServer;
 

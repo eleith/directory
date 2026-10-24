@@ -75,15 +75,18 @@
 			]
 		},
 		"Tags": {
-			"description": "Comma-separated labels, not a map or list. Empty means no tags.",
-			"type": "string",
-			"anyOf": [
-				{ "type": "string", "pattern": "^[^\\x00-\\x1f\\x7f]*(?![\\s\\S])" },
-				{
-					"type": "string",
-					"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
-				}
-			]
+			"description": "A list of labels. Commas inside a label are literal; an empty list means no tags.",
+			"type": "array",
+			"items": {
+				"type": "string",
+				"anyOf": [
+					{ "type": "string", "pattern": "^[^\\x00-\\x1f\\x7f]*(?![\\s\\S])" },
+					{
+						"type": "string",
+						"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+					}
+				]
+			}
 		},
 		"Link": {
 			"additionalProperties": false,
@@ -104,7 +107,7 @@
 				"url": { "$ref": "#/$defs/HttpUrl" },
 				"description": { "description": "Plain text; multiline is supported.", "type": "string" },
 				"logo_path": { "$ref": "#/$defs/LocalImagePath" },
-				"tags": { "default": "", "$ref": "#/$defs/Tags" },
+				"tags": { "default": [], "$ref": "#/$defs/Tags" },
 				"group": {
 					"description": "Optional display group label.",
 					"type": "string",

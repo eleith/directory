@@ -35,11 +35,28 @@ export function validateConfig(
 			[...configurationReferences],
 			copy
 		);
+		assertArrayShapesPreserved(raw, defaulted);
 		const expanded = interpolate(defaulted, options.env ?? process.env);
 		return checkSchema(expanded);
 	} catch (error) {
 		if (error instanceof ConfigError) throw error;
 		throw new ConfigError([{ code: 'invalid_value', path: '/' }]);
+	}
+}
+
+function assertArrayShapesPreserved(raw: unknown, defaulted: unknown, path = ''): void {
+	if (typeof raw !== 'object' || raw === null) return;
+	// TypeBox defaults can merge arrays into object defaults, or objects into array defaults.
+	if (Array.isArray(raw) !== Array.isArray(defaulted)) {
+		throw new ConfigError([{ code: 'invalid_shape', path: path || '/' }]);
+	}
+	for (const [key, value] of Object.entries(raw)) {
+		let defaultedValue: unknown;
+		if (typeof defaulted === 'object' && defaulted !== null) {
+			defaultedValue = (defaulted as Record<string, unknown>)[key];
+		}
+		const segment = key.replace(/~/g, '~0').replace(/\//g, '~1');
+		assertArrayShapesPreserved(value, defaultedValue, `${path}/${segment}`);
 	}
 }
 

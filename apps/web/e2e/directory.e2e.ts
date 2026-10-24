@@ -17,7 +17,7 @@ links:
     description: |
       Store your originals.
       Keep shared albums together.
-    tags: photos, backup
+    tags: [photos, backup]
     group: Media
   router:
     title: Router

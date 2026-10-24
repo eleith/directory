@@ -33,6 +33,27 @@ interface ValidationCase {
 const validationCases: ValidationCase[] = [
 	{ name: 'minimal YAML', yaml: 'links: {}\n', valid: true },
 	{
+		name: 'YAML tag list with an interpolated label and literal comma',
+		yaml: "links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, tags: ['${TAG}', 'family, photos']}\n",
+		env: { TAG: 'DO_NOT_PRINT_TAG' },
+		valid: true
+	},
+	{
+		name: 'empty YAML tag list',
+		yaml: 'links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, tags: []}\n',
+		valid: true
+	},
+	{
+		name: 'legacy CSV tags are rejected',
+		yaml: "links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, tags: 'DO_NOT_PRINT_TAG,other'}\n",
+		valid: false
+	},
+	{
+		name: 'tag list with a non-string item is rejected',
+		yaml: 'links:\n  photos: {title: DO_NOT_PRINT_TITLE, url: https://example.com, tags: [1]}\n',
+		valid: false
+	},
+	{
 		name: 'explicit bundled site logo and favicon',
 		yaml: 'site: {logo_path: /favicon.svg, favicon_path: /favicon.svg}\nlinks: {}\n',
 		valid: true

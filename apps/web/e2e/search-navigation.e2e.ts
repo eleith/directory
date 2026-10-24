@@ -12,7 +12,7 @@ ${Array.from(
     title: ${index === 4 ? 'AnUnbrokenTitleThatStillWrapsWithoutOverflow' : `Service ${index}`}
     url: https://service-${index}.example.test/
     group: Household
-    tags: navigationfixture`
+    tags: [navigationfixture]`
 ).join('\n')}
 `;
 let server: TestServer;

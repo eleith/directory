@@ -51,10 +51,15 @@ function expectRedacted(error: unknown): void {
 }
 
 describe('default, interpolate, then validate', () => {
-	it('loads defaults while retaining authored order, CSV text, group and advisory flags', () => {
+	it('loads defaults while retaining authored order, tag lists, group and advisory flags', () => {
 		const raw = {
 			links: {
-				zebra: { ...link, tags: ' photos, , backup, ', group: 'Other', admin_only: true },
+				zebra: {
+					...link,
+					tags: [' photos ', '', 'backup', 'family, photos'],
+					group: 'Other',
+					admin_only: true
+				},
 				alpha: { ...link, title: 'Files' }
 			}
 		};
@@ -74,7 +79,7 @@ describe('default, interpolate, then validate', () => {
 		});
 		expect(Object.keys(config.links)).toEqual(['zebra', 'alpha']);
 		expect(config.links.zebra).toMatchObject({
-			tags: ' photos, , backup, ',
+			tags: [' photos ', '', 'backup', 'family, photos'],
 			group: 'Other',
 			admin_only: true,
 			requires_auth: false,
@@ -83,7 +88,7 @@ describe('default, interpolate, then validate', () => {
 		expect(config.links.alpha).toEqual({
 			...link,
 			title: 'Files',
-			tags: '',
+			tags: [],
 			requires_auth: false,
 			internal_only: false,
 			admin_only: false
@@ -91,6 +96,30 @@ describe('default, interpolate, then validate', () => {
 		expect(config).not.toHaveProperty('auth');
 		expect(config.links.alpha).not.toHaveProperty('group');
 		expect(raw).toEqual(before);
+	});
+
+	it('keeps authored arrays independent and interpolates individual tag values once', () => {
+		const raw = {
+			links: { photos: { ...link, tags: [' ${TAG} ', 'family, photos', '${OPTIONAL:-}'] } }
+		};
+		const before = structuredClone(raw);
+		const config = validateConfig(raw, { env: { TAG: 'PhOtOs' } });
+		expect(config.links.photos!.tags).toEqual([' PhOtOs ', 'family, photos', '']);
+		expect(config.links.photos!.tags).not.toBe(raw.links.photos.tags);
+		config.links.photos!.tags.push('changed');
+		expect(raw).toEqual(before);
+		const missing = configurationError(() => validateConfig(raw, { env: {} }));
+		expect(missing.issues).toMatchObject([
+			{ code: 'missing_environment', path: '/links/*/tags/*' }
+		]);
+	});
+
+	it('does not parse whole-list environment strings into arrays', () => {
+		for (const tags of ['photos, backup', '[photos, backup]']) {
+			expect(() =>
+				validateConfig({ links: { photos: { ...link, tags: '${TAGS}' } } }, { env: { TAGS: tags } })
+			).toThrow(ConfigError);
+		}
 	});
 
 	it.each([
@@ -221,11 +250,20 @@ describe('default, interpolate, then validate', () => {
 	});
 
 	it.each([
+		{ raw: { links: {}, site: [] }, path: '/site' },
+		{ raw: { links: {}, appearance: [] }, path: '/appearance' },
+		{ raw: { links: { photos: [] } }, path: '/links/*' },
+		{ raw: { links: { photos: { ...link, tags: {} } } }, path: '/links/*/tags' },
+		{ raw: { links: { photos: { ...link, tags: { photos: true } } } }, path: '/links/*/tags' },
+		{ raw: { links: { photos: { ...link, tags: { '0': 'photos' } } } }, path: '/links/*/tags' }
+	])('does not change an authored container kind at $path', ({ raw, path }) => {
+		const error = configurationError(() => validateConfig(raw, { env: {} }));
+		expect(error.issues).toMatchObject([{ code: 'invalid_shape', path }]);
+	});
+
+	it.each([
 		{},
 		{ links: [] },
-		{ links: {}, site: [] },
-		{ links: {}, appearance: [] },
-		{ links: { photos: [] } },
 		{ links: {}, site: null },
 		{ links: {}, site: true },
 		{ links: {}, appearance: 0 },
@@ -257,8 +295,11 @@ describe('default, interpolate, then validate', () => {
 		{ links: {}, site: { group_by: 'tags' } },
 		{ links: { photos: { ...link, sign_in: 'yes' } } },
 		{ version: 2, links: {} },
-		{ links: { photos: { ...link, tags: ['photos'] } } },
-		{ links: { photos: { ...link, tags: { photos: true } } } },
+		{ links: { photos: { ...link, tags: '' } } },
+		{ links: { photos: { ...link, tags: 'photos, backup' } } },
+		{ links: { photos: { ...link, tags: null } } },
+		{ links: { photos: { ...link, tags: [1] } } },
+		{ links: { photos: { ...link, tags: [['photos']] } } },
 		{ links: { photos: { ...link, group: '' } } },
 		{ links: { photos: { ...link, internal_only: 'false' } } }
 	])('rejects invalid explicit data rather than replacing or cleaning it %#', (raw) => {
@@ -335,6 +376,27 @@ links:
 			description: 'Family photos.\nInstall the mobile app.\n'
 		});
 		expect(config.links.photos).not.toHaveProperty('group');
+	});
+
+	it('loads flow and block tag lists with literal commas', async () => {
+		const config = await loadYaml(
+			`
+links:
+  photos:
+    title: Photos
+    url: https://photos.example.com
+    tags: [photos, 'family, photos']
+  files:
+    title: Files
+    url: https://files.example.com
+    tags:
+      - backup
+      - '\${TAG}'
+`,
+			{ TAG: 'Family files' }
+		);
+		expect(config.links.photos!.tags).toEqual(['photos', 'family, photos']);
+		expect(config.links.files!.tags).toEqual(['backup', 'Family files']);
 	});
 
 	it('uses YAML core scalar rules for unquoted text', async () => {

@@ -17,7 +17,7 @@ links:
     title: Broken primary
     url: https://broken.example.test
     description: The service is still available.
-    tags: household, photos
+    tags: [household, photos]
     logo_path: ${primary}
   valid:
     title: Valid primary

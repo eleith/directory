@@ -106,6 +106,19 @@ describe('interpolate', () => {
 		expect(interpolate('${PATH:-explicit-only}', {})).toBe('explicit-only');
 	});
 
+	it('preserves array shape and interpolates values without mutating authored lists', () => {
+		const tags = Object.freeze(['${TAG}', 'family, photos', '$${LITERAL}']);
+		const input = Object.freeze({ links: Object.freeze({ photos: Object.freeze({ tags }) }) });
+		const result = interpolate(input, { TAG: 'Photos' });
+		expect(result.links.photos.tags).toEqual(['Photos', 'family, photos', '${LITERAL}']);
+		expect(Array.isArray(result.links.photos.tags)).toBe(true);
+		expect(result.links.photos.tags).not.toBe(tags);
+		expect(input.links.photos.tags).toEqual(['${TAG}', 'family, photos', '$${LITERAL}']);
+		expect(
+			missingEnvironmentError({ links: { photos: { tags: ['${MISSING}'] } } }).issues
+		).toMatchObject([{ code: 'missing_environment', path: '/links/*/tags/*' }]);
+	});
+
 	it('preserves booleans, numbers, empty objects, and the input type', () => {
 		const input = { version: 1, enabled: true, hidden: false, amount: 0, links: {} };
 		const result = interpolate(input, {});

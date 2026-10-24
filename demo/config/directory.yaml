@@ -26,14 +26,14 @@ links:
     description: |
       Family photos and videos, all in one place.
       Install your photo service's mobile app for automatic uploads.
-    tags: photos, videos, memories
+    tags: [photos, videos, memories]
     group: Photos & files
     requires_auth: true
   files:
     title: Files
     url: https://files.example.com
     description: Shared documents, school projects and household paperwork.
-    tags: documents, sharing, storage
+    tags: [documents, sharing, storage]
     group: Photos & files
   backups:
     title: Backups
@@ -41,93 +41,93 @@ links:
     description: |
       Check the latest backup status before you need a restore.
       Ask your household maintainer for help recovering a file.
-    tags: backup, recovery, storage
+    tags: [backup, recovery, storage]
     group: Photos & files
   scans:
     title: Paperwork inbox
     url: https://scans.example.com
     description: Sort recent scans into searchable bills, receipts and warranties.
-    tags: scans, documents, receipts
+    tags: [scans, documents, receipts]
     group: Photos & files
   archive:
     title: Family history archive
     url: https://archive.example.com
     description: Old letters, digitized albums and notes about the family tree.
-    tags: history, memories, documents
+    tags: [history, memories, documents]
     group: Photos & files
   albums:
     title: Shared albums
     url: https://albums.example.com
     description: Choose a photo collection to share with visiting relatives.
-    tags: photos, albums, sharing
+    tags: [photos, albums, sharing]
     group: Photos & files
   transfers:
     title: File drop
     url: https://transfers.example.com
     description: Temporary space for large files moving between household devices.
-    tags: transfer, sharing, storage
+    tags: [transfer, sharing, storage]
     group: Photos & files
     internal_only: true
   notebooks:
     title: Household notebooks
     url: https://notebooks.example.com
     description: Shared notes for school, travel plans and everyday reference.
-    tags: notes, writing, planning
+    tags: [notes, writing, planning]
     group: Photos & files
   sync:
     title: Device sync status
     url: https://sync.example.com
     description: Check whether laptop folders have reached the home server.
-    tags: sync, devices, storage
+    tags: [sync, devices, storage]
     group: Photos & files
     internal_only: true
   keepsakes:
     title: DigitalKeepsakesAndSchoolProjectCollections
     url: https://keepsakes.example.com
     description: Finished school projects and small creations worth keeping.
-    tags: school, archive, memories
+    tags: [school, archive, memories]
     group: Photos & files
   music:
     title: Music
     url: https://music.example.com
     description: Albums, playlists and a soundtrack for dinner.
-    tags: music, audio, playlists
+    tags: [music, audio, playlists]
     group: Entertainment
   movies:
     title: Movies
     url: https://movies.example.com
     description: Browse the family movie and television library.
-    tags: movies, television, streaming
+    tags: [movies, television, streaming]
     group: Entertainment
   books:
     title: Books
     url: https://books.example.com
     description: Find your next ebook or audiobook for the commute.
-    tags: books, reading, audiobooks
+    tags: [books, reading, audiobooks]
     group: Entertainment
   radio:
     title: Radio
     url: https://radio.example.com
     description: Saved station links and recordings from the community radio club.
-    tags: radio, audio, recordings
+    tags: [radio, audio, recordings]
     group: Entertainment
   podcasts:
     title: Podcast queue
     url: https://podcasts.example.com
     description: Episodes downloaded for the next long drive.
-    tags: podcasts, audio, travel
+    tags: [podcasts, audio, travel]
     group: Entertainment
   reading:
     title: Weekend reading list
     url: https://reading.example.com
     description: Saved articles and reading suggestions from around the household.
-    tags: reading, articles, bookmarks
+    tags: [reading, articles, bookmarks]
     group: Entertainment
   requests:
     title: Library requests
     url: https://requests.example.com
     description: Suggest something for the household media collection.
-    tags: library, requests, media
+    tags: [library, requests, media]
     group: Entertainment
     requires_auth: true
   home-automation:
@@ -136,76 +136,76 @@ links:
     description: |
       Lights, room temperatures and everyday routines.
       Connect to the home network or VPN before opening this service.
-    tags: home, lights, routines
+    tags: [home, lights, routines]
     group: Everyday tools
     internal_only: true
   recipes:
     title: Recipes
     url: https://recipes.example.com
     description: Favorite meals, shopping lists and this week's dinner plan.
-    tags: cooking, meals, shopping
+    tags: [cooking, meals, shopping]
     group: Everyday tools
   calendar:
     title: Family calendar
     url: https://calendar.example.com
     description: Appointments, school events and reminders for bin collection.
-    tags: calendar, reminders, planning
+    tags: [calendar, reminders, planning]
     group: Everyday tools
   groceries:
     title: Shopping list
     url: https://groceries.example.com
     description: Add groceries before the next trip to the shops.
-    tags: shopping, groceries, pantry
+    tags: [shopping, groceries, pantry]
     group: Everyday tools
   weather:
     title: Garden weather station
     url: https://weather.example.com
     description: Local rainfall and temperature readings from the garden sensors.
-    tags: weather, garden, sensors
+    tags: [weather, garden, sensors]
     group: Everyday tools
   energy:
     title: Energy
     url: https://energy.example.com
     description: Household electricity trends and daily solar production.
-    tags: energy, solar, sensors
+    tags: [energy, solar, sensors]
     group: Everyday tools
     internal_only: true
   guides:
     title: Workshop guides
     url: https://guides.example.com
     description: Repair notes and instructions for frequently used tools.
-    tags: workshop, repair, guides
+    tags: [workshop, repair, guides]
     group: Workshop
   printer:
     title: 3D printer
     url: https://printer.example.com
     description: Check the current print before starting another job.
-    tags: printing, workshop, projects
+    tags: [printing, workshop, projects]
     group: Workshop
     internal_only: true
   inventory:
     title: Parts inventory
     url: https://inventory.example.com
     description: Find spare cables, screws and electronic components.
-    tags: parts, storage, workshop
+    tags: [parts, storage, workshop]
     group: Workshop
   projects:
     title: Works in progress
     url: https://projects.example.com
     description: Sketches, task lists and progress photos for household projects.
-    tags: projects, planning, workshop
+    tags: [projects, planning, workshop]
     group: Workshop
   manuals:
     title: Appliance manuals and warranty notes
     url: https://manuals.example.com
     description: Setup instructions and service records for household appliances.
-    tags: manuals, warranties, repair
+    tags: [manuals, warranties, repair]
     group: Workshop
   router:
     title: Router
     url: https://router.example.com
     description: Manage the home network; leave changes to your household maintainer.
-    tags: network, router, maintenance
+    tags: [network, router, maintenance]
     group: Behind the scenes
     requires_auth: true
     internal_only: true
@@ -214,7 +214,7 @@ links:
     title: Server health
     url: https://monitoring.example.com
     description: Storage capacity, temperatures and service availability.
-    tags: monitoring, maintenance, server
+    tags: [monitoring, maintenance, server]
     group: Behind the scenes
     internal_only: true
     admin_only: true
@@ -222,7 +222,7 @@ links:
     title: Container console
     url: https://containers.example.com
     description: Maintenance console for the services running on the home server.
-    tags: containers, maintenance, server
+    tags: [containers, maintenance, server]
     group: Behind the scenes
     requires_auth: true
     internal_only: true
@@ -231,7 +231,7 @@ links:
     title: Local name service
     url: https://dns.example.com
     description: Household DNS records and local network filtering settings.
-    tags: network, dns, maintenance
+    tags: [network, dns, maintenance]
     group: Behind the scenes
     internal_only: true
     admin_only: true

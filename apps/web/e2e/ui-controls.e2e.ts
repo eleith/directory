@@ -19,7 +19,7 @@ links:
     title: Controls archive
     url: ${destinationURL}
     logo_path: /public/controls-logo.svg
-    tags: ${JSON.stringify(literalTag)}
+    tags: [${JSON.stringify(literalTag)}]
     requires_auth: true
   notebook:
     title: Controls notebook

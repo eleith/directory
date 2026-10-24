@@ -19,7 +19,7 @@ function eventFor(query = '', withAuth = false) {
 				description: 'Family albums\nShared memories',
 				group: 'Other',
 				logo_path: '/public/photos.png',
-				tags: 'family, photos',
+				tags: ['family', 'photos', 'family, photos'],
 				requires_auth: true
 			},
 			notes: {
@@ -76,7 +76,7 @@ describe('directory page data', () => {
 			url: 'https://photos.example.com',
 			description: 'Family albums\nShared memories',
 			logo_path: '/public/photos.png',
-			tags: ['family', 'photos'],
+			tags: ['family', 'photos', 'family, photos'],
 			requires_auth: true,
 			internal_only: false,
 			admin_only: false

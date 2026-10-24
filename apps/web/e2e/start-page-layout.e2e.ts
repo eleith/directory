@@ -66,7 +66,7 @@ ${bookmarks
     title: ${bookmark.title}
     url: https://layout.example.test/${bookmark.id}
     group: ${bookmark.group}
-    tags: canvasfixture`
+    tags: [canvasfixture]`
 	)
 	.join('\n')}
 `;

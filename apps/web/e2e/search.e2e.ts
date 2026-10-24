@@ -27,7 +27,7 @@ links:
     title: Immich
     url: https://photos.example.test/
     group: Media
-    tags: ' , backup, , snapshots, '
+    tags: [' ', ' backup', ' ', ' snapshots', ' ']
     description: Photos for the family
     requires_auth: true
   navidrome:
@@ -48,7 +48,7 @@ links:
     title: Documents
     url: https://documents.example.test/
     group: Records
-    tags: amberquartz
+    tags: [amberquartz]
   title:
     title: amberquartz
     url: https://reference.example.test/

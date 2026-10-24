@@ -17,13 +17,13 @@ links:
     title: Reference archive
     url: ${serviceURL}
     group: Shared references
-    tags: interactionfixture
+    tags: [interactionfixture]
     logo_path: /public/service.svg
   notebook:
     title: Notebook
     url: https://interaction.example.test/notebook
     group: Shared references
-    tags: interactionfixture
+    tags: [interactionfixture]
 `;
 let server: TestServer;
 let publicDir: string;

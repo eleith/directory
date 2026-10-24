@@ -53,10 +53,9 @@ export const HexColorSchema = Type.String({
 	description: 'A three- or six-digit hexadecimal color.'
 });
 
-export const TagsSchema = Type.String({
+export const TagsSchema = Type.Array(Type.String({ pattern: `^[^\\x00-\\x1f\\x7f]*${end}` }), {
 	$id: 'Tags',
-	pattern: `^[^\\x00-\\x1f\\x7f]*${end}`,
-	description: 'Comma-separated labels, not a map or list. Empty means no tags.'
+	description: 'A list of labels. Commas inside a label are literal; an empty list means no tags.'
 });
 
 export const LinkSchema = Type.Object(
@@ -65,7 +64,7 @@ export const LinkSchema = Type.Object(
 		url: ref(HttpUrlSchema),
 		description: Type.Optional(Type.String({ description: 'Plain text; multiline is supported.' })),
 		logo_path: Type.Optional(ref(LocalImagePathSchema)),
-		tags: ref(TagsSchema, { default: '' }),
+		tags: ref(TagsSchema, { default: [] }),
 		group: Type.Optional(
 			Type.String({ ...nonEmptyText, description: 'Optional display group label.' })
 		),

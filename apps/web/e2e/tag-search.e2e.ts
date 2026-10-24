@@ -14,7 +14,7 @@ links:
     title: Family archive
     url: https://archive.example.test/
     group: Media
-    tags: PhOtOs, Family Photos, Album Vault
+    tags: [PhOtOs, Family Photos, Album Vault]
     requires_auth: true
     internal_only: true
     admin_only: true
@@ -22,19 +22,19 @@ links:
     title: Travel albums
     url: https://travel.example.test/
     group: Media
-    tags: photos
+    tags: [photos]
   shared:
     title: Shared albums
     url: https://shared.example.test/
     group: Records
-    tags: '  FAMILY PHOTOS  '
+    tags: ['  FAMILY PHOTOS  ', ' ', '', '  Login, Internal  ']
     requires_auth: true
   decoy:
     title: photos
     url: https://notes.example.test/
     group: Records
     description: Family photos, login, internal and admin are only words here.
-    tags: login, internal, admin, topic:orchard, access:login
+    tags: [login, internal, admin, 'topic:orchard', 'access:login']
     requires_auth: false
     internal_only: false
     admin_only: false
@@ -110,6 +110,53 @@ test('typed whole-tag queries ignore title, description and advisory decoys; spa
 	await page.getByRole('button', { name: 'Clear search', exact: true }).click();
 	await expect(search(page)).toBeFocused();
 	await expectGroups(page);
+});
+
+test('a literal-comma tag stays whole in its chip, native query and exact matches; no-JS stays informational', async ({
+	page,
+	browser
+}) => {
+	await page.goto(`${server.url}/?link=shared`);
+	await expect(page.getByRole('dialog', { name: 'Shared albums', exact: true })).toBeVisible();
+	const literal = chip(page, 'Filter by tag: login, internal');
+	await expect(literal).toHaveText('login, internal');
+	await literal.click();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	await expect(search(page)).toBeFocused();
+	await expect(search(page)).toHaveValue('tag:login, internal');
+	await expect(page).toHaveURL(`${server.url}/?q=tag%3Alogin%2C+internal`);
+	await expectTitles(page, ['Shared albums']);
+	await page.reload();
+	await expect(search(page)).toBeEnabled();
+	await expect(search(page)).toHaveValue('tag:login, internal');
+	await expectTitles(page, ['Shared albums']);
+	for (const query of ['tag:login', 'tag:internal']) {
+		await search(page).fill(query);
+		await expectTitles(page, ['photos']);
+	}
+	const context = await browser.newContext({ javaScriptEnabled: false });
+	try {
+		const plain = await context.newPage();
+		await plain.goto(`${server.url}/?link=shared`);
+		const section = plain.getByRole('region', { name: 'Shared albums', exact: true });
+		await expect(section).toBeVisible();
+		await expect(search(plain)).toBeDisabled();
+		const tags = section.getByRole('list', { name: 'Tags', exact: true });
+		await expect(tags.locator('span.tag')).toHaveText([
+			'login',
+			'family photos',
+			'login, internal'
+		]);
+		await expect(tags.locator('button, a, [tabindex]')).toHaveCount(0);
+		await tags.getByText('login, internal', { exact: true }).click();
+		await expect(plain).toHaveURL(`${server.url}/?link=shared`);
+		await expect(search(plain)).toHaveValue('');
+		await expect(
+			section.getByRole('link', { name: 'Open Shared albums (opens in a new tab)', exact: true })
+		).toHaveAttribute('href', 'https://shared.example.test/');
+	} finally {
+		await context.close();
+	}
 });
 
 test('the three access queries select enabled booleans, not identically named custom tags or prose', async ({

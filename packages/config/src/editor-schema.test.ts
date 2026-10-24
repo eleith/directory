@@ -30,8 +30,11 @@ describe('default-aware editor schema', () => {
 		expect(definition(editor, 'Site').required).toBeUndefined();
 		expect(definition(editor, 'Appearance').required).toBeUndefined();
 		expect(definition(editor, 'Link').required).toEqual(['title', 'url']);
-		expect(property(definition(editor, 'Link'), 'tags').default).toBe('');
-		expect(definition(editor, 'Tags').type).toBe('string');
+		expect(property(definition(editor, 'Link'), 'tags').default).toEqual([]);
+		expect(definition(editor, 'Tags').type).toBe('array');
+		const tagItem = object(definition(editor, 'Tags').items);
+		expect(tagItem.type).toBe('string');
+		expect(interpolationPattern(tagItem).test('${TAG}')).toBe(true);
 		expect(property(definition(editor, 'Link'), 'group').type).toBe('string');
 		for (const flag of ['requires_auth', 'internal_only', 'admin_only']) {
 			expect(property(definition(editor, 'Link'), flag)).toMatchObject({

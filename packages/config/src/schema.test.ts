@@ -16,7 +16,7 @@ import type { DirectoryConfiguration, DirectoryLink } from './types.js';
 
 const link = { title: 'Photos', url: 'https://photos.example.com' };
 const raw = { links: { photos: link } };
-const linkDefaults = { tags: '', requires_auth: false, internal_only: false, admin_only: false };
+const linkDefaults = { tags: [], requires_auth: false, internal_only: false, admin_only: false };
 
 function defaultFixture(value: unknown) {
 	return Value.Default(
@@ -58,7 +58,7 @@ describe('configuration defaults and inferred types', () => {
 		expect(accepts({})).toBe(false);
 	});
 
-	it('keeps groups, comma-separated tags, multiline descriptions and advisory flags independent', () => {
+	it('keeps groups, tag lists, multiline descriptions and advisory flags independent', () => {
 		const value = defaultFixture({
 			site: { title: 'Home' },
 			appearance: { primary_light_color: '#abc' },
@@ -66,7 +66,7 @@ describe('configuration defaults and inferred types', () => {
 				photos: {
 					...link,
 					description: 'First line\n<b>Plain text</b>',
-					tags: 'photos, videos, backup',
+					tags: ['photos', 'videos', 'backup'],
 					group: 'Photos & files',
 					logo_path: '/public/photos.svg',
 					requires_auth: true,
@@ -89,6 +89,8 @@ describe('configuration defaults and inferred types', () => {
 		first.site.logo_path = '/public/changed.svg';
 		expect(defaultFixture(raw)).toHaveProperty('site.logo_path', '/favicon.svg');
 		first.links['photos']!.requires_auth = true;
+		first.links['photos']!.tags.push('changed');
+		expect(defaultFixture(raw)).toHaveProperty('links.photos.tags', []);
 		expect(defaultFixture(raw)).toHaveProperty('site.title', 'Directory');
 		expect(defaultFixture(raw)).toHaveProperty('links.photos.requires_auth', false);
 		expect(raw).toEqual({ links: { photos: link } });
@@ -101,7 +103,7 @@ describe('configuration defaults and inferred types', () => {
 		expectTypeOf<DirectoryConfiguration['site']['favicon_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryLink['logo_path']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryConfiguration['auth']>().toBeNullable();
-		expectTypeOf<DirectoryLink['tags']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectoryLink['tags']>().toEqualTypeOf<string[]>();
 		expectTypeOf<DirectoryLink['group']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryLink['requires_auth']>().toEqualTypeOf<boolean>();
 		expectTypeOf<DirectoryLink['internal_only']>().toEqualTypeOf<boolean>();
@@ -176,7 +178,9 @@ describe('strict configuration boundary', () => {
 			{ title: 'Missing URL' },
 			{ url: link.url },
 			{ ...link, title: '   ' },
-			{ ...link, tags: [] },
+			{ ...link, tags: '' },
+			{ ...link, tags: 'photos, backup' },
+			{ ...link, tags: [1] },
 			{ ...link, tags: { topic: 'photos' } },
 			{ ...link, tags: null },
 			{ ...link, group: '' },
@@ -226,13 +230,13 @@ describe('strict configuration boundary', () => {
 	it('rejects own prototype-polluting keys before any defaulting', () => {
 		for (const key of ['__proto__', 'constructor', 'prototype']) {
 			const poisonedLink = JSON.parse(
-				`{"title":"Bad","url":"https://example.com","tags":"","requires_auth":false,"internal_only":false,"admin_only":false,"${key}":{}}`
+				`{"title":"Bad","url":"https://example.com","tags":[],"requires_auth":false,"internal_only":false,"admin_only":false,"${key}":{}}`
 			) as unknown;
 			expect(Value.Check(LinkSchema, configurationReferences, poisonedLink)).toBe(false);
 			for (const value of [
 				JSON.parse(`{"links":{},"${key}":{}}`) as unknown,
 				JSON.parse(
-					`{"links":{"${key}":{"title":"Bad","url":"https://example.com","tags":"","requires_auth":false,"internal_only":false,"admin_only":false}},"version":1,"site":{"title":"Directory","description":"","footer":""},"appearance":{"primary_light_color":"#fff","primary_dark_color":"#000"}}`
+					`{"links":{"${key}":{"title":"Bad","url":"https://example.com","tags":[],"requires_auth":false,"internal_only":false,"admin_only":false}},"version":1,"site":{"title":"Directory","description":"","footer":""},"appearance":{"primary_light_color":"#fff","primary_dark_color":"#000"}}`
 				) as unknown
 			]) {
 				expect(Value.Check(DirectoryConfigurationSchema, configurationReferences, value)).toBe(
@@ -243,16 +247,40 @@ describe('strict configuration boundary', () => {
 	});
 });
 
-describe('comma-separated tags', () => {
-	it.each(['', 'photos', 'photos, videos, backup', ' photos , , videos ', '图像, Réseau'])(
-		'accepts a simple comma-separated string %j',
-		(tags) => expect(Value.Check(TagsSchema, tags)).toBe(true)
+describe('tag lists', () => {
+	it.each(
+		[
+			[],
+			['photos'],
+			['photos', 'videos', 'backup'],
+			[' photos ', '', '   ', 'backup'],
+			['Family, photos', 'topic:orchard'],
+			['图像', 'Réseau']
+		].map((tags) => ({ tags }))
+	)('accepts string labels with literal commas: $tags', ({ tags }) =>
+		expect(Value.Check(TagsSchema, tags)).toBe(true)
 	);
 	it.each(
-		[[], {}, null, false, 1, 'photos\nbackup', 'photos\tbackup', 'photos\u0000backup'].map(
-			(tags) => ({ tags })
-		)
-	)('rejects non-string/control-character tags', ({ tags }) =>
+		[
+			'',
+			'photos',
+			'photos, backup',
+			{},
+			null,
+			false,
+			1,
+			[null],
+			[false],
+			[1],
+			[{}],
+			[['photos']],
+			[undefined],
+			['\t\n'],
+			['photos\nbackup'],
+			['photos\tbackup'],
+			['photos\u0000backup']
+		].map((tags) => ({ tags }))
+	)('rejects scalar tags, non-string items and control characters: $tags', ({ tags }) =>
 		expect(Value.Check(TagsSchema, tags)).toBe(false)
 	);
 });

@@ -46,7 +46,7 @@ function configuration(
 					title: `${title} photos`,
 					url: 'https://photos.example.com',
 					logo_path: `/public/${title}-photos.svg`,
-					tags: ' photos, backup '
+					tags: [' photos ', ' backup ']
 				}
 			}
 		},
@@ -187,7 +187,7 @@ links:
   photos:
     title: Photos
     url: https://photos.example.com
-    tags: photos, backup
+    tags: [photos, backup]
 `;
 		await writeFile(configPath, source);
 		const realConfig =
@@ -416,11 +416,13 @@ describe('boot authentication', () => {
 		const boot = directory.currentSnapshot();
 		input.site.title = 'mutated';
 		input.site.logo_path = '/public/mutated.svg';
-		input.links.photos!.tags = 'mutated';
+		input.links.photos!.tags.push('mutated');
 		input.auth!.credentials!.password = 'mutated';
 		expect(Object.isFrozen(input)).toBe(false);
 		expect(Object.isFrozen(boot.configuration.auth?.credentials)).toBe(true);
+		expect(Object.isFrozen(boot.configuration.links.photos!.tags)).toBe(true);
 		expect(boot.configuration.auth?.credentials?.password).toBe(sentinel);
+		expect(boot.configuration.links.photos!.tags).toEqual([' photos ', ' backup ']);
 		expect(boot.display.groups[0]?.links[0]?.tags).toEqual(['photos', 'backup']);
 		await directory.reload();
 		expect(directory.currentSnapshot()).toBe(boot);

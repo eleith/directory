@@ -60,6 +60,11 @@ function interpolateNode(
 	missingPaths: Set<string>
 ): unknown {
 	if (typeof node === 'string') return interpolateString(node, env, path, missingPaths);
+	if (Array.isArray(node)) {
+		return node.map((value, index) =>
+			interpolateNode(value, env, `${path}/${index}`, missingPaths)
+		);
+	}
 	if (typeof node !== 'object') return node;
 
 	return Object.fromEntries(

@@ -13,7 +13,7 @@ function configuration() {
 			links: {
 				photos: {
 					...service,
-					tags: ' photos, backup ',
+					tags: [' photos ', ' backup '],
 					logo_path: '/public/photos.svg'
 				},
 				files: {
@@ -49,6 +49,14 @@ describe('private prepared snapshots', () => {
 		expect(snapshot.configuration).toEqual(input);
 		expect(snapshot.configuration).not.toBe(input);
 		expect(snapshot.configuration.site).not.toBe(input.site);
+		expect(snapshot.configuration.links.photos!.tags).not.toBe(input.links.photos!.tags);
+		const displayTags = snapshot.display.groups.flatMap((group) => group.links)[0]!.tags;
+		expect(displayTags).not.toBe(snapshot.configuration.links.photos!.tags);
+		expect(displayTags).not.toBe(input.links.photos!.tags);
+		expect(Object.isFrozen(input.links.photos!.tags)).toBe(false);
+		expect(Object.isFrozen(snapshot.configuration.links.photos!.tags)).toBe(true);
+		expect(Object.isFrozen(displayTags)).toBe(true);
+		expect(Reflect.set(displayTags, '0', 'Changed')).toBe(false);
 		expect(Object.isFrozen(snapshot)).toBe(true);
 		expect(Object.isFrozen(snapshot.configuration)).toBe(true);
 		expect(Object.isFrozen(snapshot.configuration.site)).toBe(true);
@@ -59,13 +67,11 @@ describe('private prepared snapshots', () => {
 		expect(Object.isFrozen(snapshot.assets.bookmarkLogos)).toBe(true);
 		expect(Reflect.set(snapshot.assets.bookmarkLogos, 'photos', 'Changed')).toBe(false);
 		input.site.title = 'Changed';
-		input.links.photos!.tags = 'changed';
+		input.links.photos!.tags.push('changed');
 		if (input.auth?.credentials) input.auth.credentials.password = 'Changed';
 		expect(snapshot.display.site.title).toBe('Home');
-		expect(snapshot.display.groups.flatMap((group) => group.links)[0]?.tags).toEqual([
-			'photos',
-			'backup'
-		]);
+		expect(displayTags).toEqual(['photos', 'backup']);
+		expect(snapshot.configuration.links.photos!.tags).toEqual([' photos ', ' backup ']);
 		expect(snapshot.configuration.auth?.credentials?.password).toBe('PRIVATE_PASSWORD');
 		expect(Reflect.set(snapshot.configuration.site, 'title', 'Changed')).toBe(false);
 	});

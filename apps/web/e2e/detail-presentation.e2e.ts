@@ -13,7 +13,7 @@ links:
     url: ${serviceURL}
     description: Family photographs and documents, together in one place.
     group: Everyday
-    tags: FaMiLy, PHOTOGRAPHS
+    tags: [FaMiLy, PHOTOGRAPHS]
     requires_auth: true
     internal_only: true
     admin_only: true

@@ -87,10 +87,11 @@ stays server-private.
 
 Files use one YAML 1.2 core document. Mapping keys are read as strings; duplicate
 keys, collection keys, unknown tags and other YAML versions are rejected. Merge
-keys are disabled. Alias expansion is bounded and cycles are rejected. Arrays,
-non-plain objects and unsafe keys are rejected before defaults can alter them.
-Explicit nulls and wrongly typed values are errors, not requests for defaults.
-Unknown fields remain errors.
+keys are disabled. Alias expansion is bounded and cycles are rejected. Non-plain
+objects and unsafe keys are rejected before defaults can alter them. Arrays are
+accepted only where the schema allows lists, such as bookmark tags. Explicit nulls
+and wrongly typed values are errors, not requests for defaults. Unknown fields
+remain errors.
 
 A valid file prints `Configuration is valid.` and exits 0. Invalid or unreadable
 input exits 1. Errors contain fixed messages, codes and field paths such as
@@ -140,6 +141,7 @@ links:
   photos:
     title: Photos
     url: '${PHOTOS_URL:-https://photos.example.com}'
+    tags: ['${PHOTO_TAG:-family photos}', backup]
 ```
 
 The editor schema accepts supported templates in constrained string fields;
@@ -161,7 +163,7 @@ secrets stay outside its display model. The validator prints neither kind.
 | `site.logo_path`, `site.favicon_path` | Independent site images, normalized by the shared loader to bundled `/favicon.svg` when omitted. Explicit `/favicon.svg` is also valid. Header and sign-in show the logo at 48px. Mounted selections publish bytes at `/logo` and `/favicon` independently. |
 | `appearance`                          | Optional object. `primary_light_color` defaults to `#0f766e`, `primary_dark_color` to `#5eead4`. Colors use three or six hex digits.                                                                                                                        |
 | `auth`                                | Omit for no auth; otherwise exactly one complete strategy below. No default strategy or credentials.                                                                                                                                                        |
-| `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `''` and the three advisory booleans default to `false`.                                                                               |
+| `links`                               | Required keyed map; `{}` is an explicitly empty directory. Each value requires `title` and `url`; `tags` defaults to `[]` and the three advisory booleans default to `false`.                                                                               |
 
 Appearance colors are public branding: they accent keyboard focus, the directory's
 Back-link underline and the filled sign-in action. Server-owned appearance emits
@@ -184,20 +186,30 @@ key is not a slug. `constructor`, `prototype` and `__proto__` are forbidden keys
 ### Tags, groups and service hints
 
 ```yaml
-tags: photos, videos, backup
+tags: [photos, videos, backup]
 group: Photos & files
 requires_auth: true
 internal_only: false
 admin_only: false
 ```
 
-`tags` is a simple comma-separated string, not a map or YAML list. It defaults to
-an empty string. Commas separate labels; surrounding spaces and empty segments
-are ignored for display/search. This is not a quoted CSV dialect, so a comma is
-always a separator. Control characters/newlines are invalid. The configuration
-retains the authored string. Snapshot preparation now produces display labels
-by splitting commas, trimming spaces and dropping empty parts; loading and
-validation leave the original string alone.
+`tags` is a YAML list of strings, in flow form as above or block-list form. It
+defaults to `[]`. Scalar strings (including empty strings and CSV), maps, nulls
+and non-string elements are invalid. The loaded configuration retains each
+string's whitespace, case, duplicates and list order after environment expansion.
+Snapshot preparation trims each string and drops blank labels for display/search;
+it preserves order, duplicates and case. A comma inside an element is literal:
+`tags: ['photos, videos', backup]` has two tags, not three.
+
+Environment interpolation is supported inside list elements. An environment value
+containing commas remains one tag; `tags: '${TAGS}'` is invalid even if the value
+looks like CSV or YAML. Environment values are never parsed into lists.
+
+To migrate older configurations, replace each comma-separated `tags` scalar with
+an explicit YAML list, for example `tags: photos, videos, backup` becomes
+`tags: [photos, videos, backup]`. Use `tags: []` or omit the field for no tags.
+There is no automatic CSV compatibility or migration; update operator files
+manually.
 
 `group` is an optional nonblank display label, independent of tags. If every link
 omits it, the planned directory is flat. If any link has a group, ungrouped links

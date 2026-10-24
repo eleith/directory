@@ -58,8 +58,5 @@ function prepareLink(id: string, link: DirectoryLink): DisplayLink {
 }
 
 function getTagLabels(link: DirectoryLink): string[] {
-	return link.tags
-		.split(',')
-		.map((tag) => tag.trim())
-		.filter((tag) => tag.length > 0);
+	return link.tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0);
 }

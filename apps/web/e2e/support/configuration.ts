@@ -43,7 +43,7 @@ links:
     title: PRIVATE_C6_SERVICE
     url: https://private-service.example.test/C6
     description: PRIVATE_C6_LINK_DESCRIPTION
-    tags: PRIVATE_C6_TAG
+    tags: [PRIVATE_C6_TAG]
     requires_auth: false
     internal_only: false
     admin_only: false
