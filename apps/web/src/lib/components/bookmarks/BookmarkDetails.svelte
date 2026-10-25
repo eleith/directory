@@ -12,14 +12,14 @@
 		openLinksInNewTab,
 		headingAttributes = {},
 		reserveCloseSpace = false,
-		onTagSearch
+		onFilterSelect
 	}: {
 		link: DisplayLink;
 		groupLabel?: string | undefined;
 		openLinksInNewTab: boolean;
 		headingAttributes?: HTMLAttributes<HTMLHeadingElement>;
 		reserveCloseSpace?: boolean;
-		onTagSearch?: (query: string) => void;
+		onFilterSelect?: (query: string) => void;
 	} = $props();
 </script>
 
@@ -28,8 +28,8 @@
 	<Chip
 		class="tag"
 		{access}
-		aria-label={onTagSearch ? `Filter by ${filterKind}: ${label}` : undefined}
-		onclick={onTagSearch ? () => onTagSearch?.(query) : undefined}>{label}</Chip
+		aria-label={onFilterSelect ? `Filter by ${filterKind}: ${label}` : undefined}
+		onclick={onFilterSelect ? () => onFilterSelect?.(query) : undefined}>{label}</Chip
 	>
 {/snippet}
 

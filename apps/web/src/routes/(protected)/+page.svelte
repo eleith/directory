@@ -25,8 +25,8 @@
 	let searchInput = $state<HTMLInputElement>();
 	let resultList = $state<HTMLUListElement>();
 	let mounted = $state(false);
-	let closing = false;
-	let pendingSearchQuery: string | undefined;
+	let isClosingDetails = false;
+	let pendingFilterQuery: string | undefined;
 	let returnTile: HTMLAnchorElement | undefined;
 	let directoryHeading: HTMLHeadingElement | undefined = $state();
 
@@ -47,8 +47,8 @@
 
 	$effect(() => {
 		if (selectedLink) {
-			closing = false;
-			pendingSearchQuery = undefined;
+			isClosingDetails = false;
+			pendingFilterQuery = undefined;
 		}
 	});
 
@@ -129,15 +129,15 @@
 		const href = tile.href;
 		event.preventDefault();
 		returnTile = tile;
-		pendingSearchQuery = undefined;
-		closing = false;
+		pendingFilterQuery = undefined;
+		isClosingDetails = false;
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- This absolute href comes from the real tile anchor.
 		pushState(href, { ...page.state, directoryDetail: { id, fromGrid: true } });
 	}
 
 	function closeDetails() {
-		if (closing) return;
-		closing = true;
+		if (isClosingDetails) return;
+		isClosingDetails = true;
 		if (page.state.directoryDetail?.fromGrid) {
 			history.back();
 			return;
@@ -146,21 +146,26 @@
 		replaceState(directoryURL, { ...page.state, directoryDetail: null });
 	}
 
-	function searchByTag(query: string) {
-		if (closing) return;
-		pendingSearchQuery = query;
+	function selectDetailFilter(query: string) {
+		if (isClosingDetails) return;
+		pendingFilterQuery = query;
 		closeDetails();
 	}
 
-	function returnFocus() {
-		closing = false;
-		if (pendingSearchQuery !== undefined) {
-			const query = pendingSearchQuery;
-			pendingSearchQuery = undefined;
+	function handleDetailsClosed() {
+		isClosingDetails = false;
+		if (pendingFilterQuery !== undefined) {
+			const query = pendingFilterQuery;
+			pendingFilterQuery = undefined;
+			// Apply after closing so the query belongs to the directory history entry.
 			setSearchQuery(query);
 			searchInput?.focus();
 			return;
 		}
+		restoreDirectoryFocus();
+	}
+
+	function restoreDirectoryFocus() {
 		if (returnTile && !returnTile.isConnected) {
 			const id = new URL(returnTile.href).searchParams.get('link');
 			if (id) returnTile = findResultLink(id);
@@ -173,8 +178,8 @@
 	}
 
 	beforeNavigate(() => {
-		closing = false;
-		pendingSearchQuery = undefined;
+		isClosingDetails = false;
+		pendingFilterQuery = undefined;
 		returnTile = undefined;
 	});
 	onMount(() => {
@@ -233,8 +238,8 @@
 			groupLabel={selectedGroup?.label}
 			openLinksInNewTab={data.directory.site.open_links_in_new_tab}
 			onClose={closeDetails}
-			onReturnFocus={returnFocus}
-			onTagSearch={searchByTag}
+			onClosed={handleDetailsClosed}
+			onFilterSelect={selectDetailFilter}
 		/>
 	{:else if selectedLink}
 		<noscript>

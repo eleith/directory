@@ -11,15 +11,15 @@
 		groupLabel,
 		openLinksInNewTab,
 		onClose,
-		onReturnFocus,
-		onTagSearch
+		onClosed,
+		onFilterSelect
 	}: {
 		link?: DisplayLink | undefined;
 		groupLabel?: string | undefined;
 		openLinksInNewTab: boolean;
 		onClose: () => void;
-		onReturnFocus: () => void;
-		onTagSearch: (query: string) => void;
+		onClosed: () => void;
+		onFilterSelect: (query: string) => void;
 	} = $props();
 
 	let retainedDetails = $state<{ link: DisplayLink; groupLabel?: string | undefined } | undefined>(
@@ -35,7 +35,7 @@
 		if (open || link || !retainedDetails) return;
 		retainedDetails = undefined;
 		await tick();
-		if (!link && !retainedDetails) onReturnFocus();
+		if (!link && !retainedDetails) onClosed();
 	}
 </script>
 
@@ -78,7 +78,7 @@
 										{openLinksInNewTab}
 										headingAttributes={titleProps}
 										reserveCloseSpace
-										{onTagSearch}
+										{onFilterSelect}
 									/>
 								{/snippet}
 							</Dialog.Title>
