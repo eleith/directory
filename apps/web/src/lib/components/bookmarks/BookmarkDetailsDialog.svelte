@@ -25,11 +25,17 @@
 	let retainedDetails = $state<{ link: DisplayLink; groupLabel?: string | undefined } | undefined>(
 		untrack(() => (link ? { link, groupLabel } : undefined))
 	);
-	let dialogElement: HTMLElement | undefined = $state();
+	let openAction = $state<HTMLAnchorElement>();
 
 	$effect.pre(() => {
 		if (link) retainedDetails = { link, groupLabel };
 	});
+
+	function focusOpenAction(event: Event) {
+		if (!openAction) return;
+		event.preventDefault();
+		openAction.focus();
+	}
 
 	async function handleOpenChangeComplete(open: boolean) {
 		if (open || link || !retainedDetails) return;
@@ -57,18 +63,13 @@
 				{/snippet}
 			</Dialog.Overlay>
 			<Dialog.Content
-				onOpenAutoFocus={(event) => {
-					const action = dialogElement?.querySelector<HTMLAnchorElement>('.open-service');
-					if (!action) return;
-					event.preventDefault();
-					action.focus();
-				}}
+				onOpenAutoFocus={focusOpenAction}
 				onCloseAutoFocus={(event) => {
 					event.preventDefault();
 				}}
 			>
 				{#snippet child({ props })}
-					<section {...props} bind:this={dialogElement} class="details" inert={!link}>
+					<section {...props} class="details" inert={!link}>
 						<div class="scroll-content">
 							<Dialog.Title>
 								{#snippet child({ props: titleProps })}
@@ -76,6 +77,7 @@
 										link={details.link}
 										groupLabel={details.groupLabel}
 										{openLinksInNewTab}
+										bind:openAction
 										headingAttributes={titleProps}
 										reserveCloseSpace
 										{onFilterSelect}

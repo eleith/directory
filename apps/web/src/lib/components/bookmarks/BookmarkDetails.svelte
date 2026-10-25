@@ -10,6 +10,7 @@
 		link,
 		groupLabel,
 		openLinksInNewTab,
+		openAction = $bindable<HTMLAnchorElement | undefined>(),
 		headingAttributes = {},
 		reserveCloseSpace = false,
 		onFilterSelect
@@ -17,6 +18,7 @@
 		link: DisplayLink;
 		groupLabel?: string | undefined;
 		openLinksInNewTab: boolean;
+		openAction?: HTMLAnchorElement | undefined;
 		headingAttributes?: HTMLAttributes<HTMLHeadingElement>;
 		reserveCloseSpace?: boolean;
 		onFilterSelect?: (query: string) => void;
@@ -81,7 +83,7 @@
 					spellcheck="false"
 				/>
 				<ButtonLink
-					class="open-service"
+					bind:element={openAction}
 					href={link.url}
 					target={openLinksInNewTab ? '_blank' : '_self'}
 					rel="noopener noreferrer"
