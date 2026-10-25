@@ -9,7 +9,7 @@
 	import BookmarkDetailsDialog from '$lib/components/bookmarks/BookmarkDetailsDialog.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	import Search from '$lib/components/Search.svelte';
+	import BookmarkSearch from '$lib/components/search/BookmarkSearch.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { nextResultIndex } from '$lib/search/result-navigation.js';
 	import type { DisplayLink } from '$lib/display/types.js';
@@ -206,7 +206,7 @@
 			</div>
 		</div>
 		<div class="search-slot">
-			<Search
+			<BookmarkSearch
 				directory={data.directory}
 				bind:query={() => searchQuery, setSearchQuery}
 				bind:results={searchResults}

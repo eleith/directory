@@ -14,8 +14,8 @@
 	import { onMount } from 'svelte';
 	import IconMagnifyingGlass from 'virtual:icons/ph/magnifying-glass';
 	import IconX from 'virtual:icons/ph/x';
-	import Button from './ui/Button.svelte';
-	import Input from './ui/Input.svelte';
+	import Button from '../ui/Button.svelte';
+	import Input from '../ui/Input.svelte';
 	import { beforeNavigate, afterNavigate } from '$app/navigation';
 	import type { DirectoryDisplay } from '$lib/display/types.js';
 	import type { SearchResult } from '$lib/search/engine.js';
