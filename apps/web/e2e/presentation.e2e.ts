@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { credentialsAuth, password, username } from './support/configuration.js';
-import { startServer } from './support/server.js';
+import { startServer, type TestServer } from './support/server.js';
 
 const labels = [
 	'Household calendar and reminders',
@@ -45,23 +45,25 @@ for (const javaScriptEnabled of [true, false]) {
 			browser
 		}) => {
 			const publicDir = await mkdtemp(join(tmpdir(), 'directory-presentation-'));
-			const context = await browser.newContext({
-				javaScriptEnabled,
-				colorScheme,
-				reducedMotion: 'no-preference'
-			});
-			const svg =
-				'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#369" d="M0 0h64v64H0z"/></svg>';
-			await Promise.all(
-				['header', 'bookmark'].map((name) => writeFile(join(publicDir, `${name}.svg`), svg))
-			);
-			const server = await startServer({
-				configuration: configuration(),
-				publicDir,
-				secret: null,
-				origin: null
-			});
+			let context: BrowserContext | undefined;
+			let server: TestServer | undefined;
 			try {
+				context = await browser.newContext({
+					javaScriptEnabled,
+					colorScheme,
+					reducedMotion: 'no-preference'
+				});
+				const svg =
+					'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="#369" d="M0 0h64v64H0z"/></svg>';
+				for (const name of ['header', 'bookmark']) {
+					await writeFile(join(publicDir, `${name}.svg`), svg);
+				}
+				server = await startServer({
+					configuration: configuration(),
+					publicDir,
+					secret: null,
+					origin: null
+				});
 				await server.ready();
 				const page = await context.newPage();
 				const accent = colorScheme === 'light' ? 'rgb(153, 51, 102)' : 'rgb(171, 205, 239)';
@@ -223,9 +225,16 @@ for (const javaScriptEnabled of [true, false]) {
 					await expect(page).toHaveURL(`${server.url}/`);
 				}
 			} finally {
-				await context.close();
-				expect(await server.stop()).toEqual({ code: 0, signal: null });
+				const [contextClosed, serverStopped] = await Promise.allSettled([
+					context?.close(),
+					server?.stop()
+				]);
 				await rm(publicDir, { recursive: true, force: true });
+				expect(contextClosed).toEqual({ status: 'fulfilled', value: undefined });
+				expect(serverStopped).toEqual({
+					status: 'fulfilled',
+					value: server ? { code: 0, signal: null } : undefined
+				});
 			}
 		});
 	}

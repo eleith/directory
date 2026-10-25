@@ -38,9 +38,13 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-	for (const server of [protectedServer, openServer, longBrandServer]) {
-		if (server) expect(await server.stop()).toEqual({ code: 0, signal: null });
-	}
+	const servers = [protectedServer, openServer, longBrandServer].filter(
+		(server) => server !== undefined
+	);
+	const results = await Promise.allSettled(servers.map((server) => server.stop()));
+	expect(results).toEqual(
+		servers.map(() => ({ status: 'fulfilled', value: { code: 0, signal: null } }))
+	);
 });
 
 const search = (page: Page) => page.getByRole('searchbox', { name: 'Search', exact: true });
