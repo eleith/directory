@@ -46,10 +46,8 @@ jobs:
         run: pnpm --filter '@directory/web...' build
       - name: Check types
         run: pnpm --filter @directory/web check
-      - name: Lint root and workspace
-        run: |
-          pnpm lint
-          pnpm --filter @directory/web lint
+      - name: Lint repository
+        run: pnpm lint
       - name: Unit tests
         run: pnpm --filter @directory/web test:coverage
 
@@ -98,18 +96,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check schema drift before building
         run: pnpm schema:check
-      - name: Build CLI and shared dependencies
-        run: pnpm --filter '@directory/cli...' build
+      - name: Build config dependency
+        run: pnpm --filter @directory/config build
       - name: Check config dependency
         run: |
           pnpm --filter @directory/config check
-          pnpm --filter @directory/config lint
-          pnpm --filter @directory/config test:coverage
-      - name: Check CLI
-        run: |
-          pnpm --filter @directory/cli check
-          pnpm --filter @directory/cli lint
-          pnpm --filter @directory/cli test:coverage
+          pnpm --filter @directory/config test
       - name: Check release version
         if: github.ref_type == 'tag'
         run: |

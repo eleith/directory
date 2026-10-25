@@ -56,7 +56,6 @@ steps:
       - corepack enable
       - pnpm --filter @directory/config check
       - pnpm lint
-      - pnpm --filter @directory/config lint
 
   test:
     image: node:26.5.0-bookworm

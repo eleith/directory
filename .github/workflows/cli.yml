@@ -48,10 +48,8 @@ jobs:
         run: pnpm --filter '@directory/cli...' build
       - name: Check types
         run: pnpm --filter @directory/cli check
-      - name: Lint root and workspace
-        run: |
-          pnpm lint
-          pnpm --filter @directory/cli lint
+      - name: Lint repository
+        run: pnpm lint
       - name: Unit tests
         run: pnpm --filter @directory/cli test:coverage
 

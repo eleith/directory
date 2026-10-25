@@ -50,7 +50,6 @@ steps:
       - corepack enable
       - pnpm --filter @directory/web check
       - pnpm lint
-      - pnpm --filter @directory/web lint
 
   build:
     image: node:26.5.0-bookworm
@@ -79,7 +78,7 @@ steps:
       - test "$(pnpm --version)" = "11.9.0"
       - pnpm --filter @directory/web test:e2e
 
-  source-dependency-checks:
+  config-checks:
     image: node:26.5.0-bookworm
     environment:
       COREPACK_HOME: /workspace/src/.pnpm-store/corepack
@@ -87,13 +86,8 @@ steps:
       - npm install --global corepack@0.36.0
       - corepack enable
       - pnpm schema:check
-      - pnpm --filter '@directory/cli...' build
       - pnpm --filter @directory/config check
-      - pnpm --filter @directory/config lint
-      - pnpm --filter @directory/config test:coverage
-      - pnpm --filter @directory/cli check
-      - pnpm --filter @directory/cli lint
-      - pnpm --filter @directory/cli test:coverage
+      - pnpm --filter @directory/config test
     when:
       - event: push
         branch: main

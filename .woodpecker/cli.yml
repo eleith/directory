@@ -84,7 +84,6 @@ steps:
       - corepack enable
       - pnpm --filter @directory/cli check
       - pnpm lint
-      - pnpm --filter @directory/cli lint
 
   test:
     image: node:26.5.0-bookworm

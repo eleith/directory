@@ -47,9 +47,7 @@ jobs:
         run: pnpm --filter '@directory/config...' build
       - name: Check types
         run: pnpm --filter @directory/config check
-      - name: Lint root and workspace
-        run: |
-          pnpm lint
-          pnpm --filter @directory/config lint
+      - name: Lint repository
+        run: pnpm lint
       - name: Unit and artifact tests
         run: pnpm --filter @directory/config test:coverage
