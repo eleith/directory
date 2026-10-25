@@ -3,20 +3,14 @@
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
-	"exports": {
-		".": {
-			"types": "./dist/cli.d.ts",
-			"import": "./dist/cli.js"
-		}
-	},
 	"bin": {
-		"directory": "./dist/index.js"
+		"directory-cli": "./dist/index.js"
 	},
 	"files": [
 		"dist"
 	],
 	"scripts": {
-		"build": "rm -rf dist && tsc -p tsconfig.build.json && esbuild src/index.ts src/cli.ts --bundle --platform=neutral --format=esm --target=node26 --outdir=dist --main-fields=module,main --conditions=import --external:node:*",
+		"build": "rm -rf dist && esbuild src/index.ts --bundle --platform=neutral --format=esm --target=node26 --outdir=dist --main-fields=module,main --conditions=import --external:node:*",
 		"check": "tsc --noEmit -p tsconfig.json",
 		"lint": "prettier --ignore-path ../../.prettierignore --check . && eslint .",
 		"format": "prettier --ignore-path ../../.prettierignore --write .",

@@ -1,5 +1,0 @@
-{
-	"extends": "./tsconfig.json",
-	"compilerOptions": { "emitDeclarationOnly": true },
-	"exclude": ["dist", "src/**/*.test.ts"]
-}
