@@ -1,8 +1,9 @@
-name: CI (CLI App)
+name: CI/CD (CLI App)
 
 on:
   push:
     branches: [main]
+    tags: ['@directory/cli@*']
     paths:
       - '*'
       - .changeset/**
@@ -51,5 +52,64 @@ jobs:
         run: |
           pnpm lint
           pnpm --filter @directory/cli lint
-      - name: Unit and artifact tests
+      - name: Unit tests
         run: pnpm --filter @directory/cli test:coverage
+
+  build-push:
+    name: Publish CLI image
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/@directory/cli@'))
+    needs: check
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26.5.0
+      - name: Check release version
+        if: github.ref_type == 'tag'
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const tag = process.env.GITHUB_REF_NAME ?? '';
+          const match = /^@directory\/cli@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$/.exec(tag);
+          if (!match || match[0] !== tag) {
+            throw new Error('Expected a stable @directory/cli@<major>.<minor>.<patch> tag');
+          }
+          const version = JSON.parse(readFileSync('apps/cli/package.json', 'utf8')).version;
+          if (match[1] !== version) {
+            throw new Error('Release tag must exactly match apps/cli/package.json version');
+          }
+          NODE
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/eleith/directory-cli
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=match,pattern=^@directory/cli@(\d+\.\d+\.\d+)$,group=1
+            type=match,pattern=^@directory/cli@(\d+\.\d+)\.\d+$,group=1
+            type=match,pattern=^@directory/cli@(\d+)\.\d+\.\d+$,group=1
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push CLI image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/cli/Dockerfile
+          target: prod
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
