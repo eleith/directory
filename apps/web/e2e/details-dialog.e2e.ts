@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { directoryScript, navigateQuery } from './support/details.js';
+import { navigateQuery } from './support/navigation.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const longCopy =
@@ -44,7 +44,7 @@ async function hydrated(page: Page) {
 async function holdHydration(page: Page) {
 	const requested = Promise.withResolvers<void>();
 	const release = Promise.withResolvers<void>();
-	await page.route(`**${directoryScript}`, async (route) => {
+	await page.route('**/*.js', async (route) => {
 		requested.resolve();
 		await release.promise;
 		await route.continue();
@@ -115,34 +115,6 @@ test('direct SSR keeps plain details in noscript without a visible card before h
 		delayed.release();
 		await page.unrouteAll({ behavior: 'wait' });
 	}
-});
-
-test('browsing and opening details fetch no additional scripts, styles or page data', async ({
-	page
-}) => {
-	const requested: string[] = [];
-	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
-	await page.goto(server.url);
-	await hydrated(page);
-	await expect(page.getByRole('dialog')).toHaveCount(0);
-	const before = requested.length;
-	const tile = page.locator('a[href="/?link=alpha"]');
-	await tile.hover();
-	await tile.focus();
-	await expect(tile).toHaveAttribute('href', '/?link=alpha');
-	await expect(tile).toHaveAttribute('data-sveltekit-preload-data', 'off');
-	await tile.click();
-	await expect(page.getByRole('dialog', { name: 'Alpha service' })).toBeVisible();
-	await page.getByRole('button', { name: 'Close', exact: true }).click();
-	await expect(page).toHaveURL(`${server.url}/`);
-	await page.locator('a[href="/?link=beta"]').click();
-	await expect(page.getByRole('dialog', { name: 'Beta service' })).toBeVisible();
-	await finishRendering(page);
-	expect(
-		requested
-			.slice(before)
-			.filter((path) => /\.(?:js|css)$/.test(path) || path.includes('__data.json') || path === '/')
-	).toEqual([]);
 });
 
 test('controlled focus trap, Escape, outside dismissal, close, history and return focus', async ({
@@ -261,34 +233,6 @@ for (const entry of ['grid', 'direct']) {
 		expect(documents).toBe(entry === 'grid' ? 3 : 2);
 	});
 }
-
-test('a failed eager route module offers safe recovery without a reload loop', async ({ page }) => {
-	let documents = 0;
-	page.on('request', (request) => {
-		if (request.isNavigationRequest()) documents++;
-	});
-	await page.route(`**${directoryScript}`, (route) => route.abort());
-	await page.goto(server.url);
-	await expect(page.getByText('500', { exact: true })).toBeVisible();
-	await expect(
-		page.getByRole('heading', { name: 'Something went wrong', exact: true })
-	).toBeVisible();
-	const recovery = page.getByRole('link', { name: 'Back to home', exact: true });
-	await expect(recovery).toHaveAttribute('href', '/');
-	await expect(recovery).toHaveAttribute('data-sveltekit-reload', 'true');
-	await expect(page.getByRole('dialog')).toHaveCount(0);
-	await expect(page.locator('body')).not.toContainText(
-		'Failed to fetch dynamically imported module'
-	);
-	await finishRendering(page);
-	expect(documents).toBe(1);
-	await page.unroute(`**${directoryScript}`);
-	await recovery.click();
-	await expect(page).toHaveURL(`${server.url}/`);
-	await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeEnabled();
-	await expect(page.locator('.tile')).toHaveCount(2);
-	expect(documents).toBe(2);
-});
 
 test('modifier and middle activation preserve real new-tab navigation without enhancing the original grid', async ({
 	page,

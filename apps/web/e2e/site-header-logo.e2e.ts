@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator } from '@playwright/test';
-import { navigateQuery } from './support/details.js';
+import { navigateQuery } from './support/navigation.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const title = 'A household directory with a very long unbroken title HouseholdDirectoryForEveryone';

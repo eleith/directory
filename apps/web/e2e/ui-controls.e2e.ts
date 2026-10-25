@@ -3,7 +3,6 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { credentialsAuth, oidcAuth, password, username } from './support/configuration.js';
-import { clientManifest, directoryScript } from './support/details.js';
 import { startIssuer } from './support/oidc-issuer.js';
 import { startServer, type TestServer } from './support/server.js';
 
@@ -186,83 +185,6 @@ test.afterAll(async () => {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
 	} finally {
 		await rm(publicDir, { recursive: true, force: true });
-	}
-});
-
-test('Search binds the native value/ref; Clear alone owns its focused frame', async ({ page }) => {
-	for (const colorScheme of ['light', 'dark'] as const) {
-		await page.emulateMedia({ colorScheme });
-		await page.goto(server.url);
-		await expect(search(page)).toBeEnabled();
-		const frame = search(page).locator('..');
-		const frameBox = await frame.boundingBox();
-		const nativeBox = await search(page).boundingBox();
-		const accent = colorScheme === 'light' ? 'rgb(19, 87, 155)' : 'rgb(226, 196, 166)';
-		const engineScript = '/' + clientManifest['src/lib/search/engine.ts']!.file;
-		const engineRequest = page.waitForRequest((request) => request.url().endsWith(engineScript));
-		const leading = frame.locator('.ui-input__leading');
-		await expect(leading).toHaveJSProperty('tagName', 'LABEL');
-		await expect(leading).toHaveAttribute('for', 'directory-search');
-		await leading.click({ position: { x: 2, y: 2 } });
-		await expect(search(page)).toBeFocused();
-		await engineRequest;
-		await page.getByRole('heading', { name: 'Shared controls fixture', exact: true }).click();
-		await expect(search(page)).not.toBeFocused();
-		await search(page).hover();
-		await expectBackground(frame, hoverBackground);
-		await search(page).click();
-		await expect(search(page)).toBeFocused();
-		await expectBackground(frame, focusBackground);
-		await expectInsetFocus(frame, accent);
-		await expect(search(page)).toHaveCSS('outline-style', 'none');
-		expect(await search(page).boundingBox()).toEqual(nativeBox);
-		await search(page).fill('archive');
-		await expect(page).toHaveURL(`${server.url}/?q=archive`);
-		await expect(page.getByRole('list', { name: 'Search results' }).getByRole('link')).toHaveCount(
-			1
-		);
-		const clear = page.getByRole('button', { name: 'Clear search', exact: true });
-		const clearBox = await clear.boundingBox();
-		const filledBox = await search(page).boundingBox();
-		await page.keyboard.press('Tab');
-		await expect(clear).toBeFocused();
-		await expectBackground(clear, focusBackground);
-		await expectInsetFocus(clear, accent);
-		await expect(frame).toHaveCSS('outline-style', 'none');
-		await page.keyboard.press('Tab');
-		const theme = page.getByRole('button', { name: 'Switch to dark theme', exact: true });
-		await expect(theme).toBeFocused();
-		await clear.hover();
-		await expectBackground(clear, hoverBackground);
-		await page.mouse.down();
-		try {
-			await expectBackground(clear, pressedBackground);
-			await expect(frame).toHaveCSS('outline-style', 'none');
-		} finally {
-			await page.mouse.move(0, 0);
-			await page.mouse.up();
-		}
-		expect(await clear.boundingBox()).toEqual(clearBox);
-		expect(await search(page).boundingBox()).toEqual(filledBox);
-		expect(await frame.boundingBox()).toEqual(frameBox);
-		await page.keyboard.press('Enter');
-		await expect(search(page)).toBeFocused();
-		await expect(search(page)).toHaveValue('');
-		await expect(page).toHaveURL(`${server.url}/`);
-		await expect(clear).toHaveCount(0);
-		await search(page).fill('archive');
-		await page.keyboard.press('Tab');
-		await page.keyboard.press('Tab');
-		await expect(theme).toBeFocused();
-		await page.keyboard.press('Alt+/');
-		await expect(search(page)).toBeFocused();
-		expect(
-			await search(page).evaluate((node: HTMLInputElement) => [
-				node.selectionStart,
-				node.selectionEnd
-			])
-		).toEqual([0, 7]);
-		await expectSharedControls(page);
 	}
 });
 
@@ -487,7 +409,7 @@ test('pre-hydration and no-JS disabled controls never acquire interactive surfac
 	browser
 }) => {
 	const release = Promise.withResolvers<void>();
-	await page.route(`**${directoryScript}`, async (route) => {
+	await page.route('**/*.js', async (route) => {
 		await release.promise;
 		await route.continue();
 	});

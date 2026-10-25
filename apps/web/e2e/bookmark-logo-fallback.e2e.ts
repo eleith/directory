@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator } from '@playwright/test';
-import { directoryScript, navigateQuery } from './support/details.js';
+import { navigateQuery } from './support/navigation.js';
 import { startServer, type TestServer } from './support/server.js';
 
 let directory: string;
@@ -91,9 +91,9 @@ for (const view of ['card', 'details'] as const) {
 			: 'direct details defer their image until hydration, then decode the primary’s fallback';
 	test(caption, async ({ page }) => {
 		const hydration = Promise.withResolvers<void>();
-		let heldDirectoryScript = false;
-		await page.route(`**${directoryScript}`, async (route) => {
-			heldDirectoryScript = true;
+		let heldJavaScript = false;
+		await page.route('**/*.js', async (route) => {
+			heldJavaScript = true;
 			await hydration.promise;
 			await route.continue();
 		});
@@ -104,7 +104,7 @@ for (const view of ['card', 'details'] as const) {
 			const cardImage = page.locator('a[href="/?link=broken"] img');
 			await expect(cardImage).toHaveAttribute('src', '/public/primary-a.svg');
 			await expectBroken(cardImage);
-			await expect.poll(() => heldDirectoryScript).toBe(true);
+			await expect.poll(() => heldJavaScript).toBe(true);
 			await expect(page.getByRole('dialog')).toHaveCount(0);
 			const detailsImage = page.locator('section.details img[width="64"]');
 			if (view === 'details') await expect(detailsImage).toHaveCount(0);

@@ -3,7 +3,6 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { credentialsAuth } from './support/configuration.js';
-import { directoryScript } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const serviceURL = `https://interaction.example.test/archive?reference=${'full-value-'.repeat(20)}#latest`;
@@ -356,7 +355,7 @@ test('disabled Search has no interactive surface before hydration or without Jav
 	browser
 }) => {
 	const release = Promise.withResolvers<void>();
-	await page.route(`**${directoryScript}`, async (route) => {
+	await page.route('**/*.js', async (route) => {
 		await release.promise;
 		await route.continue();
 	});
