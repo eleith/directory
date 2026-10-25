@@ -20,7 +20,6 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/home/app/store pnpm fetch --frozen-lockfile
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/home/app/store pnpm install --offline --frozen-lockfile
-RUN pnpm --filter "@directory/cli..." build
 # Only generated output and caches are writable; source binds stay read-only.
 RUN mkdir -p /m/packages/config/dist /m/apps/web/.svelte-kit \
         /m/apps/web/node_modules/.vite /m/apps/web/node_modules/.vite-temp \

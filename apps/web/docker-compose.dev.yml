@@ -40,3 +40,30 @@ services:
       timeout: 3s
       start_period: 60s
       retries: 3
+
+  directory-cli:
+    image: directory-cli:dev
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: apps/cli/Dockerfile
+      target: prod
+    profiles:
+      - tools
+    user: '${LOCAL_UID:-1000}:${LOCAL_GID:-1000}'
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      CONFIG_PATH: /m/apps/web/config/directory.yaml
+      DIRECTORY_PUBLIC_DIR: /m/apps/web/public
+      ORIGIN: ${ORIGIN:-http://localhost:5173}
+      AUTH_URL: ${ORIGIN:-http://localhost:5173}
+    volumes:
+      - ./config:/m/apps/web/config:ro
+    read_only: true
+    network_mode: none
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

@@ -39,3 +39,31 @@ services:
       timeout: 3s
       start_period: 5s
       retries: 3
+
+  directory-cli:
+    image: ${DIRECTORY_CLI_IMAGE:-git.eleith.com/eleith.private/directory-cli:latest}
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: apps/cli/Dockerfile
+      target: prod
+    profiles:
+      - tools
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      HOST: 0.0.0.0
+      PORT: '3000'
+      CONFIG_PATH: /app/config/directory.yaml
+      DIRECTORY_PUBLIC_DIR: /app/public
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      AUTH_URL: ${ORIGIN:-http://localhost:3000}
+    volumes:
+      - ./config:/app/config:ro
+    read_only: true
+    network_mode: none
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
