@@ -2,4 +2,4 @@
 '@directory/web': patch
 ---
 
-Remove standalone browser suites for grid geometry, hover/focus styling and title clamping. Retain core browsing, details, keyboard and no-JavaScript journeys; detailed visual behavior remains a manual review responsibility. Application behavior is unchanged.
+Remove standalone and overlapping browser suites for layout, hover/focus styling, title clamping and control presentation. Retain two focused service-navigation smoke tests alongside existing browsing, details, keyboard, privacy and no-JavaScript coverage. Detailed visual behavior remains a manual review responsibility. Application behavior is unchanged.
