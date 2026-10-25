@@ -1,6 +1,6 @@
 import { Logger } from 'tslog';
 import { AuthSettingsError, type AuthSetting } from './auth/settings.js';
-import { DirectoryError, type DirectoryIssue } from './config/load-directory.js';
+import { DirectoryError, type DirectoryIssue } from './directory-error.js';
 
 let logType: 'pretty' | 'json' = 'pretty';
 if (process.env.NODE_ENV === 'production') logType = 'json';

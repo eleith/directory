@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Authentication } from './auth/index.js';
 import { AuthSettingsError } from './auth/settings.js';
 import { bootApp } from './boot.js';
-import { DirectoryError, type Directory } from './config/load-directory.js';
+import type { Directory } from './config/load-directory.js';
+import { DirectoryError } from './directory-error.js';
 import { prepareSnapshot } from './config/snapshot.js';
 import { logger, reportDirectoryIssue, reportStartupFailure } from './logger.js';
 

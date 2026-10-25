@@ -1,33 +1,9 @@
 import { resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import {
-	ConfigError,
-	loadConfigFile,
-	resolveConfigPath,
-	type ConfigIssue
-} from '@directory/config';
+import { ConfigError, loadConfigFile, resolveConfigPath } from '@directory/config';
 import type { ConfigLoadOptions } from '@directory/config/types';
+import { DirectoryError, type DirectoryIssue } from '../directory-error.js';
 import { prepareSnapshot, type PreparedSnapshot } from './snapshot.js';
-
-export interface DirectoryIssue {
-	readonly code:
-		| 'load_failed'
-		| 'prepare_failed'
-		| 'restart_required'
-		| 'auth_failed'
-		| 'watch_failed';
-	readonly issues?: readonly ConfigIssue[];
-}
-
-export class DirectoryError extends Error {
-	readonly issue: DirectoryIssue;
-
-	constructor(issue: DirectoryIssue) {
-		super(`Directory startup failed (${issue.code}).`);
-		this.name = 'DirectoryError';
-		this.issue = Object.freeze({ ...issue });
-	}
-}
 
 export interface LoadDirectoryOptions extends ConfigLoadOptions {
 	/** Called synchronously with safe diagnostics for rejected reloads. */

@@ -5,7 +5,8 @@ import { inspect } from 'node:util';
 import { ConfigError, validateConfig } from '@directory/config';
 import type { DirectoryConfiguration } from '@directory/config/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DirectoryError, loadDirectory, type DirectoryIssue } from './load-directory.js';
+import { DirectoryError, type DirectoryIssue } from '../directory-error.js';
+import { loadDirectory } from './load-directory.js';
 import type { PreparedSnapshot } from './snapshot.js';
 
 const mocks = vi.hoisted(() => ({

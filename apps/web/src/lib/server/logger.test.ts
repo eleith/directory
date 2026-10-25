@@ -1,7 +1,7 @@
 import { ConfigError } from '@directory/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthSettingsError } from './auth/settings.js';
-import { DirectoryError } from './config/load-directory.js';
+import { DirectoryError } from './directory-error.js';
 import { logger, reportDirectoryIssue, reportStartupFailure } from './logger.js';
 
 const sentinel = 'PRIVATE-secret-environment-name-filename.yaml';
