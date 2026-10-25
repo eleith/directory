@@ -41,7 +41,7 @@
 	let navigating = $state(false);
 	let activated = $state(false);
 	let completedQuery: string | undefined;
-	let search: ReturnType<typeof import('$lib/search/engine.js').createSearch> | undefined;
+	let searchBookmarks: ReturnType<typeof import('$lib/search/engine.js').createSearch> | undefined;
 	let indexedSnapshotId: string | undefined;
 	let searchRequestVersion = 0;
 	let searchUnavailable = false;
@@ -52,28 +52,36 @@
 		if (searchUnavailable) return;
 		if (!trimmedQuery) results = null;
 		if (indexedSnapshotId !== snapshot.snapshotId) {
-			search = undefined;
+			searchBookmarks = undefined;
 			indexedSnapshotId = undefined;
 		}
 		try {
-			if (!search) {
+			if (!searchBookmarks) {
 				status = trimmedQuery ? 'loading' : 'idle';
 				const engine = await loadEngine();
-				if (!mounted || navigating || requestVersion !== searchRequestVersion) return;
-				if (directory.snapshotId !== snapshot.snapshotId) return;
-				search = engine.createSearch(snapshot);
+				if (!isCurrentSearchRequest(snapshot.snapshotId, requestVersion)) return;
+				searchBookmarks = engine.createSearch(snapshot);
 				indexedSnapshotId = snapshot.snapshotId;
 			}
-			if (trimmedQuery) results = search(trimmedQuery);
+
+			if (trimmedQuery) results = searchBookmarks(trimmedQuery);
 			completedQuery = currentQuery;
 			status = 'ready';
 		} catch {
-			if (!mounted || navigating || requestVersion !== searchRequestVersion) return;
-			if (directory.snapshotId !== snapshot.snapshotId) return;
+			if (!isCurrentSearchRequest(snapshot.snapshotId, requestVersion)) return;
 			searchUnavailable = true;
 			status = 'failed';
 			results = null;
 		}
+	}
+
+	function isCurrentSearchRequest(snapshotId: string, requestVersion: number): boolean {
+		return (
+			mounted &&
+			!navigating &&
+			requestVersion === searchRequestVersion &&
+			directory.snapshotId === snapshotId
+		);
 	}
 
 	function clearSearch() {
