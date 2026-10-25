@@ -110,6 +110,16 @@ bookmark declaration order retain the existing snapshot and revision; comments
 and formatting alone do not create an update. `/healthz` stays generic and ready
 while a last-good snapshot is serving.
 
+Open pages with JavaScript check the accepted revision every five seconds while
+visible, and when returning to the tab. A newer revision shows **Updates available**
+in a sticky bar above the header, with a **Refresh** link. It does not replace
+content or move focus automatically.
+Refresh reloads the current browser URL, including its search, so document colors
+and branding update together. Hidden/offline tabs pause checks, temporary failures
+back off, and authentication denials stop checks without exposing revision data.
+Without JavaScript, use the browser's normal refresh. Image-file byte changes alone
+do not create a YAML revision or an update notice.
+
 An auth change rejects the entire replacement and reports `restart_required`,
 including changes that enable or disable auth. It never partially accepts the
 candidate's display changes or restarts the process automatically. Restore the

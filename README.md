@@ -13,7 +13,8 @@ paths to bundled `/favicon.svg`; explicit bundled selections are also valid.
 The web server routes mounted site selections through public branding aliases.
 The web server loads an immutable directory
 before serving, polls for file changes, and keeps the last good snapshot after
-invalid edits. Compact icon-and-title tiles flow into a responsive grid with muted
+invalid edits. Open pages with JavaScript check for accepted updates and offer
+Refresh without automatically replacing what someone is reading. Compact icon-and-title tiles flow into a responsive grid with muted
 group headings, plain shareable details and real external service links.
 Header search loads on first focus/input and finds bookmarks with typo-tolerant,
 word-order-independent matching across public bookmark metadata. Results rank by

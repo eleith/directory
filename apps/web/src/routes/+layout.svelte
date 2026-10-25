@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
+	import { page } from '$app/state';
+	import ConfigUpdateNotice from '$lib/components/ConfigUpdateNotice.svelte';
 	import type { LayoutData } from './$types';
 	import '../lib/styles/reset.css';
 	import '../lib/styles/theme.css';
@@ -23,4 +25,5 @@
 	<link rel="icon" href={data.faviconPath} />
 </svelte:head>
 
+<ConfigUpdateNotice snapshotId={page.data.directory?.snapshotId} />
 {@render children()}

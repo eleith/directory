@@ -367,6 +367,24 @@ instead applies its query to the destination directory entry and focuses Search
 after exit, not to the detail entry that is being popped. The body portal inherits
 the configured accents naturally from the document root.
 
+### Configuration update notice
+
+The protected `/config/version` endpoint returns only the accepted snapshot ID
+with private/no-store caching. It follows the existing endpoint authentication
+boundary; rejected configuration details remain in operator diagnostics.
+
+`ConfigUpdateNotice` lives in the root layout, observing the optional authorized
+page display through typed `App.PageData`. It captures the document's first display
+revision once, so later SPA data updates do not incorrectly mark old document CSS
+as current. It owns one request/timer, visibility/focus/online listeners, abort
+cleanup and bounded failure backoff. No checks run on public pages without display
+data, and no-JavaScript pages keep native refresh behavior. The full-width status
+bar sits above the header in document flow, stays sticky while scrolling, and
+remains below the modal overlay. It never takes focus. Its native link tracks the
+actual browser URL when Kit navigation state changes, including shallow query
+changes, and opts out of Kit navigation for a full document load. No invalidation
+or client theme bridge is needed.
+
 ### Local search
 
 The header search shell is server-rendered but disabled until hydration. Its first
