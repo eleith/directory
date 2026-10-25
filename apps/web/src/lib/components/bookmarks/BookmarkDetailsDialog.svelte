@@ -3,8 +3,8 @@
 	import { Dialog } from 'bits-ui';
 	import IconX from 'virtual:icons/ph/x';
 	import type { DisplayLink } from '$lib/display/types.js';
-	import DetailContent from './DetailContent.svelte';
-	import Button from './ui/Button.svelte';
+	import BookmarkDetails from './BookmarkDetails.svelte';
+	import Button from '../ui/Button.svelte';
 
 	let {
 		link,
@@ -72,7 +72,7 @@
 						<div class="scroll-content">
 							<Dialog.Title>
 								{#snippet child({ props: titleProps })}
-									<DetailContent
+									<BookmarkDetails
 										link={details.link}
 										groupLabel={details.groupLabel}
 										{openLinksInNewTab}

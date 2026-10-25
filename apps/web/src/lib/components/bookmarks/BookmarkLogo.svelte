@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Logo from './Logo.svelte';
+	import Logo from '../Logo.svelte';
 	import type { DisplayLink } from '$lib/display/types.js';
 
 	interface Props {

@@ -2,9 +2,9 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { DisplayLink } from '$lib/display/types.js';
 	import BookmarkLogo from './BookmarkLogo.svelte';
-	import ButtonLink from './ui/ButtonLink.svelte';
-	import Chip from './ui/Chip.svelte';
-	import Input from './ui/Input.svelte';
+	import ButtonLink from '../ui/ButtonLink.svelte';
+	import Chip from '../ui/Chip.svelte';
+	import Input from '../ui/Input.svelte';
 
 	let {
 		link,

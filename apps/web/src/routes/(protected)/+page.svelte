@@ -4,9 +4,9 @@
 	import IconSignOut from 'virtual:icons/ph/sign-out';
 	import { beforeNavigate, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
-	import BookmarkLogo from '$lib/components/BookmarkLogo.svelte';
-	import DetailContent from '$lib/components/DetailContent.svelte';
-	import DetailDialog from '$lib/components/DetailDialog.svelte';
+	import BookmarkLogo from '$lib/components/bookmarks/BookmarkLogo.svelte';
+	import BookmarkDetails from '$lib/components/bookmarks/BookmarkDetails.svelte';
+	import BookmarkDetailsDialog from '$lib/components/bookmarks/BookmarkDetailsDialog.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import Search from '$lib/components/Search.svelte';
@@ -228,7 +228,7 @@
 	</header>
 
 	{#if mounted}
-		<DetailDialog
+		<BookmarkDetailsDialog
 			link={selectedLink}
 			groupLabel={selectedGroup?.label}
 			openLinksInNewTab={data.directory.site.open_links_in_new_tab}
@@ -241,7 +241,7 @@
 			<section class="details" aria-labelledby="link-details-title">
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 				<a class="back" href={directoryURL} data-sveltekit-preload-data="off">Back to directory</a>
-				<DetailContent
+				<BookmarkDetails
 					link={selectedLink}
 					groupLabel={selectedGroup?.label}
 					openLinksInNewTab={data.directory.site.open_links_in_new_tab}
