@@ -1,14 +1,14 @@
 import type { DirectoryConfiguration } from '@directory/config/types';
-import type { DirectoryDisplay, DisplaySite } from '../../display/types.js';
-import { getGroups } from './groups.js';
+import type { DirectoryContent, DisplaySite } from '../../display/types.js';
+import { prepareBookmarkGroups } from './bookmark-groups.js';
 import { freezeData } from './immutable.js';
 
-export function prepareDirectory(
+export function prepareDirectoryContent(
 	config: DirectoryConfiguration,
 	snapshotId: string
-): DirectoryDisplay {
+): DirectoryContent {
 	const site = getSite(config);
-	const { grouped, groups } = getGroups(config);
+	const { grouped, groups } = prepareBookmarkGroups(config);
 	return freezeData({
 		snapshotId,
 		site,

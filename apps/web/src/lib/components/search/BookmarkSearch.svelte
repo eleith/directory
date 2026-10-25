@@ -17,7 +17,7 @@
 	import Button from '../ui/Button.svelte';
 	import Input from '../ui/Input.svelte';
 	import { beforeNavigate, afterNavigate } from '$app/navigation';
-	import type { DirectoryDisplay } from '$lib/display/types.js';
+	import type { DirectoryContent } from '$lib/display/types.js';
 	import type { SearchResult } from '$lib/search/engine.js';
 
 	let {
@@ -28,7 +28,7 @@
 		input = $bindable(),
 		onEnterResults
 	}: {
-		directory: DirectoryDisplay;
+		directory: DirectoryContent;
 		query?: string;
 		results: SearchResult[] | null;
 		status: 'idle' | 'loading' | 'ready' | 'failed';
@@ -46,7 +46,7 @@
 	let searchRequestVersion = 0;
 	let searchUnavailable = false;
 
-	async function updateSearch(snapshot: DirectoryDisplay, currentQuery: string) {
+	async function updateSearch(snapshot: DirectoryContent, currentQuery: string) {
 		const requestVersion = ++searchRequestVersion;
 		const trimmedQuery = currentQuery.trim();
 		if (searchUnavailable) return;

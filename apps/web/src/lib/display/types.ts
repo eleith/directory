@@ -1,4 +1,4 @@
-export interface DirectoryDisplay {
+export interface DirectoryContent {
 	readonly snapshotId: string;
 	readonly site: DisplaySite;
 	readonly appearance: DisplayAppearance;

@@ -1,7 +1,7 @@
 import { validateConfig } from '@directory/config';
 import type { DirectoryLink } from '@directory/config/types';
 import { describe, expect, it } from 'vitest';
-import { getGroups } from './groups.js';
+import { prepareBookmarkGroups } from './bookmark-groups.js';
 
 function directory(links: Record<string, Pick<DirectoryLink, 'title'> & Partial<DirectoryLink>>) {
 	const config = validateConfig(
@@ -12,7 +12,7 @@ function directory(links: Record<string, Pick<DirectoryLink, 'title'> & Partial<
 		},
 		{ env: {} }
 	);
-	return getGroups(config);
+	return prepareBookmarkGroups(config);
 }
 
 function groupLinkIds(display: ReturnType<typeof directory>) {

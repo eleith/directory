@@ -1,9 +1,9 @@
 import type { DirectoryConfiguration, DirectoryLink } from '@directory/config/types';
-import type { DirectoryDisplay, DisplayGroup, DisplayLink } from '../../display/types.js';
+import type { DirectoryContent, DisplayGroup, DisplayLink } from '../../display/types.js';
 
-export function getGroups(
+export function prepareBookmarkGroups(
 	config: DirectoryConfiguration
-): Pick<DirectoryDisplay, 'grouped' | 'groups'> {
+): Pick<DirectoryContent, 'grouped' | 'groups'> {
 	const namedGroups = new Map<string, { id: string; label: string; links: DisplayLink[] }>();
 	const ungroupedLinks: DisplayLink[] = [];
 

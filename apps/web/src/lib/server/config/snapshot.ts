@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { DirectoryConfiguration } from '@directory/config/types';
-import type { DirectoryDisplay } from '../../display/types.js';
+import type { DirectoryContent } from '../../display/types.js';
 import { freezeData, type Immutable } from './immutable.js';
-import { prepareDirectory } from './directory.js';
+import { prepareDirectoryContent } from './directory-content.js';
 import { getBookmarkLogos } from '../bookmark-logos.js';
 
 export interface PreparedSnapshot {
 	readonly configuration: Immutable<DirectoryConfiguration>;
-	readonly display: DirectoryDisplay;
+	readonly display: DirectoryContent;
 	readonly assets: {
 		readonly referencedPaths: readonly string[];
 		readonly brandingPaths: readonly string[];
@@ -17,7 +17,7 @@ export interface PreparedSnapshot {
 
 export function prepareSnapshot(config: DirectoryConfiguration): PreparedSnapshot {
 	const configuration = structuredClone(config);
-	const display = prepareDirectory(configuration, randomUUID());
+	const display = prepareDirectoryContent(configuration, randomUUID());
 	const assets = {
 		...collectAssetPaths(configuration),
 		bookmarkLogos: getBookmarkLogos(configuration)

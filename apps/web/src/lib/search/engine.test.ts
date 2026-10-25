@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DirectoryDisplay, DisplayGroup, DisplayLink } from '$lib/display/types.js';
+import type { DirectoryContent, DisplayGroup, DisplayLink } from '$lib/display/types.js';
 import { createSearch } from './engine.js';
 
 function link(id: string, fields: Partial<DisplayLink> = {}): DisplayLink {
@@ -16,7 +16,7 @@ function link(id: string, fields: Partial<DisplayLink> = {}): DisplayLink {
 	});
 }
 
-function directory(groups: readonly DisplayGroup[]): DirectoryDisplay {
+function directory(groups: readonly DisplayGroup[]): DirectoryContent {
 	return Object.freeze({
 		snapshotId: 'unit-snapshot',
 		site: Object.freeze({

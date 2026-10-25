@@ -2,7 +2,7 @@ import { validateConfig } from '@directory/config';
 import type { DirectoryConfiguration } from '@directory/config/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { DisplaySite } from '../../display/types.js';
-import { getSite, prepareDirectory } from './directory.js';
+import { getSite, prepareDirectoryContent } from './directory-content.js';
 
 const destination = { title: 'Photos', url: 'https://photos.example.com' };
 
@@ -12,7 +12,7 @@ function expectDeeplyFrozen(value: unknown): void {
 	for (const child of Object.values(value)) expectDeeplyFrozen(child);
 }
 
-describe('prepareDirectory', () => {
+describe('prepareDirectoryContent', () => {
 	it('copies only public fields and preserves site images, primary logos and multiline text', () => {
 		const config = validateConfig(
 			{
@@ -40,7 +40,7 @@ describe('prepareDirectory', () => {
 			{ env: {} }
 		);
 
-		expect(prepareDirectory(config, 'snapshot-one')).toEqual({
+		expect(prepareDirectoryContent(config, 'snapshot-one')).toEqual({
 			snapshotId: 'snapshot-one',
 			site: {
 				title: 'Family',
@@ -75,7 +75,7 @@ describe('prepareDirectory', () => {
 
 	it('selects resolved site defaults and preserves optional bookmark absence', () => {
 		const config = validateConfig({ links: { photos: destination } }, { env: {} });
-		const display = prepareDirectory(config, 'minimal');
+		const display = prepareDirectoryContent(config, 'minimal');
 		expect(display).toEqual({
 			snapshotId: 'minimal',
 			site: {
@@ -136,7 +136,7 @@ describe('prepareDirectory', () => {
 			const site = getSite(config);
 			expectTypeOf<DisplaySite['open_links_in_new_tab']>().toEqualTypeOf<boolean>();
 			expect(site.open_links_in_new_tab).toBe(open_links_in_new_tab);
-			const display = prepareDirectory(config, 'link-target');
+			const display = prepareDirectoryContent(config, 'link-target');
 			expect(display.site).toEqual(site);
 			expect(display.groups[0]!.links[0]!).not.toHaveProperty('open_links_in_new_tab');
 			expect(config).toEqual(before);
@@ -152,7 +152,7 @@ describe('prepareDirectory', () => {
 			{ env: {} }
 		);
 		const original = structuredClone(config);
-		const display = prepareDirectory(config, 'independent');
+		const display = prepareDirectoryContent(config, 'independent');
 		expect(config).toEqual(original);
 		expect(display.site).toHaveProperty('favicon_path', '/public/site.png');
 		expect(display.site).toHaveProperty('logo_path', '/favicon.svg');
@@ -187,7 +187,7 @@ describe('prepareDirectory', () => {
 		({ tags, expected }) => {
 			const original = [...tags];
 			const config = validateConfig({ links: { photos: { ...destination, tags } } }, { env: {} });
-			const display = prepareDirectory(config, 'tags');
+			const display = prepareDirectoryContent(config, 'tags');
 			const displayTags = display.groups[0]!.links[0]!.tags;
 			expect(displayTags).toEqual(expected);
 			expect(displayTags).not.toBe(config.links.photos!.tags);
@@ -215,7 +215,7 @@ describe('prepareDirectory', () => {
 			}
 		}
 		const config = validateConfig({ links }, { env: {} });
-		const display = prepareDirectory(config, 'flags');
+		const display = prepareDirectoryContent(config, 'flags');
 		const displayLinks = display.groups.flatMap((group) => group.links);
 		expect(displayLinks).toHaveLength(8);
 		expect(new Set(displayLinks.map((link) => link.id)).size).toBe(8);
@@ -252,9 +252,9 @@ describe('prepareDirectory', () => {
 		Object.assign(config.site, { future: sentinel });
 		Object.assign(config.appearance, { future: sentinel });
 		Object.assign(config.links.photos!, { future: sentinel });
-		const display = prepareDirectory(config, 'redacted');
+		const display = prepareDirectoryContent(config, 'redacted');
 		const publicConfig = validateConfig({ links: { photos: destination } }, { env: {} });
-		expect(display).toEqual(prepareDirectory(publicConfig, 'redacted'));
+		expect(display).toEqual(prepareDirectoryContent(publicConfig, 'redacted'));
 		expect(JSON.stringify(display)).not.toContain(sentinel);
 		expect(display).not.toHaveProperty('auth');
 	});
@@ -267,7 +267,7 @@ describe('prepareDirectory', () => {
 			{ env: {} }
 		);
 		const original = structuredClone(config);
-		const display = prepareDirectory(config, 'immutable');
+		const display = prepareDirectoryContent(config, 'immutable');
 		expectDeeplyFrozen(display);
 		expect(config).toEqual(original);
 		for (const value of [

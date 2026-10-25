@@ -1,5 +1,5 @@
 import Fuse from 'fuse.js';
-import type { DirectoryDisplay, DisplayLink } from '$lib/display/types.js';
+import type { DirectoryContent, DisplayLink } from '$lib/display/types.js';
 
 export interface SearchResult {
 	readonly link: DisplayLink;
@@ -14,7 +14,7 @@ interface SearchDocument {
 	readonly result: SearchResult;
 }
 
-export function createSearch(directory: DirectoryDisplay) {
+export function createSearch(directory: DirectoryContent) {
 	const documents: SearchDocument[] = [];
 	for (const group of directory.groups) {
 		for (const link of group.links) {
