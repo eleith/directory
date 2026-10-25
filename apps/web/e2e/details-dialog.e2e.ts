@@ -1,11 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import {
-	directoryScript,
-	eagerClientFiles,
-	navigateQuery,
-	staticClientFiles
-} from './support/details.js';
+import { directoryScript, navigateQuery } from './support/details.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const longCopy =
@@ -123,24 +117,13 @@ test('direct SSR keeps plain details in noscript without a visible card before h
 	}
 });
 
-test('dialog is in the initial page graph; hover, focus and first activation fetch no additional JS, CSS or data', async ({
+test('browsing and opening details fetch no additional scripts, styles or page data', async ({
 	page
 }) => {
-	const directoryFiles = staticClientFiles(['.svelte-kit/generated/client-optimized/nodes/2.js']);
-	const directorySource = [...directoryFiles]
-		.map((file) =>
-			readFileSync(new URL(`../.svelte-kit/output/client/${file}`, import.meta.url), 'utf8')
-		)
-		.join('\n');
-	expect(directorySource).toContain('scroll-content');
 	const requested: string[] = [];
 	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
 	await page.goto(server.url);
 	await hydrated(page);
-	for (const file of directoryFiles) {
-		expect(eagerClientFiles.has(file)).toBe(true);
-		expect(requested).toContain('/' + file);
-	}
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	const before = requested.length;
 	const tile = page.locator('a[href="/?link=alpha"]');

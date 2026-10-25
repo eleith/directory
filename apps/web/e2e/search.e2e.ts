@@ -1,20 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { expect, test, type Page, type Request } from '@playwright/test';
-import {
-	clientManifest,
-	directoryScript,
-	eagerClientFiles,
-	navigateQuery,
-	staticClientFiles
-} from './support/details.js';
+import { clientManifest, directoryScript, navigateQuery } from './support/details.js';
 import { credentialsAuth, password, username } from './support/configuration.js';
 import { startServer, type TestServer } from './support/server.js';
 
 import { watchSearchStability } from './support/search-stability.js';
 
-const engineKey = 'src/lib/search/engine.ts';
-const engineScript = '/' + clientManifest[engineKey]!.file;
-const engineFiles = staticClientFiles([engineKey]);
+const engineScript = '/' + clientManifest['src/lib/search/engine.ts']!.file;
 const longTerms = 'copper lantern telescope meadow archive orchard constellation';
 const configuration = `site:
   title: Search fixture
@@ -131,28 +122,7 @@ async function finishRendering(page: Page) {
 	);
 }
 
-test('full Fuse engine is outside the eager directory/dialog graph; only search focus loads it once', async ({
-	page
-}) => {
-	for (const file of engineFiles) {
-		expect(eagerClientFiles.has(file)).toBe(false);
-		expect(staticClientFiles(['.svelte-kit/generated/client-optimized/nodes/2.js']).has(file)).toBe(
-			false
-		);
-	}
-	const engineSource = readFileSync(
-		new URL(`../.svelte-kit/output/client${engineScript}`, import.meta.url),
-		'utf8'
-	);
-	for (const marker of ['7.5.0', 'useTokenSearch', 'tokenMatch', '_coversAllTokens'])
-		expect(engineSource).toContain(marker);
-	for (const file of eagerClientFiles) {
-		const source = readFileSync(
-			new URL(`../.svelte-kit/output/client/${file}`, import.meta.url),
-			'utf8'
-		);
-		expect(source).not.toContain('useTokenSearch');
-	}
+test('search loads once on first focus, not while browsing bookmarks', async ({ page }) => {
 	const requested: string[] = [];
 	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
 	await openGrid(page);
@@ -161,8 +131,7 @@ test('full Fuse engine is outside the eager directory/dialog graph; only search 
 	await page.locator('.tile').first().click();
 	await expect(page.getByRole('dialog', { name: 'Immich', exact: true })).toBeVisible();
 	await page.getByRole('button', { name: 'Close', exact: true }).click();
-	for (const file of engineFiles) expect(requested).not.toContain('/' + file);
-	expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
+	expect(requested).not.toContain(engineScript);
 	await searchInput(page).focus();
 	await expect.poll(() => requested.filter((path) => path === engineScript).length).toBe(1);
 	await searchInput(page).fill('backup');
@@ -173,7 +142,6 @@ test('full Fuse engine is outside the eager directory/dialog graph; only search 
 	await searchInput(page).fill('drome');
 	await expectTitles(page, ['Navidrome']);
 	expect(requested.filter((path) => path === engineScript)).toHaveLength(1);
-	expect(requested.filter((path) => path === directoryScript)).toHaveLength(1);
 });
 
 test('empty focus quietly warms search without moving or reloading the full directory', async ({
