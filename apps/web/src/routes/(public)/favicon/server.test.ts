@@ -1,10 +1,10 @@
 import { validateConfig } from '@directory/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readImage } from '../../../lib/server/assets.js';
+import { readMountedImage } from '../../../lib/server/images/read-mounted-image.js';
 import { prepareSnapshot } from '../../../lib/server/config/snapshot.js';
 import { GET, HEAD } from './+server.js';
 
-vi.mock('../../../lib/server/assets.js', () => ({ readImage: vi.fn() }));
+vi.mock('../../../lib/server/images/read-mounted-image.js', () => ({ readMountedImage: vi.fn() }));
 
 const publicDir = '/PRIVATE_MOUNTED_ROOT';
 const image = { bytes: new TextEncoder().encode('<svg/>'), contentType: 'image/svg+xml' };
@@ -32,13 +32,13 @@ function expectHeaders(response: Response, contentType: string, length: number) 
 }
 
 beforeEach(() => {
-	vi.mocked(readImage).mockReset().mockResolvedValue(image);
+	vi.mocked(readMountedImage).mockReset().mockResolvedValue(image);
 });
 
 describe('public favicon alias', () => {
 	it.each(['GET', 'HEAD'] as const)('reads exactly the selected source for %s', async (method) => {
 		const response = await (method === 'HEAD' ? HEAD : GET)(event(method));
-		expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/café family.svg');
+		expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/café family.svg');
 		expect(response.status).toBe(200);
 		expectHeaders(response, image.contentType, image.bytes.byteLength);
 		expect(await response.text()).toBe(method === 'HEAD' ? '' : '<svg/>');
@@ -52,7 +52,7 @@ describe('public favicon alias', () => {
 		['HEAD', '/favicon.svg']
 	] as const)('returns 404 before I/O for %s with bundled selection %s', async (method, source) => {
 		const response = await GET(event(method, snapshot(source)));
-		expect(readImage).not.toHaveBeenCalled();
+		expect(readMountedImage).not.toHaveBeenCalled();
 		expect(response.status).toBe(404);
 		expectHeaders(response, 'text/plain; charset=utf-8', 9);
 		expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');
@@ -62,9 +62,12 @@ describe('public favicon alias', () => {
 	it.each(['GET', 'HEAD'] as const)(
 		'maps unavailable reader results to generic %s 404',
 		async (method) => {
-			vi.mocked(readImage).mockResolvedValue(undefined);
+			vi.mocked(readMountedImage).mockResolvedValue(undefined);
 			const response = await GET(event(method));
-			expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/café family.svg');
+			expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(
+				publicDir,
+				'/public/café family.svg'
+			);
 			expect(response.status).toBe(404);
 			expectHeaders(response, 'text/plain; charset=utf-8', 9);
 			expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');
@@ -84,8 +87,8 @@ describe('public favicon alias', () => {
 			});
 			expect((await GET(request)).status).toBe(200);
 		}
-		expect(readImage).toHaveBeenCalledTimes(3);
-		for (const args of vi.mocked(readImage).mock.calls) {
+		expect(readMountedImage).toHaveBeenCalledTimes(3);
+		for (const args of vi.mocked(readMountedImage).mock.calls) {
 			expect(args).toEqual([publicDir, '/public/café family.svg']);
 		}
 	});
@@ -100,7 +103,7 @@ describe('public favicon alias', () => {
 		const replacement = event('GET', snapshot('/public/replacement.png'));
 		await GET(captured);
 		await GET(replacement);
-		expect(vi.mocked(readImage).mock.calls).toEqual([
+		expect(vi.mocked(readMountedImage).mock.calls).toEqual([
 			[publicDir, '/public/café family.svg'],
 			[publicDir, '/public/replacement.png']
 		]);

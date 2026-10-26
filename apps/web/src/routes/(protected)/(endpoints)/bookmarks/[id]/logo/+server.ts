@@ -1,4 +1,4 @@
-import { imageResponse } from '../../../../../../lib/server/image-response.js';
+import { imageResponse } from '../../../../../../lib/server/images/image-response.js';
 import type { RequestHandler } from './$types.js';
 
 export const GET: RequestHandler = ({ locals, params, request }) => {

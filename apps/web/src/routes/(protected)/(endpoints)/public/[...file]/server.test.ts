@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readImage } from '../../../../../lib/server/assets.js';
+import { readMountedImage } from '../../../../../lib/server/images/read-mounted-image.js';
 import { GET, HEAD } from './+server.js';
 
-vi.mock('../../../../../lib/server/assets.js', () => ({ readImage: vi.fn() }));
+vi.mock('../../../../../lib/server/images/read-mounted-image.js', () => ({
+	readMountedImage: vi.fn()
+}));
 
 const publicDir = '/mounted/private-images';
 const image = { bytes: new TextEncoder().encode('<svg/>'), contentType: 'image/svg+xml' };
@@ -18,13 +20,13 @@ function event(file: string, method = 'GET', captured = snapshot()) {
 }
 
 beforeEach(() => {
-	vi.mocked(readImage).mockReset().mockResolvedValue(image);
+	vi.mocked(readMountedImage).mockReset().mockResolvedValue(image);
 });
 
 describe('referenced mounted image route', () => {
 	it.each(['GET', 'HEAD'])('reads eligible images for %s', async (method) => {
 		const response = await (method === 'HEAD' ? HEAD : GET)(event('icon.svg', method));
-		expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/icon.svg');
+		expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/icon.svg');
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toBe(image.contentType);
 		expect(response.headers.get('content-length')).toBe(String(image.bytes.byteLength));
@@ -49,17 +51,17 @@ describe('referenced mounted image route', () => {
 				expect(response.status).toBe(404);
 				expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');
 			}
-			expect(readImage).not.toHaveBeenCalled();
+			expect(readMountedImage).not.toHaveBeenCalled();
 		}
 	);
 
 	it('passes Kit-decoded paths unchanged, without a second decode', async () => {
 		const captured = snapshot('/public/café family.svg');
 		expect((await GET(event('café family.svg', 'GET', captured))).status).toBe(200);
-		expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/café family.svg');
-		vi.mocked(readImage).mockClear();
+		expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/café family.svg');
+		vi.mocked(readMountedImage).mockClear();
 		expect((await GET(event('caf%C3%A9%20family.svg', 'GET', captured))).status).toBe(404);
-		expect(readImage).not.toHaveBeenCalled();
+		expect(readMountedImage).not.toHaveBeenCalled();
 	});
 
 	it('keeps old captured eligibility while a replacement removes the reference', async () => {
@@ -67,15 +69,15 @@ describe('referenced mounted image route', () => {
 		const replacement = snapshot('/public/replacement.svg');
 		expect((await GET(captured)).status).toBe(200);
 		expect((await GET(event('icon.svg', 'GET', replacement))).status).toBe(404);
-		expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/icon.svg');
+		expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/icon.svg');
 	});
 
 	it.each(['GET', 'HEAD'])(
 		'maps an unavailable reader result to a generic %s 404',
 		async (method) => {
-			vi.mocked(readImage).mockResolvedValue(undefined);
+			vi.mocked(readMountedImage).mockResolvedValue(undefined);
 			const response = await (method === 'HEAD' ? HEAD : GET)(event('icon.svg', method));
-			expect(readImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/icon.svg');
+			expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(publicDir, '/public/icon.svg');
 			expect(response.status).toBe(404);
 			expect(response.headers.get('content-length')).toBe('9');
 			expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not found');

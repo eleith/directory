@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { validateConfig } from '@directory/config';
 import type { DirectoryConfiguration, DirectoryLink } from '@directory/config/types';
 import { describe, expect, it } from 'vitest';
-import { getBookmarkLogos } from './bookmark-logos.js';
+import { renderBookmarkLogos } from './render-bookmark-logos.js';
 
 function configuration(
 	links: Record<string, Pick<DirectoryLink, 'title'> & Partial<DirectoryLink>>
@@ -41,7 +41,7 @@ function luminance(hex: string): number {
 
 describe('prepared bookmark logos with the current Initials renderer', () => {
 	it('keeps the exact published Initials definition bytes', async () => {
-		const bytes = await readFile(new URL('./initials.json', import.meta.url));
+		const bytes = await readFile(new URL('./initials-style.json', import.meta.url));
 		expect(bytes.byteLength).toBe(2116);
 		expect(createHash('sha256').update(bytes).digest('hex')).toBe(
 			'9d2ddeeaaa4070a3ff2a7c57368bbfa8bd863a001625fe6ec97907b9d1914eb4'
@@ -56,7 +56,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 		['e\u0301cole Photos', 'E\u0301P'],
 		['Photos@home', 'PH']
 	])('uses the visible title %j rather than the route slug', (title, expected) => {
-		const logos = getBookmarkLogos(configuration({ 'different-slug': { title } }));
+		const logos = renderBookmarkLogos(configuration({ 'different-slug': { title } }));
 		expect(Object.keys(logos)).toEqual(['different-slug']);
 		expect(letters(logos['different-slug']!)).toBe(expected);
 	});
@@ -64,7 +64,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 	it.each(['12345', '😀', '\u0301', '123@Photos', '@Photos'])(
 		'falls back to the slug for a title without usable letters: %j',
 		(title) => {
-			const logos = getBookmarkLogos(configuration({ 'backup-files': { title } }));
+			const logos = renderBookmarkLogos(configuration({ 'backup-files': { title } }));
 			expect(letters(logos['backup-files']!)).toBe('BF');
 		}
 	);
@@ -76,21 +76,21 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 		{ id: 'late-letter', title: '1'.repeat(1024) + 'A' }
 	])('bounds renderer input without restricting configured titles or slugs', ({ id, title }) => {
 		const config = configuration({ [id]: { title } });
-		const logos = getBookmarkLogos(config);
+		const logos = renderBookmarkLogos(config);
 		expect(logos[id]).toMatch(/^<svg\b/);
 		expect(letters(logos[id]!)).not.toBe('');
-		expect(getBookmarkLogos(config)).toEqual(logos);
+		expect(renderBookmarkLogos(config)).toEqual(logos);
 	});
 
 	it('uses an explicit Directory fallback for a valid slug with no letters', () => {
-		const logos = getBookmarkLogos(configuration({ '123-456': { title: '😀' } }));
+		const logos = renderBookmarkLogos(configuration({ '123-456': { title: '😀' } }));
 		expect(letters(logos['123-456']!)).toBe('DI');
 	});
 
 	it.each(['<script>alert(1)</script>\u0001', '<>&"\'\u0000\nPhotos', 'A & B'])(
 		'accepts raw HTML-like and control text without copying it into SVG metadata: %j',
 		(title) => {
-			const svg = getBookmarkLogos(configuration({ photos: { title } })).photos!;
+			const svg = renderBookmarkLogos(configuration({ photos: { title } })).photos!;
 			expect(letters(svg)).not.toBe('');
 			expect(svg).not.toMatch(/<script|<title|<desc|onerror=/u);
 			expect(svg).not.toContain('\u0000');
@@ -103,21 +103,21 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 	it('is deterministic, owns its result, and leaves caller configuration untouched', () => {
 		const config = configuration({ photos: { title: 'Family Photos' } });
 		const before = structuredClone(config);
-		const first = getBookmarkLogos(config);
-		const second = getBookmarkLogos(config);
+		const first = renderBookmarkLogos(config);
+		const second = renderBookmarkLogos(config);
 		expect(first).toEqual(second);
 		expect(first).not.toBe(second);
 		expect(config).toEqual(before);
 		expect(Object.isFrozen(config.links)).toBe(false);
 		first.photos = 'changed';
-		expect(getBookmarkLogos(config)).toEqual(second);
+		expect(renderBookmarkLogos(config)).toEqual(second);
 		expect(
-			letters(getBookmarkLogos(configuration({ photos: { title: 'Backup Files' } })).photos!)
+			letters(renderBookmarkLogos(configuration({ photos: { title: 'Backup Files' } })).photos!)
 		).toBe('BF');
 	});
 
 	it('keys separate slugs independently while sharing a named group color', () => {
-		const logos = getBookmarkLogos(
+		const logos = renderBookmarkLogos(
 			configuration({
 				photos: { title: 'Photos', group: 'Family' },
 				backup: { title: 'Backup Files', group: 'Family' }
@@ -135,7 +135,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 			files: { title: 'Files' },
 			other: { title: 'Named Other', group: 'Other' }
 		});
-		const original = getBookmarkLogos(config);
+		const original = renderBookmarkLogos(config);
 		const reordered = configuration({
 			newcomer: { title: 'New group', group: 'A new group' },
 			other: config.links.other!,
@@ -144,7 +144,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 		});
 		reordered.appearance.primary_light_color = '#000000';
 		reordered.appearance.primary_dark_color = '#ffffff';
-		const updated = getBookmarkLogos(reordered);
+		const updated = renderBookmarkLogos(reordered);
 		for (const id of Object.keys(original)) expect(updated[id]).toBe(original[id]);
 	});
 
@@ -155,7 +155,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 			)
 		);
 		const colors = new Set<string>();
-		for (const svg of Object.values(getBookmarkLogos(config))) {
+		for (const svg of Object.values(renderBookmarkLogos(config))) {
 			expect(svg).toMatch(/^<svg\b[^>]*width="64"[^>]*height="64"/u);
 			expect(svg).toContain('fill="#1f2937"');
 			expect(svg).not.toMatch(/mix-blend-mode|opacity=|<title/u);
@@ -168,6 +168,6 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 	});
 
 	it('returns an empty record for an empty directory', () => {
-		expect(getBookmarkLogos(configuration({}))).toEqual({});
+		expect(renderBookmarkLogos(configuration({}))).toEqual({});
 	});
 });

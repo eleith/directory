@@ -43,7 +43,7 @@ function sameFileContent(before: BigIntStats, after: BigIntStats): boolean {
 	);
 }
 
-export async function readImage(
+export async function readMountedImage(
 	publicDir: string,
 	publicPath: string
 ): Promise<ImageFile | undefined> {

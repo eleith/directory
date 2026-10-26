@@ -1,6 +1,6 @@
 import { validateConfig } from '@directory/config';
 import { describe, expect, it, vi } from 'vitest';
-import * as bookmarkLogos from '../bookmark-logos.js';
+import * as bookmarkLogos from '../images/render-bookmark-logos.js';
 import { prepareSnapshot } from './snapshot.js';
 
 const service = { title: 'Photos', url: 'https://photos.example.com' };
@@ -121,7 +121,7 @@ describe('private prepared snapshots', () => {
 	it('prepares bookmark logos exactly once per cloned snapshot and retains coherent earlier captures', ({
 		onTestFinished
 	}) => {
-		const generate = vi.spyOn(bookmarkLogos, 'getBookmarkLogos');
+		const generate = vi.spyOn(bookmarkLogos, 'renderBookmarkLogos');
 		onTestFinished(() => generate.mockRestore());
 		const input = configuration();
 		const captured = prepareSnapshot(input);

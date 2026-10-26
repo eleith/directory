@@ -1,5 +1,5 @@
-import { readImage } from '../../../../../lib/server/assets.js';
-import { imageResponse } from '../../../../../lib/server/image-response.js';
+import { readMountedImage } from '../../../../../lib/server/images/read-mounted-image.js';
+import { imageResponse } from '../../../../../lib/server/images/image-response.js';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals, params, request }) => {
@@ -7,7 +7,7 @@ export const GET: RequestHandler = async ({ locals, params, request }) => {
 	if (!locals.snapshot.assets.referencedPaths.includes(publicPath)) {
 		return imageResponse(request.method);
 	}
-	const image = await readImage(locals.publicDir, publicPath);
+	const image = await readMountedImage(locals.publicDir, publicPath);
 	return imageResponse(request.method, image);
 };
 

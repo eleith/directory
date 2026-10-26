@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import { Avatar, Style } from '@dicebear/core';
 import type { DirectoryConfiguration } from '@directory/config/types';
-import initials from './initials.json';
+import initials from './initials-style.json';
 
 const style = new Style(initials);
 const backgrounds = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe', '#cffafe'];
 
-export function getBookmarkLogos(config: DirectoryConfiguration): Record<string, string> {
+export function renderBookmarkLogos(config: DirectoryConfiguration): Record<string, string> {
 	return Object.fromEntries(
 		Object.entries(config.links).map(([id, link]) => {
 			const identity = link.group === undefined ? `link:${id}` : `named:${link.group}`;

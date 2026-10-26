@@ -3,7 +3,7 @@ import type { DirectoryConfiguration } from '@directory/config/types';
 import type { DirectoryContent } from '../../display/types.js';
 import { freezeData, type Immutable } from './immutable.js';
 import { prepareDirectoryContent } from './directory-content.js';
-import { getBookmarkLogos } from '../bookmark-logos.js';
+import { renderBookmarkLogos } from '../images/render-bookmark-logos.js';
 
 export interface PreparedSnapshot {
 	readonly configuration: Immutable<DirectoryConfiguration>;
@@ -20,7 +20,7 @@ export function prepareSnapshot(config: DirectoryConfiguration): PreparedSnapsho
 	const display = prepareDirectoryContent(configuration, randomUUID());
 	const assets = {
 		...collectAssetPaths(configuration),
-		bookmarkLogos: getBookmarkLogos(configuration)
+		bookmarkLogos: renderBookmarkLogos(configuration)
 	};
 	return freezeData({ configuration, display, assets });
 }

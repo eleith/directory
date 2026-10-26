@@ -4,7 +4,7 @@ import { themeStyleTag } from './lib/server/appearance.js';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Authentication } from './lib/server/auth/index.js';
 import { requireSignIn } from './lib/server/auth/access.js';
-import { readImage } from './lib/server/assets.js';
+import { readMountedImage } from './lib/server/images/read-mounted-image.js';
 import { GET as mountedImage } from './routes/(protected)/(endpoints)/public/[...file]/+server.js';
 import { GET as bookmarkLogo } from './routes/(protected)/(endpoints)/bookmarks/[id]/logo/+server.js';
 import type { Application } from './lib/server/lifecycle/application.js';
@@ -50,7 +50,7 @@ vi.mock('@sveltejs/kit/hooks', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('./lib/server/assets.js', () => ({ readImage: vi.fn() }));
+vi.mock('./lib/server/images/read-mounted-image.js', () => ({ readMountedImage: vi.fn() }));
 vi.mock('./lib/server/boot.js', () => ({ bootApp: mocks.boot }));
 vi.mock('./lib/server/logger.js', () => ({ reportStartupFailure: mocks.report }));
 vi.mock('@directory/config', async (importOriginal) => ({
@@ -358,10 +358,10 @@ describe('server hooks', () => {
 			}
 			expect(session).toHaveBeenCalledTimes(12);
 			expect(resolve).not.toHaveBeenCalled();
-			expect(readImage).not.toHaveBeenCalled();
+			expect(readMountedImage).not.toHaveBeenCalled();
 
 			session.mockResolvedValue({ user: { name: 'Directory' }, expires: '2030-01-01' });
-			vi.mocked(readImage).mockResolvedValue({
+			vi.mocked(readMountedImage).mockResolvedValue({
 				bytes: new TextEncoder().encode('<svg/>'),
 				contentType: 'image/svg+xml'
 			});
@@ -375,7 +375,10 @@ describe('server hooks', () => {
 				locals: {}
 			} as unknown as RequestEvent;
 			expect((await hooks.handle({ event: authorized, resolve })).status).toBe(200);
-			expect(readImage).toHaveBeenCalledExactlyOnceWith(ready.publicDir, '/public/photo.svg');
+			expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(
+				ready.publicDir,
+				'/public/photo.svg'
+			);
 		}
 	);
 
