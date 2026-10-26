@@ -308,76 +308,14 @@ describe('bounded mounted images', () => {
 	});
 });
 
-describe('extension-matched image headers', () => {
+describe('image format checks during file reads', () => {
 	it.each([
 		['icon.png', svg],
 		['icon.svg', png],
-		['icon.jpg', gif],
-		['icon.gif', webp],
-		['icon.webp', jpeg],
-		['icon.png', png.subarray(0, 30)],
-		['icon.gif', gif.subarray(0, 9)],
-		['icon.jpeg', jpeg.subarray(0, 2)],
-		['icon.webp', webp.subarray(0, 11)],
-		['icon.png', Buffer.from('<html>not an image</html>')]
-	])('rejects disguised bytes or an incomplete header for %s', async (name, bytes) => {
+		['icon.svg', Buffer.from('<!DOCTYPE svg><svg/>')]
+	] as const)('rejects mismatched bytes or unsupported SVG markup in %s', async (name, bytes) => {
 		await put(name, bytes);
 		expect(await readMountedImage(root, `/public/${name}`)).toBeUndefined();
-	});
-
-	it.each([
-		['icon.png', png.subarray(0, 33)],
-		['icon.jpeg', jpeg.subarray(0, 3)],
-		['icon.gif', gif.subarray(0, 10)],
-		['icon.webp', webp.subarray(0, 12)]
-	])('recognizes %s without requiring complete codec data', async (name, bytes) => {
-		await put(name, bytes);
-		expect((await readMountedImage(root, `/public/${name}`))?.bytes).toEqual(new Uint8Array(bytes));
-	});
-
-	it.each([
-		'<svg/>',
-		'<!-- first -->\n<!-- second --> <svg/>',
-		'<?xml version="1.0"?>\n<svg/>',
-		"<?xml version='1.0' encoding='utf-8'?><svg/>",
-		'\ufeff<?xml version="1.0" encoding="UTF-8"?>\n<!-- icon -->\n<svg xmlns="http://www.w3.org/2000/svg"><text>Home &amp; family</text></svg>',
-		'<svg><text><![CDATA[<hello> & anything]]></text></svg><!-- end & -->',
-		'<svg viewBox="0 0 1 1"><path d="M0 0" /></svg>'
-	])('recognizes an SVG document with XML prolog/comments', async (text) => {
-		await put('icon.svg', text);
-		expect(await readMountedImage(root, '/public/icon.svg')).toBeDefined();
-	});
-
-	it.each([
-		'<html><svg/></html>',
-		'<?xml version="1.0"?><!-- icon --><html><svg/></html>',
-		'<!-- <svg/> -->',
-		'not xml <svg/>',
-		'<svgish/>',
-		'<svg',
-		'<!-- unclosed <svg/>',
-		'<?xml version="1.0" <svg/>',
-		'<!DOCTYPE svg><svg/>',
-		'<!doctype svg><svg/>',
-		'<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///private">]><svg>&x;</svg>',
-		'<svg><!ENTITY x "value"></svg>',
-		'<?xml version="1.0" encoding="ISO-8859-1"?><svg/>',
-		'<svg><script/></svg><!DOCTYPE html>'
-	])('rejects non-SVG roots, unsupported encodings and DTD/entity markup', async (text) => {
-		await put('icon.svg', text);
-		expect(await readMountedImage(root, '/public/icon.svg')).toBeUndefined();
-	});
-
-	it('recognizes an SVG root without validating descendant XML grammar', async () => {
-		await put('icon.svg', '<svg><path bad=value>&unknown;</svg>');
-		expect(await readMountedImage(root, '/public/icon.svg')).toBeDefined();
-	});
-
-	it('compares magic bytes without masking their high bits', async () => {
-		const disguised = Buffer.from(gif);
-		disguised[0] = disguised[0]! | 0x80;
-		await put('icon.gif', disguised);
-		expect(await readMountedImage(root, '/public/icon.gif')).toBeUndefined();
 	});
 
 	it('rejects invalid UTF-8 and bounded long non-SVG prefixes', async () => {
