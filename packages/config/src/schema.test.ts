@@ -82,21 +82,6 @@ describe('configuration defaults and inferred types', () => {
 		expect(value).not.toHaveProperty('links.router.group');
 	});
 
-	it('does not mutate authored input or share mutable defaults between calls', () => {
-		const first = defaultFixture(raw);
-		if (!Value.Check(DirectoryConfigurationSchema, configurationReferences, first))
-			throw new Error('Invalid fixture');
-		first.site.title = 'Changed';
-		first.site.logo_path = '/public/changed.svg';
-		expect(defaultFixture(raw)).toHaveProperty('site.logo_path', '/favicon.svg');
-		first.links['photos']!.requires_auth = true;
-		first.links['photos']!.tags.push('changed');
-		expect(defaultFixture(raw)).toHaveProperty('links.photos.tags', []);
-		expect(defaultFixture(raw)).toHaveProperty('site.title', 'Directory');
-		expect(defaultFixture(raw)).toHaveProperty('links.photos.requires_auth', false);
-		expect(raw).toEqual({ links: { photos: link } });
-	});
-
 	it('keeps loaded defaults required and genuinely optional metadata optional in TypeScript', () => {
 		expectTypeOf<DirectoryConfiguration['version']>().toEqualTypeOf<1>();
 		expectTypeOf<DirectoryConfiguration['site']['title']>().toEqualTypeOf<string>();

@@ -49,5 +49,5 @@ jobs:
         run: pnpm --filter @directory/config check
       - name: Lint repository
         run: pnpm lint
-      - name: Unit and artifact tests
+      - name: Unit tests
         run: pnpm --filter @directory/config test:coverage

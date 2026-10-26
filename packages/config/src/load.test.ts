@@ -51,7 +51,7 @@ function expectRedacted(error: unknown): void {
 }
 
 describe('default, interpolate, then validate', () => {
-	it('loads defaults while retaining authored order, tag lists, group and advisory flags', () => {
+	it('loads independent defaults while preserving authored values and order', () => {
 		const raw = {
 			links: {
 				zebra: {
@@ -96,6 +96,8 @@ describe('default, interpolate, then validate', () => {
 		});
 		expect(config).not.toHaveProperty('auth');
 		expect(config.links.alpha).not.toHaveProperty('group');
+		config.links.alpha!.tags.push('changed');
+		expect(validateConfig(raw, { env: {} }).links.alpha!.tags).toEqual([]);
 		expect(raw).toEqual(before);
 	});
 
