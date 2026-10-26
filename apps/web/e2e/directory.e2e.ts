@@ -33,7 +33,7 @@ ${auth}`;
 }
 
 test('groups, bookmark titles and plain details work without JavaScript', async ({ browser }) => {
-	const server = await startServer({ configuration: configuration(), secret: null, origin: null });
+	const server = await startServer({ configuration: configuration() });
 	const context = await browser.newContext({ javaScriptEnabled: false });
 	try {
 		await server.ready();
@@ -112,8 +112,7 @@ test('actual bookmark HTML and Kit data remain private until sign-in', async ({ 
 		expect(data.status()).toBe(200);
 		const payload = await data.text();
 		expect(payload).toContain('photos.example.test');
-		for (const value of [username, password, server.secret!, server.path])
-			expect(payload).not.toContain(value);
+		for (const value of [username, password, server.path]) expect(payload).not.toContain(value);
 		await page.getByRole('button', { name: 'Sign out' }).click();
 		await expect(page).toHaveURL(/\/signin/);
 		expect(
@@ -130,7 +129,7 @@ test('flat and empty directories, invalid selections and phone-width text stay u
 	const flat = configuration()
 		.replaceAll('    group: Media\n', '')
 		.replaceAll('    group: Behind the scenes\n', '');
-	const server = await startServer({ configuration: flat, secret: null, origin: null });
+	const server = await startServer({ configuration: flat });
 	try {
 		await server.ready();
 		await page.setViewportSize({ width: 360, height: 900 });

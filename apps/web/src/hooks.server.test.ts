@@ -15,6 +15,7 @@ const adapterEvents: NodeJS.EventEmitter = process;
 const mocks = vi.hoisted(() => ({
 	building: false,
 	dev: false,
+	env: { ORIGIN: 'https://directory.example.com', AUTH_URL: 'https://directory.example.com' },
 	boot: vi.fn<typeof import('./lib/server/boot.js').bootApp>(),
 	report: vi.fn<typeof import('./lib/server/logger.js').reportStartupFailure>(),
 	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 	prepare: vi.fn<typeof import('./lib/server/config/snapshot.js').prepareSnapshot>()
 }));
 
+vi.mock('$env/dynamic/private', () => ({ env: mocks.env }));
 vi.mock('$app/environment', () => ({
 	get building() {
 		return mocks.building;
@@ -72,7 +74,11 @@ function snapshot(title: string, light = '#13579b', dark = '#c4d6e8') {
 			{
 				site: { title, description: `${title} description`, favicon_path: '/public/site.svg' },
 				appearance: { primary_light_color: light, primary_dark_color: dark },
-				auth: { credentials: { username: 'family', password: sentinel } },
+				auth: {
+					origin: 'https://directory.example.com',
+					secret: sentinel,
+					credentials: { username: 'family', password: sentinel }
+				},
 				links: {
 					photos: {
 						title: 'Photos',
@@ -166,7 +172,7 @@ describe('server hooks', () => {
 		expect(ready.directory.currentSnapshot).not.toHaveBeenCalled();
 		pending.resolve(ready);
 		await startup;
-		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
+		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith(undefined, mocks.env);
 		expect((await hooks.handle({ event: event(), resolve })).status).toBe(200);
 		adapterEvents.emit('sveltekit:shutdown');
 		expect((await hooks.handle({ event: event(), resolve })).status).toBe(503);
@@ -179,7 +185,7 @@ describe('server hooks', () => {
 		await hooks.init();
 		expect(development).toHaveBeenCalledOnce();
 		expect(production).not.toHaveBeenCalled();
-		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
+		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith(undefined, mocks.env);
 		process.emit('directory:dev-stop');
 	});
 

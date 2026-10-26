@@ -1,0 +1,10 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"rootDir": "src",
+		"outDir": "build/bootstrap",
+		"types": ["node"],
+		"noEmitOnError": true
+	},
+	"include": ["src/start.ts"]
+}

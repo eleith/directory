@@ -10,7 +10,7 @@ const configuration = `links:
 `;
 
 test('Open uses a new tab by default', async ({ page, context }) => {
-	const server = await startServer({ configuration, secret: null, origin: null });
+	const server = await startServer({ configuration });
 	try {
 		await server.ready();
 		await context.route('https://service.example.test/**', (route) =>
@@ -48,9 +48,7 @@ test('Open uses a new tab by default', async ({ page, context }) => {
 
 test('Open uses the current tab when configured', async ({ page, context }) => {
 	const server = await startServer({
-		configuration: `site:\n  open_links_in_new_tab: false\n${configuration}`,
-		secret: null,
-		origin: null
+		configuration: `site:\n  open_links_in_new_tab: false\n${configuration}`
 	});
 	try {
 		await server.ready();

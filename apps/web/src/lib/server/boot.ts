@@ -1,15 +1,17 @@
 import { resolveConfigPath, resolvePublicDir } from '@directory/config';
 import type { ConfigEnvironment } from '@directory/config/types';
 import { createAuthentication, type Authentication } from './auth/index.js';
-import { AuthSettingsError } from './auth/settings.js';
 import { loadDirectory, type Directory } from './config/load-directory.js';
 import { DirectoryError } from './directory-error.js';
 import type { Application } from './lifecycle/application.js';
 import { watchConfig } from './config/watch.js';
 import { reportDirectoryIssue } from './logger.js';
 
-export async function bootApp(env?: ConfigEnvironment): Promise<Application> {
-	const options = env === undefined ? {} : { env };
+export async function bootApp(
+	env: ConfigEnvironment = process.env,
+	frameworkEnv: ConfigEnvironment = process.env
+): Promise<Application> {
+	const options = { env };
 	let path: string;
 	let publicDir: string;
 	let directory: Directory;
@@ -25,10 +27,17 @@ export async function bootApp(env?: ConfigEnvironment): Promise<Application> {
 	let authentication: Authentication | undefined;
 	try {
 		const auth = directory.currentSnapshot().configuration.auth;
-		if (auth !== undefined) authentication = createAuthentication(auth, env);
-	} catch (error) {
+		// Reject edits between URL preparation and Kit startup, including enabling/disabling auth.
+		if (
+			auth?.origin !== (process.env.ORIGIN || undefined) ||
+			auth?.origin !== (frameworkEnv.ORIGIN || undefined) ||
+			auth?.origin !== (frameworkEnv.AUTH_URL || undefined)
+		) {
+			throw new DirectoryError({ code: 'auth_failed' });
+		}
+		if (auth !== undefined) authentication = createAuthentication(auth);
+	} catch {
 		directory.stop();
-		if (error instanceof AuthSettingsError) throw error;
 		throw new DirectoryError({ code: 'auth_failed' });
 	}
 

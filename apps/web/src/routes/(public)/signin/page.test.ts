@@ -16,7 +16,11 @@ function eventFor(query = '', strategy: Authentication['strategy'] = 'credential
 					description: 'PRIVATE_DESCRIPTION',
 					logo_path: '/public/private.svg'
 				},
-				auth: { credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' } },
+				auth: {
+					origin: 'https://private-auth.example.test',
+					secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
+					credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
+				},
 				links: { photos: { title: 'PRIVATE_LINK', url: 'https://photos.example.com' } }
 			},
 			{ env: {} }
@@ -55,8 +59,6 @@ describe('sign-in page', () => {
 				callbackUrl: '/?link=photos',
 				error: null
 			});
-			expect(JSON.stringify(data)).not.toContain('PRIVATE_');
-			expect(JSON.stringify(data)).not.toContain('private.svg');
 		}
 	);
 

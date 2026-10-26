@@ -10,14 +10,14 @@ services:
         LOCAL_UID: ${LOCAL_UID:-1000}
         LOCAL_GID: ${LOCAL_GID:-1000}
     user: '${LOCAL_UID:-1000}:${LOCAL_GID:-1000}'
-    env_file: .env
+    # Optional values for ${VAR} references in directory.yaml.
+    env_file:
+      - path: .env
+        required: false
     environment:
       NODE_ENV: development
-      AUTH_SECRET: ${AUTH_SECRET:-}
       CONFIG_PATH: /m/apps/web/config/directory.yaml
       DIRECTORY_PUBLIC_DIR: /m/apps/web/public
-      ORIGIN: ${ORIGIN:-http://localhost:5173}
-      AUTH_URL: ${ORIGIN:-http://localhost:5173}
     ports:
       - '127.0.0.1:5173:5173'
     volumes:
@@ -51,14 +51,14 @@ services:
     profiles:
       - tools
     user: '${LOCAL_UID:-1000}:${LOCAL_GID:-1000}'
-    env_file: .env
+    # Optional values for ${VAR} references in directory.yaml.
+    env_file:
+      - path: .env
+        required: false
     environment:
       NODE_ENV: development
-      AUTH_SECRET: ${AUTH_SECRET:-}
       CONFIG_PATH: /m/apps/web/config/directory.yaml
       DIRECTORY_PUBLIC_DIR: /m/apps/web/public
-      ORIGIN: ${ORIGIN:-http://localhost:5173}
-      AUTH_URL: ${ORIGIN:-http://localhost:5173}
     volumes:
       - ./config:/m/apps/web/config:ro
     read_only: true

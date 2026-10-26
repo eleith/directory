@@ -1,23 +1,20 @@
 services:
   directory-app:
-    image: ${DIRECTORY_IMAGE:-git.eleith.com/eleith.private/directory:latest}
+    # Replace latest with a published version or digest to pin updates.
+    image: ghcr.io/eleith/directory:latest
     platform: linux/amd64
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
       target: prod
-    env_file: .env
-    environment:
-      NODE_ENV: production
-      AUTH_SECRET: ${AUTH_SECRET:-}
-      HOST: 0.0.0.0
-      PORT: '3000'
-      CONFIG_PATH: /app/config/directory.yaml
-      DIRECTORY_PUBLIC_DIR: /app/public
-      ORIGIN: ${ORIGIN:-http://localhost:3000}
-      AUTH_URL: ${ORIGIN:-http://localhost:3000}
+    # Optional values for ${VAR} references in directory.yaml.
+    env_file:
+      - path: .env
+        required: false
     ports:
-      - '${DIRECTORY_BIND:-127.0.0.1}:${DIRECTORY_PORT:-3000}:3000'
+      # Localhost only. Use '3000:3000' for LAN access; restrict it with your firewall.
+      # Change the left port to use a different host port, e.g. '127.0.0.1:8080:3000'.
+      - '127.0.0.1:3000:3000'
     volumes:
       - ./config:/app/config:ro
       - ./public:/app/public:ro
@@ -41,7 +38,8 @@ services:
       retries: 3
 
   directory-cli:
-    image: ${DIRECTORY_CLI_IMAGE:-git.eleith.com/eleith.private/directory-cli:latest}
+    # Keep this version matched to the web image if you pin it.
+    image: ghcr.io/eleith/directory-cli:latest
     platform: linux/amd64
     build:
       context: ../..
@@ -49,16 +47,10 @@ services:
       target: prod
     profiles:
       - tools
-    env_file: .env
-    environment:
-      NODE_ENV: production
-      AUTH_SECRET: ${AUTH_SECRET:-}
-      HOST: 0.0.0.0
-      PORT: '3000'
-      CONFIG_PATH: /app/config/directory.yaml
-      DIRECTORY_PUBLIC_DIR: /app/public
-      ORIGIN: ${ORIGIN:-http://localhost:3000}
-      AUTH_URL: ${ORIGIN:-http://localhost:3000}
+    # Optional values for ${VAR} references in directory.yaml.
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - ./config:/app/config:ro
     read_only: true

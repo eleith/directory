@@ -58,4 +58,4 @@ COPY --from=pruner /pruned/package.json /app/package.json
 RUN mkdir -p /app/config /app/public
 USER node
 EXPOSE 3000
-CMD ["node", "/app/build/index.js"]
+CMD ["node", "/app/build/bootstrap/start.js"]

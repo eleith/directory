@@ -33,6 +33,8 @@ function eventFor(query = '', withAuth = false) {
 	};
 	if (withAuth) {
 		configuration.auth = {
+			origin: 'https://private-auth.example.test',
+			secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
 			credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
 		};
 	}
@@ -120,6 +122,7 @@ describe('directory page data', () => {
 		expect(serialized).toContain('https://photos.example.com');
 		expect(serialized).toContain('Family albums');
 		expect(serialized).not.toContain('PRIVATE_');
+		expect(serialized).not.toContain('private-auth.example.test');
 		expect(serialized).not.toContain('2099-01-01');
 		for (const field of [
 			'configuration',

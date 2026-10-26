@@ -25,8 +25,12 @@ vi.mock('./snapshot.js', async (importOriginal) => ({
 
 const realSnapshot = await vi.importActual<typeof import('./snapshot.js')>('./snapshot.js');
 const sentinel = 'PRIVATE-password-env-filename.yml';
-const credentials = { credentials: { username: 'family', password: sentinel } };
+const credentials = {
+	origin: 'https://directory.example.com',
+	credentials: { username: 'family', password: sentinel }
+};
 const oidc = {
+	origin: 'https://directory.example.com',
 	oidc: {
 		issuer: 'https://identity.example.com',
 		client_id: 'directory',
@@ -181,6 +185,7 @@ site:
   title: \${DIRECTORY_TITLE}
   logo_path: /public/boot.svg
 auth:
+  origin: https://directory.example.com
   credentials:
     username: family
     password: \${DIRECTORY_PASSWORD}
@@ -205,6 +210,7 @@ links:
 		const boot = directory.currentSnapshot();
 		expect(boot.configuration.site.title).toBe('Filesystem boot');
 		expect(boot.configuration.auth?.credentials?.password).toBe(sentinel);
+		expect(boot.configuration.auth).not.toHaveProperty('secret');
 		expect(boot.display.site).toEqual({
 			title: 'Filesystem boot',
 			description: '',
@@ -243,6 +249,8 @@ links:
 		const recovered = directory.currentSnapshot();
 		expect(recovered).not.toBe(boot);
 		expect(recovered.configuration.site.title).toBe('Filesystem recovered');
+		expect(recovered.configuration.auth).toEqual(boot.configuration.auth);
+		expect(recovered.configuration.auth).not.toHaveProperty('secret');
 		expect(recovered.display.site.title).toBe('Filesystem recovered');
 		expect(recovered.assets.referencedPaths).toEqual(['/public/recovered.svg']);
 		expect(recovered.display.snapshotId).not.toBe(boot.display.snapshotId);
@@ -510,6 +518,50 @@ describe('owned snapshot reloads', () => {
 });
 
 describe('boot authentication', () => {
+	it.each([
+		{
+			change: 'origin change',
+			bootAuth: credentials,
+			nextAuth: { ...credentials, origin: 'https://other.example.com' }
+		},
+		{
+			change: 'secret rotation',
+			bootAuth: { ...oidc, secret: `${sentinel}-session` },
+			nextAuth: { ...oidc, secret: `${sentinel}-replacement` }
+		}
+	])(
+		'requires restart for $change and retains the entire last-good snapshot',
+		async ({ bootAuth, nextAuth }) => {
+			const report = vi.fn();
+			mocks.load.mockResolvedValueOnce(configuration('boot', bootAuth));
+			const directory = await loadDirectory(undefined, { report });
+			mocks.load.mockResolvedValueOnce(configuration('accepted', bootAuth));
+			await directory.reload();
+			const accepted = directory.currentSnapshot();
+			const captured = structuredClone(accepted);
+
+			mocks.load.mockResolvedValueOnce(configuration('rejected', nextAuth));
+			await directory.reload();
+			expect(report).toHaveBeenCalledExactlyOnceWith({ code: 'restart_required' });
+			expectRedacted(report.mock.calls);
+			expect(directory.currentSnapshot()).toBe(accepted);
+			expect(directory.currentSnapshot()).toEqual(captured);
+
+			mocks.load.mockResolvedValueOnce(configuration('restored', bootAuth));
+			await directory.reload();
+			const restored = directory.currentSnapshot();
+			expect(restored).not.toBe(accepted);
+			expect(restored.configuration.auth).toEqual(bootAuth);
+			expect(restored.display.site.title).toBe('restored');
+			expect(restored.display.groups[0]?.links[0]?.title).toBe('restored photos');
+			expect(restored.assets.referencedPaths).toEqual([
+				'/public/restored.svg',
+				'/public/restored-photos.svg'
+			]);
+			expect(report).toHaveBeenCalledTimes(1);
+		}
+	);
+
 	it('rejects enabling auth on an unauthenticated boot, then accepts restored absent auth', async () => {
 		const report = vi.fn();
 		const directory = await loadDirectory(undefined, { report });
@@ -530,7 +582,7 @@ describe('boot authentication', () => {
 		const directory = await loadDirectory(undefined, { report });
 		const boot = directory.currentSnapshot();
 		mocks.load.mockResolvedValueOnce(
-			configuration('changed', { oidc: { ...oidc.oidc, client_secret: 'changed' } })
+			configuration('changed', { ...oidc, oidc: { ...oidc.oidc, client_secret: 'changed' } })
 		);
 		await directory.reload();
 		expect(directory.currentSnapshot()).toBe(boot);
@@ -549,7 +601,8 @@ describe('boot authentication', () => {
 				client_secret: sentinel,
 				client_id: 'directory',
 				issuer: 'https://identity.example.com'
-			}
+			},
+			origin: oidc.origin
 		};
 		mocks.load.mockResolvedValueOnce(restored);
 		await directory.reload();

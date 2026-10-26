@@ -47,7 +47,6 @@ function expectPrivate(text: string, app: TestServer) {
 		otherSource,
 		faviconSource,
 		app.path,
-		app.secret!,
 		publicDir,
 		logo,
 		favicon

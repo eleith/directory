@@ -34,6 +34,7 @@ function configuration(source?: string, auth = true, selectedPassword = password
 	let authentication = '';
 	if (auth) {
 		authentication = `auth:
+  origin: '\${TEST_ORIGIN}'
   credentials:
     username: ${username}
     password: ${selectedPassword}
@@ -164,12 +165,7 @@ async function stop(server: TestServer, directory: string) {
 	try {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
 		expect(server.outputTruncated()).toBe(false);
-		expectNoPrivateData(server.output(), [
-			directory,
-			server.path,
-			...(server.secret ? [server.secret] : []),
-			svg
-		]);
+		expectNoPrivateData(server.output(), [directory, server.path, svg]);
 	} finally {
 		await rm(directory, { recursive: true, force: true });
 	}
@@ -204,7 +200,7 @@ for (const [source, bytes, contentType] of [
 			const payload = await data.text();
 			expect(payload).toContain('/favicon');
 			expect(payload).toContain(title);
-			expectNoPrivateData(payload, [fixture.publicDir, server.path, server.secret!]);
+			expectNoPrivateData(payload, [fixture.publicDir, server.path]);
 
 			const cookie = await signIn(server);
 			for (const session of ['', 'authjs.session-token=invalid-favicon-cookie', cookie]) {
@@ -320,9 +316,7 @@ test('no-auth mode remains open without changing alias selection', async () => {
 	const fixture = await fixtures();
 	const server = await startServer({
 		configuration: configuration(sourceA, false),
-		publicDir: fixture.publicDir,
-		secret: null,
-		origin: null
+		publicDir: fixture.publicDir
 	});
 	try {
 		await server.ready();

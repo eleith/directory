@@ -9,7 +9,11 @@ function configuration() {
 	return validateConfig(
 		{
 			site: { title: 'Home', logo_path: '/public/home.svg', favicon_path: '/public/site-icon.png' },
-			auth: { credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' } },
+			auth: {
+				origin: 'https://directory.example.com',
+				secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
+				credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
+			},
 			links: {
 				photos: {
 					...service,

@@ -100,8 +100,7 @@ test('recovery preserves authentication and does not replace private API denials
 		expect(response?.status()).toBe(404);
 		await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible();
 		const html = await page.content();
-		for (const value of [...privateSentinels, server.secret!, server.path])
-			expect(html).not.toContain(value);
+		for (const value of [...privateSentinels, server.path]) expect(html).not.toContain(value);
 		await page.getByRole('link', { name: 'Back to home', exact: true }).click();
 		await expect(page).toHaveURL(`${server.url}/`);
 		await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();

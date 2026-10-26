@@ -19,7 +19,7 @@ ${auth}`;
 test('bookmark logos render on cards and details without JavaScript and follow accepted snapshots', async ({
 	browser
 }) => {
-	const server = await startServer({ configuration: configuration(), secret: null, origin: null });
+	const server = await startServer({ configuration: configuration() });
 	const context = await browser.newContext({ javaScriptEnabled: false });
 	try {
 		await server.ready();
@@ -87,13 +87,13 @@ test('bookmark logo GET and HEAD require a real session and never become public 
 		const data = await page.request.get(`${server.url}/__data.json`);
 		const payload = await data.text();
 		expect(payload).toContain('/bookmarks/photos/logo');
-		for (const value of [username, password, server.secret!, server.path, '<svg'])
+		for (const value of [username, password, server.path, '<svg'])
 			expect(payload).not.toContain(value);
 		await page.getByRole('button', { name: 'Sign out' }).click();
 		expect(
 			(await page.request.get(`${server.url}/bookmarks/photos/logo`, { maxRedirects: 0 })).status()
 		).toBe(401);
-		for (const value of [username, password, server.secret!, server.path])
+		for (const value of [username, password, server.path])
 			expect(server.output()).not.toContain(value);
 	} finally {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });

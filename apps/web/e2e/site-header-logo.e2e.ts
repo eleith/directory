@@ -24,6 +24,7 @@ function configuration(source?: string, auth = false) {
 	const logo = source === undefined ? '' : `  logo_path: ${source}\n`;
 	const authentication = auth
 		? `auth:
+  origin: '\${TEST_ORIGIN}'
   credentials:
     username: ${username}
     password: ${password}
@@ -43,8 +44,7 @@ ${authentication}`;
 async function boot(source?: string, auth = false) {
 	server = await startServer({
 		configuration: configuration(source, auth),
-		publicDir,
-		...(auth ? {} : { secret: null, origin: null })
+		publicDir
 	});
 	await server.ready();
 	return server;
@@ -97,8 +97,8 @@ test.afterEach(async () => {
 			expect(await server.stop()).toEqual({ code: 0, signal: null });
 			expect(server.outputTruncated()).toBe(false);
 			expectNoPrivateData(server.output());
-			for (const value of [directory, server.path, server.secret].filter(Boolean)) {
-				expect(server.output()).not.toContain(value!);
+			for (const value of [directory, server.path]) {
+				expect(server.output()).not.toContain(value);
 			}
 		}
 	} finally {

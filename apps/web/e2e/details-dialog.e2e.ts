@@ -27,7 +27,7 @@ links:
 let server: TestServer;
 
 test.beforeAll(async () => {
-	server = await startServer({ configuration, secret: null, origin: null });
+	server = await startServer({ configuration });
 	await server.ready();
 });
 test.afterAll(async () => {
@@ -355,7 +355,7 @@ for (const width of [360, 1280]) {
 test('local details keep the loaded snapshot until real native navigation accepts a replacement', async ({
 	page
 }) => {
-	const app = await startServer({ configuration, secret: null, origin: null });
+	const app = await startServer({ configuration });
 	try {
 		await app.ready();
 		await page.goto(app.url);
@@ -386,7 +386,7 @@ test('local details keep the loaded snapshot until real native navigation accept
 test('a native snapshot replacement supersedes an already active tile without reopening stale details', async ({
 	page
 }) => {
-	const app = await startServer({ configuration, secret: null, origin: null });
+	const app = await startServer({ configuration });
 	try {
 		await app.ready();
 		await page.goto(app.url);
@@ -414,9 +414,7 @@ test('dialog scroll lock and close preserve the grid scroll position', async ({ 
 		configuration: configuration.replace(
 			'title: Dialog fixture',
 			`title: Dialog fixture\n  footer: ${JSON.stringify('Footer line.\n'.repeat(80))}`
-		),
-		secret: null,
-		origin: null
+		)
 	});
 	try {
 		await app.ready();

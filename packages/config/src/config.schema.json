@@ -33,6 +33,32 @@
 				}
 			]
 		},
+		"AuthOrigin": {
+			"description": "The canonical public origin of Directory. HTTPS is required except for http://localhost[:port]. No credentials, path, trailing slash, query, fragment, or noncanonical URL spelling.",
+			"type": "string",
+			"anyOf": [
+				{
+					"type": "string",
+					"format": "uri",
+					"pattern": "^(?:https://(?:[^\\s/\\\\?#@:\\[\\]A-Z%]+|\\[[0-9a-f:.]+\\])(?::(?!443(?![\\s\\S]))[0-9]+)?|http://localhost(?::(?!80(?![\\s\\S]))[0-9]+)?)(?![\\s\\S])"
+				},
+				{
+					"type": "string",
+					"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+				}
+			]
+		},
+		"AuthSecret": {
+			"description": "An optional user-generated random session secret of at least 32 characters. Omit to let the server generate an ephemeral secret at startup; the config loader does not generate one.",
+			"type": "string",
+			"anyOf": [
+				{ "type": "string", "pattern": "\\S", "minLength": 32 },
+				{
+					"type": "string",
+					"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
+				}
+			]
+		},
 		"LocalImagePath": {
 			"description": "A decoded image path under /public/. Use SVG, PNG, JPEG, GIF or WebP; no dot segments, percent escapes, backslashes, queries or fragments.",
 			"type": "string",
@@ -232,15 +258,22 @@
 					"additionalProperties": false,
 					"title": "OIDC",
 					"type": "object",
-					"required": ["oidc"],
-					"properties": { "oidc": { "$ref": "#/$defs/OidcAuth" }, "credentials": { "not": {} } }
+					"required": ["origin", "oidc"],
+					"properties": {
+						"origin": { "$ref": "#/$defs/AuthOrigin" },
+						"secret": { "$ref": "#/$defs/AuthSecret" },
+						"oidc": { "$ref": "#/$defs/OidcAuth" },
+						"credentials": { "not": {} }
+					}
 				},
 				{
 					"additionalProperties": false,
 					"title": "Shared username and password",
 					"type": "object",
-					"required": ["credentials"],
+					"required": ["origin", "credentials"],
 					"properties": {
+						"origin": { "$ref": "#/$defs/AuthOrigin" },
+						"secret": { "$ref": "#/$defs/AuthSecret" },
 						"credentials": { "$ref": "#/$defs/CredentialsAuth" },
 						"oidc": { "not": {} }
 					}

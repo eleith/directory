@@ -13,7 +13,11 @@ function snapshot(light: string, dark: string) {
 					logo_path: '/public/PRIVATE_LOGO.svg'
 				},
 				appearance: { primary_light_color: light, primary_dark_color: dark },
-				auth: { credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' } },
+				auth: {
+					origin: 'https://private-auth.example.test',
+					secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
+					credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
+				},
 				links: { private: { title: 'PRIVATE_LINK', url: 'https://private.example.test' } }
 			},
 			{ env: {} }
@@ -36,8 +40,6 @@ describe('server-owned theme style', () => {
 			expect(style).toBe(
 				`<style>:root{--color-primary:light-dark(${light},${dark});--color-on-primary:light-dark(${onLight},${onDark})}</style>`
 			);
-			expect(style).not.toContain('PRIVATE_');
-			expect(style).not.toContain('private.example.test');
 			expect(Object.isFrozen(captured.display.appearance)).toBe(true);
 			expect(JSON.stringify(captured)).toBe(before);
 		}

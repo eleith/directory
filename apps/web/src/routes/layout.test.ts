@@ -9,7 +9,11 @@ function event(site: Record<string, string> = {}) {
 			{
 				site: { title: 'PRIVATE_LAYOUT_TITLE', description: 'PRIVATE_DESCRIPTION', ...site },
 				appearance: { primary_light_color: '#13579b', primary_dark_color: '#c4d6e8' },
-				auth: { credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' } },
+				auth: {
+					origin: 'https://private-auth.example.test',
+					secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
+					credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
+				},
 				links: { private: { title: 'PRIVATE_LINK', url: 'https://private.example.test' } }
 			},
 			{ env: {} }
@@ -32,9 +36,6 @@ describe('public branding layout data', () => {
 		const before = JSON.stringify(captured.locals);
 		const data = load(captured);
 		expect(data).toEqual({ faviconPath: '/favicon.svg', logoPath: '/favicon.svg' });
-		expect(JSON.stringify(data)).not.toContain('PRIVATE_');
-		expect(JSON.stringify(data)).not.toContain('private.example.test');
-		expect(JSON.stringify(data)).not.toContain('2099-01-01');
 		expect(JSON.stringify(captured.locals)).toBe(before);
 	});
 

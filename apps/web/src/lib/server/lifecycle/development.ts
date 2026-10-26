@@ -1,3 +1,4 @@
+import type { ConfigEnvironment } from '@directory/config/types';
 import { bootApp } from '../boot.js';
 import type { Application, ServerState } from './application.js';
 
@@ -7,15 +8,17 @@ interface DevelopmentAttempt {
 	stopped: boolean;
 }
 
-export async function startDevelopment(server: ServerState): Promise<void> {
-	// The process event reaches both cached hooks and replaced server modules.
+export async function startDevelopment(
+	server: ServerState,
+	env?: ConfigEnvironment
+): Promise<void> {
 	process.emit('directory:dev-stop');
 	const attempt: DevelopmentAttempt = { server, application: undefined, stopped: false };
 	const shutdown = () => stopDevelopment(attempt, shutdown);
 	process.once('directory:dev-stop', shutdown);
 	let application: Application;
 	try {
-		application = await bootApp();
+		application = await bootApp(undefined, env);
 	} catch (error) {
 		stopDevelopment(attempt, shutdown);
 		throw error;

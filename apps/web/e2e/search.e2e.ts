@@ -24,7 +24,7 @@ links:
 let server: TestServer;
 
 test.beforeAll(async () => {
-	server = await startServer({ configuration, secret: null, origin: null });
+	server = await startServer({ configuration });
 	await server.ready();
 });
 

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isHttpError, isRedirect, redirect, type Handle, type RequestEvent } from '@sveltejs/kit';
 import type { Session, SvelteKitAuthConfig } from '@auth/sveltekit';
@@ -18,6 +19,11 @@ const mocks = vi.hoisted(() => ({
 	logWarn: vi.fn()
 }));
 
+vi.mock('node:crypto', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('node:crypto')>();
+	return { ...actual, randomBytes: vi.fn(actual.randomBytes) };
+});
+
 vi.mock('@auth/sveltekit', () => ({
 	SvelteKitAuth: mocks.constructor
 }));
@@ -26,7 +32,7 @@ vi.mock('../logger.js', () => ({ logger: { error: mocks.logError, warn: mocks.lo
 vi.mock('@sveltejs/kit/hooks', () => ({ sequence: mocks.sequence }));
 
 const origin = 'https://directory.example';
-const env = { ORIGIN: origin, AUTH_URL: origin, AUTH_SECRET: 'x'.repeat(32) };
+const secret = ' x'.repeat(32) + ' ';
 const credentials = { username: 'family', password: 'private-password' };
 const signedIn: Session = { user: { name: 'Directory' }, expires: '2030-01-01T00:00:00.000Z' };
 const snapshot = prepareSnapshot(
@@ -79,7 +85,7 @@ function eventFor(
 }
 
 function authenticate() {
-	return createAuthentication({ credentials }, env);
+	return createAuthentication({ origin, secret, credentials });
 }
 
 async function responseFor(event: RequestEvent) {
@@ -230,8 +236,10 @@ describe('boot factory', () => {
 	it('constructs one SDK instance and seven-day native JWT pipeline per application', async () => {
 		const authentication = authenticate();
 		expect(authentication.strategy).toBe('credentials');
+		expect(randomBytes).not.toHaveBeenCalled();
+		expect(JSON.stringify(authentication)).not.toContain(secret);
 		expect(authJsConfig()).toMatchObject({
-			secret: env.AUTH_SECRET,
+			secret,
 			trustHost: true,
 			basePath: '/auth',
 			redirectProxyUrl: '',
@@ -245,9 +253,17 @@ describe('boot factory', () => {
 		expect(mocks.sequence).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not construct an SDK on invalid enabled settings', () => {
-		expect(() => createAuthentication({ credentials }, {})).toThrow();
-		expect(mocks.constructor).not.toHaveBeenCalled();
+	it('passes fresh cryptographic bytes to each SDK instance without changing config', () => {
+		const config = Object.freeze({ origin, credentials });
+		createAuthentication(config);
+		createAuthentication(config);
+		expect(vi.mocked(randomBytes).mock.calls).toEqual([[32], [32]]);
+		const secrets = mocks.constructor.mock.calls.map(([settings]) => settings.secret);
+		const generated = vi
+			.mocked(randomBytes)
+			.mock.results.map(({ value }) => (value as Buffer).toString('base64'));
+		expect(secrets).toEqual(generated);
+		expect(config).not.toHaveProperty('secret');
 	});
 
 	it('pins redirect callbacks and does not emit raw SDK diagnostics', async () => {
@@ -392,16 +408,15 @@ describe('whole-directory gate', () => {
 	});
 
 	it('permits only the configured OIDC GET callback, including cross-site navigation', async () => {
-		const authentication = createAuthentication(
-			{
-				oidc: {
-					issuer: 'https://issuer.example',
-					client_id: 'client',
-					client_secret: 'secret'
-				}
-			},
-			env
-		);
+		const authentication = createAuthentication({
+			origin,
+			secret,
+			oidc: {
+				issuer: 'https://issuer.example',
+				client_id: 'client',
+				client_secret: 'secret'
+			}
+		});
 		const callback = eventFor('/auth/callback/oidc?state=test', {
 			headers: { origin: 'https://issuer.example' }
 		});
@@ -600,16 +615,15 @@ describe('native action wrappers', () => {
 	);
 
 	it('selects configured OIDC without forwarding credential or authorization overrides', async () => {
-		const authentication = createAuthentication(
-			{
-				oidc: {
-					issuer: 'https://issuer.example',
-					client_id: 'client',
-					client_secret: 'secret'
-				}
-			},
-			env
-		);
+		const authentication = createAuthentication({
+			origin,
+			secret,
+			oidc: {
+				issuer: 'https://issuer.example',
+				client_id: 'client',
+				client_secret: 'secret'
+			}
+		});
 		await authentication.signIn(
 			actionEvent(
 				new URLSearchParams({

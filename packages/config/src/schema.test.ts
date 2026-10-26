@@ -15,6 +15,7 @@ import {
 import type { DirectoryConfiguration, DirectoryLink, DirectorySite } from './types.js';
 
 const link = { title: 'Photos', url: 'https://photos.example.com' };
+const origin = 'https://directory.example.com';
 const raw = { links: { photos: link } };
 const linkDefaults = { tags: [], requires_auth: false, internal_only: false, admin_only: false };
 
@@ -102,6 +103,7 @@ describe('configuration defaults and inferred types', () => {
 		const missingTitle: DirectoryLink = { url: link.url, ...linkDefaults };
 		// @ts-expect-error both auth strategies are forbidden statically too
 		const both: NonNullable<DirectoryConfiguration['auth']> = {
+			origin,
 			credentials: { username: 'family', password: 'fixture' },
 			oidc: { issuer: 'https://id.example.com', client_id: 'directory', client_secret: 'fixture' }
 		};
@@ -143,6 +145,9 @@ describe('strict configuration boundary', () => {
 			null,
 			[],
 			'',
+			{ secret: 'x'.repeat(32) },
+			{ credentials: null },
+			{ oidc: null },
 			{ credentials: {} },
 			{ credentials: { username: 'family' } },
 			{ credentials: { username: 'family', password: '' } },
@@ -150,11 +155,21 @@ describe('strict configuration boundary', () => {
 			{ oidc: { issuer: 'javascript:alert(1)', client_id: 'directory', client_secret: 'fixture' } },
 			{ credentials: { username: 'family', password: 'fixture' }, oidc: null },
 			{
+				oidc: {
+					issuer: 'https://id.example.com',
+					client_id: 'directory',
+					client_secret: 'fixture'
+				},
+				credentials: null
+			},
+			{
 				credentials: { username: 'family', password: 'fixture' },
 				oidc: { issuer: 'https://id.example.com', client_id: 'directory', client_secret: 'fixture' }
 			},
 			{ unknown: {} }
-		].map((auth) => ({ auth }))
+		].map((auth) => ({
+			auth: auth && !Array.isArray(auth) && typeof auth === 'object' ? { origin, ...auth } : auth
+		}))
 	)('rejects invalid or ambiguous auth: $auth', ({ auth }) => {
 		expect(accepts({ ...raw, auth })).toBe(false);
 	});
@@ -163,7 +178,7 @@ describe('strict configuration boundary', () => {
 		{ credentials: { username: 'family', password: 'fixture' } },
 		{ oidc: { issuer: 'https://id.example.com', client_id: 'directory', client_secret: 'fixture' } }
 	])('accepts exactly one complete auth strategy', (auth) => {
-		expect(accepts({ ...raw, auth })).toBe(true);
+		expect(accepts({ ...raw, auth: { origin, ...auth } })).toBe(true);
 	});
 
 	it.each([
@@ -229,7 +244,10 @@ describe('strict configuration boundary', () => {
 		{ ...raw, site: { categories: {} } },
 		{ ...raw, site: { group_by: 'section' } },
 		{ ...raw, appearance: { background_color: '#fff' } },
-		{ ...raw, auth: { credentials: { username: 'family', password: 'fixture', extra: true } } }
+		{
+			...raw,
+			auth: { origin, credentials: { username: 'family', password: 'fixture', extra: true } }
+		}
 	])('rejects unknown structural fields and invalid explicit values', (value) => {
 		expect(accepts(value)).toBe(false);
 	});

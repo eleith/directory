@@ -1,4 +1,5 @@
 import { building, dev } from '$app/environment';
+import { env } from '$env/dynamic/private';
 import type { Handle, ServerInit } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { themeStyleTag } from './lib/server/appearance.js';
@@ -12,8 +13,8 @@ const server: ServerState = { application: undefined };
 export const init: ServerInit = async () => {
 	if (building) return;
 	try {
-		if (dev) await startDevelopment(server);
-		else await startProduction(server);
+		if (dev) await startDevelopment(server, env);
+		else await startProduction(server, env);
 	} catch (error) {
 		reportStartupFailure(error);
 		// eslint-disable-next-line preserve-caught-error -- Raw startup errors may contain configuration secrets.

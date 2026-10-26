@@ -64,9 +64,7 @@ test.beforeEach(async () => {
 		await writeFile(join(publicDir, 'other.svg'), 'not an image');
 		server = await startServer({
 			configuration: configuration(),
-			publicDir,
-			secret: null,
-			origin: null
+			publicDir
 		});
 		await server.ready();
 	} catch (error) {

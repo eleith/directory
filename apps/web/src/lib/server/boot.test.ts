@@ -2,9 +2,8 @@ import { inspect } from 'node:util';
 import { resolve } from 'node:path';
 import { ConfigError, validateConfig } from '@directory/config';
 import type { DirectoryConfiguration } from '@directory/config/types';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Authentication } from './auth/index.js';
-import { AuthSettingsError } from './auth/settings.js';
 import { bootApp } from './boot.js';
 import type { Directory } from './config/load-directory.js';
 import { DirectoryError } from './directory-error.js';
@@ -39,11 +38,17 @@ const realDirectory = await vi.importActual<typeof import('./config/load-directo
 );
 const realConfig = await vi.importActual<typeof import('@directory/config')>('@directory/config');
 const sentinel = 'PRIVATE-environment-password-filename.yaml';
+const origin = 'https://directory.example.com';
+const frameworkEnv = { ORIGIN: origin, AUTH_URL: origin };
 const authCases = [
-	{ strategy: 'credentials', auth: { credentials: { username: sentinel, password: sentinel } } },
+	{
+		strategy: 'credentials',
+		auth: { origin, credentials: { username: sentinel, password: sentinel } }
+	},
 	{
 		strategy: 'oidc',
 		auth: {
+			origin,
 			oidc: {
 				issuer: 'https://identity.example.com',
 				client_id: sentinel,
@@ -89,6 +94,8 @@ function expectRedacted(error: unknown): void {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	vi.stubEnv('ORIGIN', undefined);
+	vi.stubEnv('AUTH_URL', undefined);
 	mocks.auth.mockReset();
 	mocks.path.mockReset().mockReturnValue(`/config/${sentinel}`);
 	mocks.publicDir.mockReset().mockReturnValue('/mounted/public');
@@ -96,6 +103,8 @@ beforeEach(() => {
 	mocks.directory.mockReset().mockResolvedValue(loadedDirectory());
 	mocks.watch.mockReset().mockReturnValue(mocks.stopWatching);
 });
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe('bootApp', () => {
 	it('waits for valid startup, pins one path for loading and watching, then closes the save gap', async () => {
@@ -163,8 +172,15 @@ describe('bootApp', () => {
 
 	it('passes the same default options to both path resolvers', async () => {
 		const app = await bootApp();
-		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({});
-		expect(mocks.publicDir).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {});
+		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env: process.env });
+		expect(mocks.directory).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {
+			env: process.env,
+			report: reportDirectoryIssue
+		});
+		expect(mocks.directory.mock.calls[0]![1]!.env).toBe(process.env);
+		expect(mocks.publicDir).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {
+			env: process.env
+		});
 		app.stop();
 	});
 
@@ -238,6 +254,7 @@ describe('bootApp', () => {
 	it.each(authCases)(
 		'creates $strategy authentication once before watching, retaining it across the post-watch reload',
 		async ({ strategy, auth }) => {
+			vi.stubEnv('ORIGIN', origin);
 			const config = configuration(auth);
 			const replacement = validateConfig(
 				{ ...config, site: { ...config.site, title: 'Replacement' } },
@@ -259,8 +276,8 @@ describe('bootApp', () => {
 				expect(mocks.watch).not.toHaveBeenCalled();
 				return ready;
 			});
-			const app = await bootApp(env);
-			expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(expect.any(Object), env);
+			const app = await bootApp(env, frameworkEnv);
+			expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(expect.any(Object));
 			expect(mocks.auth.mock.invocationCallOrder[0]).toBeLessThan(
 				mocks.watch.mock.invocationCallOrder[0]!
 			);
@@ -275,46 +292,116 @@ describe('bootApp', () => {
 		}
 	);
 
-	it('preserves a known auth settings error for reporting after stopping the directory', async () => {
-		const directory = loadedDirectory(configuration(authCases[0]!.auth));
-		const failure = new AuthSettingsError('AUTH_SECRET');
+	it.each([
+		{ name: 'auth enabled after preparation', auth: authCases[0]!.auth, env: {} },
+		{ name: 'auth disabled after preparation', auth: undefined, env: frameworkEnv },
+		{
+			name: 'origin changed after preparation',
+			auth: authCases[0]!.auth,
+			env: {
+				ORIGIN: `https://${sentinel}.example.com`,
+				AUTH_URL: `https://${sentinel}.example.com`
+			}
+		},
+		{
+			name: 'Kit private ORIGIN mismatch',
+			auth: authCases[0]!.auth,
+			env: { ORIGIN: sentinel, AUTH_URL: origin }
+		},
+		{
+			name: 'Kit private AUTH_URL mismatch',
+			auth: authCases[0]!.auth,
+			env: { ORIGIN: origin, AUTH_URL: sentinel }
+		}
+	])('rejects $name before authentication, watching or reloading', async ({ auth, env }) => {
+		vi.stubEnv('ORIGIN', auth?.origin);
+		const directory = loadedDirectory(configuration(auth));
 		mocks.directory.mockResolvedValueOnce(directory);
-		mocks.auth.mockImplementationOnce(() => {
-			throw failure;
-		});
+		const error: unknown = await bootApp({}, env).catch((error: unknown) => error);
+		expect(error).toBeInstanceOf(DirectoryError);
+		expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
+		expectRedacted(error);
+		expect(mocks.auth).not.toHaveBeenCalled();
+		expect(directory.stop).toHaveBeenCalledOnce();
+		expect(directory.reload).not.toHaveBeenCalled();
+		expect(mocks.watch).not.toHaveBeenCalled();
 		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
 		try {
-			const error: unknown = await bootApp({}).catch((error: unknown) => error);
-			expect(error).toBe(failure);
-			expectRedacted(error);
-			expect(directory.stop).toHaveBeenCalledOnce();
-			expect(directory.reload).not.toHaveBeenCalled();
-			expect(mocks.watch).not.toHaveBeenCalled();
 			reportStartupFailure(error);
-			expect(output.mock.calls).toEqual([
-				['Application startup failed (auth_failed).'],
-				[
-					'Invalid authentication configuration: AUTH_SECRET is required when authentication is enabled and must contain at least 32 characters.'
-				]
-			]);
+			expect(output).toHaveBeenCalledExactlyOnceWith('Application startup failed (auth_failed).');
 		} finally {
 			output.mockRestore();
 		}
 	});
 
+	it('accepts empty framework origins when authentication is absent', async () => {
+		const app = await bootApp({}, { ORIGIN: '', AUTH_URL: '' });
+		expect(app.authentication).toBeUndefined();
+		expect(mocks.auth).not.toHaveBeenCalled();
+		app.stop();
+	});
+
+	it('passes explicit source env to the loader separately from prepared process and Kit private origins', async () => {
+		const source = { ORIGIN: sentinel, AUTH_URL: sentinel, PASSWORD: sentinel };
+		vi.stubEnv('ORIGIN', origin);
+		vi.stubEnv('AUTH_URL', 'https://different.example.com');
+		const directory = loadedDirectory(configuration(authCases[0]!.auth));
+		mocks.directory.mockResolvedValueOnce(directory);
+		const ready = authentication('credentials');
+		mocks.auth.mockReturnValueOnce(ready);
+		const app = await bootApp(source, frameworkEnv);
+		expect(mocks.directory).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {
+			env: source,
+			report: reportDirectoryIssue
+		});
+		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env: source });
+		expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(
+			directory.currentSnapshot().configuration.auth
+		);
+		expect(app.authentication).toBe(ready);
+		app.stop();
+	});
+
+	it('rejects a process origin mismatch even when Kit private env matches YAML', async () => {
+		vi.stubEnv('ORIGIN', `https://${sentinel}.example.com`);
+		const directory = loadedDirectory(configuration(authCases[0]!.auth));
+		mocks.directory.mockResolvedValueOnce(directory);
+		const error: unknown = await bootApp({}, frameworkEnv).catch((error: unknown) => error);
+		expect(error).toBeInstanceOf(DirectoryError);
+		expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
+		expectRedacted(error);
+		expect(directory.stop).toHaveBeenCalledOnce();
+		expect(directory.reload).not.toHaveBeenCalled();
+		expect(mocks.auth).not.toHaveBeenCalled();
+		expect(mocks.watch).not.toHaveBeenCalled();
+	});
+
+	it('checks process.env by default rather than source interpolation origins', async () => {
+		// Keep the adapter origin valid so only the default SDK environment can reject this boot.
+		vi.stubEnv('ORIGIN', origin);
+		const directory = loadedDirectory(configuration(authCases[0]!.auth));
+		mocks.directory.mockResolvedValueOnce(directory);
+		const error: unknown = await bootApp(frameworkEnv).catch((error: unknown) => error);
+		expect(error).toBeInstanceOf(DirectoryError);
+		expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
+		expectRedacted(error);
+		expect(directory.stop).toHaveBeenCalledOnce();
+		expect(mocks.auth).not.toHaveBeenCalled();
+		expect(mocks.watch).not.toHaveBeenCalled();
+	});
+
 	it.each(authCases)(
 		'redacts unknown $strategy provider initialization failures before watching or reloading',
 		async ({ auth }) => {
+			vi.stubEnv('ORIGIN', origin);
 			const directory = loadedDirectory(configuration(auth));
 			mocks.directory.mockResolvedValueOnce(directory);
 			mocks.auth.mockImplementationOnce(() => {
 				throw new Error(sentinel, { cause: sentinel });
 			});
-			const env = { ORIGIN: 'https://directory.example.com' };
-			const error: unknown = await bootApp(env).catch((error: unknown) => error);
+			const error: unknown = await bootApp({}, frameworkEnv).catch((error: unknown) => error);
 			expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(
-				directory.currentSnapshot.mock.results[0]?.value.configuration.auth,
-				env
+				directory.currentSnapshot.mock.results[0]?.value.configuration.auth
 			);
 			expect(error).toBeInstanceOf(DirectoryError);
 			expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });

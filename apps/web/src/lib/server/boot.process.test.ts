@@ -4,16 +4,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
-const serverModule = new URL('../../../build/index.js', import.meta.url).href;
+const serverModule = new URL('../../../build/bootstrap/start.js', import.meta.url).href;
 const sentinel = 'PRIVATE_CONFIG_CREDENTIAL_LINK';
 const bookmarkTitle = 'Visible household bookmark';
-const credentialsConfiguration = `links: {}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`;
-const secretHint =
-	'Invalid authentication configuration: AUTH_SECRET is required when authentication is enabled and must contain at least 32 characters.';
-const originHint =
-	'Invalid authentication configuration: ORIGIN must be a canonical HTTPS root origin or HTTP localhost origin, with no trailing slash, path, query or fragment.';
-const authUrlHint =
-	'Invalid authentication configuration: AUTH_URL must be a canonical root origin matching ORIGIN exactly.';
+const credentialsConfiguration = `links: {}\nauth:\n  origin: http://localhost\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`;
+const hostileEnvironment = {
+	ORIGIN: `https://foreign.example.com/${sentinel}`,
+	AUTH_URL: `malformed-${sentinel}`,
+	AUTH_SECRET: 'short',
+	NEXTAUTH_URL: `https://foreign.example.com/${sentinel}`,
+	AUTH_REDIRECT_PROXY_URL: `https://proxy.example.com/${sentinel}`
+};
 
 function source(title: string): string {
 	return `
@@ -43,8 +44,6 @@ process.send(server.server.address().port);
 		env: {
 			HOST: '127.0.0.1',
 			PORT: '0',
-			ORIGIN: 'http://localhost',
-			AUTH_URL: 'http://localhost',
 			CONFIG_PATH: path,
 			NODE_ENV: 'production',
 			SHUTDOWN_TIMEOUT: '1',
@@ -123,95 +122,12 @@ describe('production configuration startup', () => {
 			contents: `links:\n  photos:\n    title: Photos\n    url: '\${${sentinel}}'`
 		},
 		{
-			name: 'credentials auth missing AUTH_SECRET',
-			code: 'auth_failed',
-			hint: secretHint,
-			contents: credentialsConfiguration
-		},
-		{
-			name: 'enabled auth without ORIGIN',
-			code: 'auth_failed',
-			hint: originHint,
-			contents: credentialsConfiguration,
-			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: undefined }
-		},
-		{
-			name: 'enabled auth without AUTH_URL',
-			code: 'auth_failed',
-			hint: authUrlHint,
-			contents: credentialsConfiguration,
-			environment: { AUTH_SECRET: sentinel.repeat(2), AUTH_URL: undefined }
-		},
-		{
-			name: 'enabled auth over an HTTP IP address',
-			code: 'auth_failed',
-			hint: originHint,
-			contents: credentialsConfiguration,
-			environment: {
-				AUTH_SECRET: sentinel.repeat(2),
-				ORIGIN: 'http://127.0.0.1',
-				AUTH_URL: 'http://127.0.0.1'
-			}
-		},
-		{
-			name: 'enabled auth with a non-root ORIGIN',
-			code: 'auth_failed',
-			hint: originHint,
-			contents: credentialsConfiguration,
-			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: `http://localhost/${sentinel}` }
-		},
-		{
-			name: 'enabled auth with a trailing-slash ORIGIN',
-			code: 'auth_failed',
-			hint: originHint,
-			contents: credentialsConfiguration,
-			environment: { AUTH_SECRET: sentinel.repeat(2), ORIGIN: 'http://localhost/' }
-		},
-		{
-			name: 'enabled auth with a mismatched AUTH_URL',
-			code: 'auth_failed',
-			hint: authUrlHint,
-			contents: credentialsConfiguration,
-			environment: {
-				AUTH_SECRET: sentinel.repeat(2),
-				AUTH_URL: `https://foreign.example.com/${sentinel}`
-			}
-		},
-		{
-			name: 'OIDC auth missing AUTH_SECRET',
-			code: 'auth_failed',
-			hint: secretHint,
-			contents: `links: {}\nauth:\n  oidc:\n    issuer: https://identity.example.com\n    client_id: ${sentinel}\n    client_secret: ${sentinel}`
-		},
-		{
-			name: 'enabled auth with a short AUTH_SECRET',
-			code: 'auth_failed',
-			hint: secretHint,
-			contents: credentialsConfiguration,
-			environment: { AUTH_SECRET: sentinel }
-		},
-		{
-			name: 'enabled auth with a mismatched NEXTAUTH_URL',
-			code: 'auth_failed',
-			hint: 'Invalid authentication configuration: NEXTAUTH_URL must match ORIGIN exactly or be unset.',
-			contents: credentialsConfiguration,
-			environment: {
-				AUTH_SECRET: sentinel.repeat(2),
-				NEXTAUTH_URL: `https://foreign.example.com/${sentinel}`
-			}
-		},
-		{
-			name: 'enabled auth with an unsupported redirect proxy',
-			code: 'auth_failed',
-			hint: 'Invalid authentication configuration: AUTH_REDIRECT_PROXY_URL is unsupported and must be unset.',
-			contents: credentialsConfiguration,
-			environment: {
-				AUTH_SECRET: sentinel.repeat(2),
-				AUTH_REDIRECT_PROXY_URL: `https://proxy.example.com/${sentinel}`
-			}
+			name: 'credentials auth missing YAML origin',
+			code: 'load_failed',
+			contents: credentialsConfiguration.replace('  origin: http://localhost\n', '')
 		}
-	])('rejects $name before opening a socket', async ({ contents, code, environment, hint }) => {
-		const server = await launchServer(contents, environment);
+	])('rejects $name before opening a socket', async ({ contents, code }) => {
+		const server = await launchServer(contents, hostileEnvironment);
 		const result = await server.closed;
 		expect(result.signal).toBeNull();
 		expect(result.code).not.toBe(0);
@@ -226,9 +142,6 @@ describe('production configuration startup', () => {
 				message: `Application startup failed (${code}).`
 			})
 		);
-		if (hint !== undefined) {
-			expect(records).toContainEqual(expect.objectContaining({ level: 'ERROR', message: hint }));
-		}
 		for (const record of records) {
 			expect(record).not.toHaveProperty('error');
 			expect(record).not.toHaveProperty('cause');
@@ -238,12 +151,85 @@ describe('production configuration startup', () => {
 		expect(server.output()).not.toContain('Listening on');
 		expect(server.output()).not.toContain('foreign.example.com');
 		expect(server.output()).not.toContain('proxy.example.com');
-		for (const value of Object.values(environment ?? {})) {
+		for (const value of Object.values(hostileEnvironment)) {
 			if (value !== undefined) expect(server.output()).not.toContain(value);
 		}
 		expect(server.output()).not.toContain(sentinel);
 		expect(server.output()).not.toContain(server.path);
 	});
+});
+
+it.each([
+	{
+		name: 'without legacy environment or a YAML secret',
+		environment: {},
+		contents: credentialsConfiguration
+	},
+	{
+		name: 'ignoring conflicting legacy environment',
+		environment: hostileEnvironment,
+		contents: credentialsConfiguration
+	},
+	{
+		name: 'with explicit legacy-named environment references',
+		environment: { ORIGIN: 'http://localhost', AUTH_SECRET: sentinel },
+		contents: credentialsConfiguration
+			.replace('origin: http://localhost', 'origin: ${ORIGIN}')
+			.replace(`password: ${sentinel}`, 'password: ${AUTH_SECRET}')
+	}
+])('starts YAML credentials auth $name', async ({ environment, contents }) => {
+	const server = await launchServer(contents, environment);
+	const address = await server.ready();
+	await expectHealthy(address);
+	const gated = await fetch(address, {
+		redirect: 'manual',
+		headers: { accept: 'text/html', connection: 'close' }
+	});
+	expect(gated.status).toBe(303);
+	const target = new URL(gated.headers.get('location')!, 'http://localhost');
+	expect(target.origin).toBe('http://localhost');
+	expect(target.pathname).toBe('/signin');
+	const response = await fetch(`${address}/signin`, {
+		method: 'POST',
+		redirect: 'manual',
+		headers: { origin: 'http://localhost', accept: 'text/html', connection: 'close' },
+		body: new URLSearchParams({ username: sentinel, password: sentinel, redirectTo: '/' })
+	});
+	expect([302, 303]).toContain(response.status);
+	expect(new URL(response.headers.get('location')!, 'http://localhost').href).toBe(
+		'http://localhost/'
+	);
+	const cookie = response.headers.getSetCookie().find((value) => value.includes('session-token='));
+	expect(cookie).toBeDefined();
+	const authenticated = await fetch(address, {
+		redirect: 'manual',
+		headers: { cookie: cookie!.split(';')[0]!, connection: 'close' }
+	});
+	expect(authenticated.status).toBe(200);
+	expect(await authenticated.text()).not.toContain(sentinel);
+	expect(server.output()).not.toContain(sentinel);
+	expect(server.output()).not.toContain(server.path);
+	expect(server.output()).not.toContain('auth_failed');
+	expect(await server.stop()).toEqual({ code: 0, signal: null });
+});
+
+it('keeps application environment references and fallbacks stable across bootstrap and reloads', async () => {
+	const fallbackTitle = '${DIRECTORY_TITLE} ${MISSING_TITLE:-Fallback}';
+	const title = 'Configured Fallback';
+	const server = await launchServer(source(fallbackTitle), {
+		...hostileEnvironment,
+		DIRECTORY_TITLE: 'Configured'
+	});
+	const address = await server.ready();
+	await expectPage(address, title);
+	await writeFile(server.path, source(`${fallbackTitle} reloaded`));
+	await vi.waitFor(() => expectPage(address, `${title} reloaded`), { timeout: 5000 });
+	await expectHealthy(address);
+	expect(server.output()).not.toContain('load_failed');
+	expect(server.output()).not.toContain('restart_required');
+	expect(server.output()).not.toContain(sentinel);
+	expect(server.output()).not.toContain(server.path);
+	expect(await server.stop()).toEqual({ code: 0, signal: null });
 });
 
 it('polls atomic saves, retains last good across invalid/deleted files, and shuts down cleanly', async () => {
@@ -275,7 +261,7 @@ it('polls atomic saves, retains last good across invalid/deleted files, and shut
 	await vi.waitFor(() => expectPage(origin, 'third'), { timeout: 5000, interval: 50 });
 	await writeFile(
 		server.path,
-		`${source('rejected')}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`
+		`${source('rejected')}\nauth:\n  origin: http://localhost\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`
 	);
 	await vi.waitFor(() => expect(server.output()).toContain('restart_required'), { timeout: 5000 });
 	await expectPage(origin, 'third');

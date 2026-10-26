@@ -11,13 +11,12 @@ export default defineConfig({
 	use: { baseURL: origin, trace: 'retain-on-failure' },
 	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 	webServer: {
-		command: 'node build/index.js',
+		command: 'node build/bootstrap/start.js',
 		url: origin,
 		reuseExistingServer: false,
 		env: {
 			HOST: '127.0.0.1',
 			PORT: '4183',
-			ORIGIN: origin,
 			CONFIG_PATH: fileURLToPath(new URL('./e2e/fixtures/directory.yaml', import.meta.url))
 		}
 	}

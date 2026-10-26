@@ -228,8 +228,12 @@ describe('prepareDirectoryContent', () => {
 	});
 
 	it.each([
-		{ credentials: { username: 'private-user', password: '${PRIVATE_VALUE}' } },
 		{
+			origin: 'https://directory.example.com',
+			credentials: { username: 'private-user', password: '${PRIVATE_VALUE}' }
+		},
+		{
+			origin: 'https://directory.example.com',
 			oidc: {
 				issuer: 'https://identity.example.com',
 				client_id: 'private-client',

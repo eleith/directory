@@ -22,6 +22,18 @@ FormatRegistry.Set('directory-http-url', (value) => {
 	}
 });
 
+FormatRegistry.Set('directory-auth-origin', (value) => {
+	try {
+		const url = new URL(value);
+		return (
+			(url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')) &&
+			value === url.origin
+		);
+	} catch {
+		return false;
+	}
+});
+
 const nonEmptyText = { minLength: 1, pattern: '\\S' };
 // Unlike $, this also rejects a final newline in identifiers, colors and paths.
 const end = '(?![\\s\\S])';
@@ -33,6 +45,23 @@ export const HttpUrlSchema = Type.String({
 	format: 'directory-http-url',
 	pattern: '^[Hh][Tt][Tt][Pp][Ss]?://[^\\s]+$',
 	description: 'An absolute HTTP or HTTPS URL. Relative and executable URLs are not accepted.'
+});
+
+export const AuthOriginSchema = Type.String({
+	$id: 'AuthOrigin',
+	format: 'directory-auth-origin',
+	// Editors cannot run the URL canonicalization check, but can enforce the origin shape.
+	pattern: `^(?:https://(?:[^\\s/\\\\?#@:\\[\\]A-Z%]+|\\[[0-9a-f:.]+\\])(?::(?!443${end})[0-9]+)?|http://localhost(?::(?!80${end})[0-9]+)?)${end}`,
+	description:
+		'The canonical public origin of Directory. HTTPS is required except for http://localhost[:port]. No credentials, path, trailing slash, query, fragment, or noncanonical URL spelling.'
+});
+
+export const AuthSecretSchema = Type.String({
+	$id: 'AuthSecret',
+	...nonEmptyText,
+	minLength: 32,
+	description:
+		'An optional user-generated random session secret of at least 32 characters. Omit to let the server generate an ephemeral secret at startup; the config loader does not generate one.'
 });
 
 export const LocalImagePathSchema = Type.String({
@@ -128,11 +157,21 @@ export const CredentialsAuthSchema = Type.Object(
 export const AuthSchema = Type.Union(
 	[
 		Type.Object(
-			{ oidc: ref(OidcAuthSchema), credentials: Type.Optional(Type.Never()) },
+			{
+				origin: ref(AuthOriginSchema),
+				secret: Type.Optional(ref(AuthSecretSchema)),
+				oidc: ref(OidcAuthSchema),
+				credentials: Type.Optional(Type.Never())
+			},
 			{ additionalProperties: false, title: 'OIDC' }
 		),
 		Type.Object(
-			{ credentials: ref(CredentialsAuthSchema), oidc: Type.Optional(Type.Never()) },
+			{
+				origin: ref(AuthOriginSchema),
+				secret: Type.Optional(ref(AuthSecretSchema)),
+				credentials: ref(CredentialsAuthSchema),
+				oidc: Type.Optional(Type.Never())
+			},
 			{ additionalProperties: false, title: 'Shared username and password' }
 		)
 	],
@@ -155,6 +194,8 @@ export const DirectoryConfigurationSchema = Type.Object(
 
 export const configurationReferences: TSchema[] = [
 	HttpUrlSchema,
+	AuthOriginSchema,
+	AuthSecretSchema,
 	LocalImagePathSchema,
 	SiteImagePathSchema,
 	HexColorSchema,

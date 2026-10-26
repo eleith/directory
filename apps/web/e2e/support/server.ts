@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const serverModule = new URL('../../build/index.js', import.meta.url).href;
+const serverModule = new URL('../../build/bootstrap/start.js', import.meta.url).href;
 const outputLimit = 64 * 1024;
 
 export function randomSecret(): string {
@@ -30,24 +30,37 @@ async function reservePort(): Promise<number> {
 interface ServerOptions {
 	configuration: string;
 	publicDir?: string;
-	secret?: string | null;
-	origin?: string | null;
+	/** Explicit YAML secret; omitted by default so the runtime generates its own. */
+	secret?: string;
+	/** Value for the fixture's ${TEST_ORIGIN}; defaults to the allocated localhost URL. */
+	origin?: string;
 	port?: number;
+	/** Deliberately injected process env, e.g. hostile legacy auth settings. */
+	env?: NodeJS.ProcessEnv;
 }
 
-/** A real adapter-node process; never inherits operator config or authentication env. */
+/** A real bootstrap/adapter process; inherits no operator configuration or environment. */
 export async function startServer(options: ServerOptions) {
 	const temporary = await mkdtemp(join(tmpdir(), 'directory-auth-e2e-'));
 	const path = join(temporary, 'directory.yaml');
+	// Fixture YAML keeps auth at the top level; apply the same secret on reload.
+	const renderConfiguration = (configuration: string) => {
+		if (options.secret === undefined) return configuration;
+		if (!/^auth:\n/m.test(configuration)) throw new Error('A test secret requires an auth block');
+		return configuration.replace(/^auth:\n/m, "auth:\n  secret: '${TEST_AUTH_SECRET}'\n");
+	};
 	try {
-		await writeFile(path, options.configuration);
+		await writeFile(path, renderConfiguration(options.configuration));
 		const publicDir = options.publicDir ?? join(temporary, 'public');
 		if (options.publicDir === undefined) await mkdir(publicDir);
 		const port = options.port ?? (await reservePort());
 		const url = `http://localhost:${port}`;
-		const origin = options.origin === undefined ? url : options.origin;
-		const secret = options.secret === undefined ? randomSecret() : options.secret;
+		const origin = options.origin ?? url;
+		const secret = options.secret;
 		const environment: NodeJS.ProcessEnv = {
+			...options.env,
+			TEST_ORIGIN: origin,
+			TEST_AUTH_SECRET: secret,
 			HOST: '127.0.0.1',
 			PORT: String(port),
 			CONFIG_PATH: path,
@@ -55,13 +68,6 @@ export async function startServer(options: ServerOptions) {
 			NODE_ENV: 'production',
 			SHUTDOWN_TIMEOUT: '1'
 		};
-		if (origin !== null) {
-			environment.ORIGIN = origin;
-			environment.AUTH_URL = origin;
-		}
-		if (secret !== null) {
-			environment.AUTH_SECRET = secret;
-		}
 		const script = `
 import { once } from 'node:events';
 const { server } = await import(${JSON.stringify(serverModule)});
@@ -123,7 +129,7 @@ process.send({ ready: server.server.address().port });
 		}
 		return {
 			url,
-			origin: origin ?? url,
+			origin,
 			port,
 			secret,
 			path,
@@ -137,7 +143,7 @@ process.send({ ready: server.server.address().port });
 				if (!listening) throw new Error(`Adapter failed to become ready: ${output}`);
 			},
 			async replace(configuration: string) {
-				await writeFile(`${path}.replacement`, configuration);
+				await writeFile(`${path}.replacement`, renderConfiguration(configuration));
 				await rename(`${path}.replacement`, path);
 			},
 			fetch(pathname: string, init: RequestInit = {}) {

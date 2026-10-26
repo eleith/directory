@@ -18,6 +18,7 @@ export const privateSentinels = [
 ];
 
 export const credentialsAuth = `auth:
+  origin: '\${TEST_ORIGIN}'
   credentials:
     username: ${JSON.stringify(username)}
     password: ${JSON.stringify(password)}
@@ -25,6 +26,7 @@ export const credentialsAuth = `auth:
 
 export function oidcAuth(issuer: string): string {
 	return `auth:
+  origin: '\${TEST_ORIGIN}'
   oidc:
     issuer: ${JSON.stringify(issuer)}
     client_id: ${JSON.stringify(clientId)}

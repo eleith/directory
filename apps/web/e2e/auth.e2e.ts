@@ -17,13 +17,28 @@ import { expiredSession, readSession } from './support/session.js';
 
 test.setTimeout(60_000);
 
+const hostileLegacyEnvironment = {
+	ORIGIN: 'https://legacy-origin.example.test',
+	AUTH_URL: 'https://legacy-auth.example.test',
+	AUTH_SECRET: 'PRIVATE_C6_IGNORED_LEGACY_SECRET_0123456789',
+	AUTH_TRUST_HOST: 'true',
+	HOST_HEADER: 'x-forwarded-host',
+	PROTOCOL_HEADER: 'x-forwarded-proto',
+	PORT_HEADER: 'x-forwarded-port'
+};
+
 function expectPublic(text: string, extra: string[] = []) {
 	for (const value of [...privateSentinels, ...extra]) expect(text).not.toContain(value);
 }
 
 function expectSafeLogs(server: TestServer, extra: string[] = []) {
 	expect(server.outputTruncated()).toBe(false);
-	expectPublic(server.output(), [server.path, ...(server.secret ? [server.secret] : []), ...extra]);
+	expectPublic(server.output(), [
+		server.path,
+		...(server.secret ? [server.secret] : []),
+		hostileLegacyEnvironment.AUTH_SECRET,
+		...extra
+	]);
 }
 
 function expectLocalLocation(response: Response, server: TestServer): URL {
@@ -240,7 +255,12 @@ test('native routes reject unsupported verbs instead of serving public or privat
 test('native SSR credentials and named root signout work without JavaScript', async ({
 	browser
 }) => {
-	const server = await startServer({ configuration: configuration() });
+	const secret = randomSecret();
+	const server = await startServer({
+		configuration: configuration(),
+		secret,
+		env: hostileLegacyEnvironment
+	});
 	const context = await browser.newContext({ javaScriptEnabled: false });
 	try {
 		await server.ready();
@@ -267,7 +287,7 @@ test('native SSR credentials and named root signout work without JavaScript', as
 		expect(cookie!.sameSite).toBe('Lax');
 		expect(cookie!.expires - Date.now() / 1000).toBeGreaterThan(7 * 86_400 - 120);
 		expect(cookie!.expires - Date.now() / 1000).toBeLessThanOrEqual(7 * 86_400 + 10);
-		const jwt = await readSession(server.secret!, cookie!.name, cookie!.value);
+		const jwt = await readSession(secret, cookie!.name, cookie!.value);
 		expect(jwt!.exp - jwt!.iat).toBe(7 * 86_400);
 
 		const data = await context.request.get(`${server.url}/__data.json?x-sveltekit-invalidated=11`);
@@ -276,6 +296,8 @@ test('native SSR credentials and named root signout work without JavaScript', as
 		expect(payload).toContain(privateDescription);
 		expect(payload).not.toContain(username);
 		expect(payload).not.toContain(password);
+		expect(payload).not.toContain(secret);
+		expect(await page.content()).not.toContain(secret);
 		expect(payload).not.toContain(cookie!.value);
 		expect(payload).not.toContain('roles');
 		await page.goto(`${server.url}/signin?callbackUrl=${encodeURIComponent('/?returned=yes')}`);
@@ -353,8 +375,13 @@ test('SDK rejects wrong, missing and non-string credentials and does not forward
 	}
 });
 
-test('return paths and untrusted proxy headers cannot mint foreign redirects', async ({ page }) => {
-	const server = await startServer({ configuration: configuration() });
+test('YAML origin overrides legacy env, return paths and untrusted proxy headers', async ({
+	page
+}) => {
+	const server = await startServer({
+		configuration: configuration(),
+		env: hostileLegacyEnvironment
+	});
 	try {
 		await server.ready();
 		for (const callback of [
@@ -479,7 +506,8 @@ test('raw auth APIs stay blocked and same-origin checks cover every POST content
 test('HTTPS origin sets Secure SDK cookies even when the trusted upstream transport is HTTP', async () => {
 	const server = await startServer({
 		configuration: configuration(),
-		origin: 'https://directory.example.test'
+		origin: 'https://directory.example.test',
+		env: hostileLegacyEnvironment
 	});
 	try {
 		await server.ready();
@@ -497,6 +525,38 @@ test('HTTPS origin sets Secure SDK cookies even when the trusted upstream transp
 		expect(refreshed.name).toBe(cookie.name);
 		expect(refreshed.header).toMatch(/; Secure(?:;|$)/i);
 		expectSafeLogs(server);
+	} finally {
+		expect(await server.stop()).toEqual({ code: 0, signal: null });
+	}
+});
+
+test('generated sessions expire on restart even when a legacy AUTH_SECRET is set', async () => {
+	const options = { configuration: configuration(), env: hostileLegacyEnvironment };
+	let server = await startServer(options);
+	try {
+		await server.ready();
+		const cookie = sessionCookie(await postCredentials(server));
+		const authenticated = await server.fetch('/__data.json', {
+			headers: { cookie: cookie.pair }
+		});
+		expect(authenticated.status).toBe(200);
+		expect(await authenticated.text()).toContain(privateDescription);
+		expectSafeLogs(server, [cookie.value]);
+		const { port } = server;
+		expect(await server.stop()).toEqual({ code: 0, signal: null });
+
+		server = await startServer({ ...options, port });
+		await server.ready();
+		await expectUnauthorized(
+			await server.fetch('/__data.json', { headers: { cookie: cookie.pair } })
+		);
+		const freshCookie = sessionCookie(await postCredentials(server));
+		const freshSession = await server.fetch('/__data.json', {
+			headers: { cookie: freshCookie.pair }
+		});
+		expect(freshSession.status).toBe(200);
+		expect(await freshSession.text()).toContain(privateDescription);
+		expectSafeLogs(server, [cookie.value, freshCookie.value]);
 	} finally {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
 	}
@@ -582,6 +642,7 @@ test('auth edits reject the entire reload; restoring auth allows display updates
 			.poll(
 				async () => {
 					const response = await server.fetch('/__data.json', { headers: { cookie: cookie.pair } });
+					expect(response.status).toBe(200);
 					return response.text();
 				},
 				{ timeout: 10_000, intervals: [100, 250, 500] }
@@ -600,9 +661,7 @@ test('omitting auth needs no AUTH_SECRET, ORIGIN or AUTH_URL and exposes no sign
 	browser
 }) => {
 	const server = await startServer({
-		configuration: configuration(''),
-		secret: null,
-		origin: null
+		configuration: configuration('')
 	});
 	const context = await browser.newContext({ javaScriptEnabled: false });
 	try {
@@ -624,11 +683,14 @@ test('omitting auth needs no AUTH_SECRET, ORIGIN or AUTH_URL and exposes no sign
 	}
 });
 
-test('real OIDC discovery and browser roundtrip use PKCE, state and nonce and the same Directory session', async ({
+test('real OIDC discovery and browser roundtrip use YAML origin, PKCE, state and nonce despite legacy env', async ({
 	browser
 }) => {
 	const issuer = await startIssuer();
-	const server = await startServer({ configuration: configuration(oidcAuth(issuer.origin)) });
+	const server = await startServer({
+		configuration: configuration(oidcAuth(issuer.origin)),
+		env: hostileLegacyEnvironment
+	});
 	try {
 		issuer.allowCallback(server.origin);
 		await server.ready();

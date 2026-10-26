@@ -11,6 +11,7 @@ import { loadConfigFile, validateConfig } from './load.js';
 import type { ConfigEnvironment } from './types.js';
 
 const link = { title: 'Photos', url: 'https://photos.example.com' };
+const origin = 'https://directory.example.com';
 const sentinel = 'SENTINEL-never-log-this';
 let directory: string;
 
@@ -274,18 +275,25 @@ describe('default, interpolate, then validate', () => {
 
 	it('loads either complete auth strategy and never fills missing credentials', () => {
 		const credentials = validateConfig(
-			{ links: {}, auth: { credentials: { username: 'family', password: '${PASSWORD}' } } },
+			{ links: {}, auth: { origin, credentials: { username: 'family', password: '${PASSWORD}' } } },
 			{ env: { PASSWORD: sentinel } }
 		);
-		expect(credentials.auth).toEqual({ credentials: { username: 'family', password: sentinel } });
+		expect(credentials.auth).toEqual({
+			origin,
+			credentials: { username: 'family', password: sentinel }
+		});
 		const oidc = validateConfig(
 			{
 				links: {},
-				auth: { oidc: { issuer: '${ISSUER}', client_id: 'directory', client_secret: '${SECRET}' } }
+				auth: {
+					origin,
+					oidc: { issuer: '${ISSUER}', client_id: 'directory', client_secret: '${SECRET}' }
+				}
 			},
 			{ env: { ISSUER: 'https://identity.example.com', SECRET: sentinel } }
 		);
 		expect(oidc.auth).toEqual({
+			origin,
 			oidc: {
 				issuer: 'https://identity.example.com',
 				client_id: 'directory',
@@ -319,15 +327,19 @@ describe('default, interpolate, then validate', () => {
 		{ links: {}, site: { favicon_path: false } },
 		{ links: {}, auth: {} },
 		{ links: {}, auth: null },
-		{ links: {}, auth: { credentials: {} } },
+		{ links: {}, auth: { origin, credentials: {} } },
 		{
 			links: {},
-			auth: { oidc: { issuer: 'https://identity.example.com', client_id: 'directory' } }
+			auth: { origin, oidc: { issuer: 'https://identity.example.com', client_id: 'directory' } }
 		},
-		{ links: {}, auth: { credentials: { username: 'family', password: 'test' }, oidc: null } },
+		{
+			links: {},
+			auth: { origin, credentials: { username: 'family', password: 'test' }, oidc: null }
+		},
 		{
 			links: {},
 			auth: {
+				origin,
 				credentials: { username: 'family', password: 'test' },
 				oidc: {
 					issuer: 'https://identity.example.com',
@@ -368,7 +380,7 @@ describe('default, interpolate, then validate', () => {
 		expect(invalid.issues[0]?.path).toBe('/links/*/url');
 		const badAuth = configurationError(() =>
 			validateConfig(
-				{ links: {}, auth: { credentials: { username: sentinel, password: {} } } },
+				{ links: {}, auth: { origin, credentials: { username: sentinel, password: {} } } },
 				{ env: {} }
 			)
 		);
@@ -426,6 +438,26 @@ describe('YAML file loader', () => {
 		expect(config.version).toBe(1);
 		expect(Object.keys(config.links).length).toBeGreaterThan(0);
 		expect(config).not.toHaveProperty('auth');
+	});
+
+	it('loads interpolated auth settings from YAML', async () => {
+		const secret = 'test-only-secret-0123456789abcdef';
+		const config = await loadYaml(
+			`links: {}
+auth:
+  origin: '\${PUBLIC_ORIGIN}'
+  secret: '\${SESSION_SECRET}'
+  credentials:
+    username: family
+    password: '\${PASSWORD}'
+`,
+			{ PUBLIC_ORIGIN: origin, SESSION_SECRET: secret, PASSWORD: sentinel }
+		);
+		expect(config.auth).toEqual({
+			origin,
+			secret,
+			credentials: { username: 'family', password: sentinel }
+		});
 	});
 
 	it('loads an empty directory, flat links, multiline descriptions and native booleans', async () => {

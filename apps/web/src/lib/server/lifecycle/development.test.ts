@@ -52,7 +52,7 @@ describe('development lifecycle', () => {
 		mocks.boot.mockResolvedValueOnce(ready);
 		const off = vi.spyOn(process, 'off');
 		await startDevelopment(server);
-		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
+		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith(undefined, undefined);
 		expect(server.application).toBe(ready);
 		expect(listeners.mock.calls.filter(([name]) => name === 'sveltekit:shutdown')).toEqual([]);
 		const shutdown = devStopListener();

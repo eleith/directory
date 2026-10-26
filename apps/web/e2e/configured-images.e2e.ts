@@ -91,7 +91,7 @@ async function stop(server: TestServer, directory: string) {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
 		const output = server.output();
 		expect(server.outputTruncated()).toBe(false);
-		for (const value of [...privateValues, directory, server.path, server.secret!]) {
+		for (const value of [...privateValues, directory, server.path]) {
 			if (value) expect(output).not.toContain(value);
 		}
 	} finally {
@@ -172,14 +172,7 @@ test('mounted files and generated bookmark logos require a real session, includi
 		const data = await server.fetch('/__data.json', { headers: { cookie } });
 		const payload = await data.text();
 		expect(payload).toContain('/public/photo.svg');
-		for (const value of [
-			username,
-			password,
-			server.path,
-			fixture.publicDir,
-			server.secret!,
-			'<svg'
-		]) {
+		for (const value of [username, password, server.path, fixture.publicDir, '<svg']) {
 			expect(payload).not.toContain(value);
 		}
 	} finally {
@@ -215,9 +208,7 @@ test('open mode serves only exact contained image references, with MIME and body
 `;
 	const server = await startServer({
 		configuration: configuration('') + extra,
-		publicDir: fixture.publicDir,
-		secret: null,
-		origin: null
+		publicDir: fixture.publicDir
 	});
 	try {
 		await server.ready();
@@ -352,9 +343,7 @@ test('missing and atomically replaced bytes recover without changing the prepare
 	await rm(join(fixture.publicDir, 'photo.svg'));
 	const server = await startServer({
 		configuration: configuration(''),
-		publicDir: fixture.publicDir,
-		secret: null,
-		origin: null
+		publicDir: fixture.publicDir
 	});
 	try {
 		await server.ready();
@@ -379,9 +368,7 @@ test('a missing public directory is valid at startup and recovers when its refer
 	await rm(fixture.publicDir, { recursive: true });
 	const server = await startServer({
 		configuration: configuration(''),
-		publicDir: fixture.publicDir,
-		secret: null,
-		origin: null
+		publicDir: fixture.publicDir
 	});
 	try {
 		await server.ready();
