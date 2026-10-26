@@ -10,7 +10,6 @@ on:
       - .github/workflows/**
       - .woodpecker/**
       - packages/config/**
-      - apps/web/config/directory.example.yml
   pull_request:
     paths:
       - '*'
@@ -19,7 +18,6 @@ on:
       - .github/workflows/**
       - .woodpecker/**
       - packages/config/**
-      - apps/web/config/directory.example.yml
 
 permissions:
   contents: read

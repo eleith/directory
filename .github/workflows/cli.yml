@@ -12,7 +12,6 @@ on:
       - .woodpecker/**
       - apps/cli/**
       - packages/**
-      - apps/web/config/directory.example.yml
   pull_request:
     paths:
       - '*'
@@ -22,7 +21,6 @@ on:
       - .woodpecker/**
       - apps/cli/**
       - packages/**
-      - apps/web/config/directory.example.yml
 
 permissions:
   contents: read

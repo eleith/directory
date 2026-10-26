@@ -14,8 +14,8 @@ appearance:
 
 auth:
   credentials:
-    username: demo
-    password: directory-demo
+    username: admin
+    password: directory
 
 # Reserved example.com destinations are placeholders, not live integrations.
 # All bookmarks use generated logos; site branding uses the bundled default.

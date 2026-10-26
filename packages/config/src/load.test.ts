@@ -401,11 +401,8 @@ describe('YAML file loader', () => {
 		}
 	);
 
-	it('validates the minimal production starter with defaults and no auth', async () => {
-		const path = fileURLToPath(
-			new URL('../../../apps/web/config/directory.example.yml', import.meta.url)
-		);
-		const config = await loadConfigFile(path, { env: {} });
+	it('loads minimal YAML with defaults and no auth', async () => {
+		const config = await loadYaml('links: {}\n');
 		expect(config.version).toBe(1);
 		expect(config.links).toEqual({});
 		expect(config).not.toHaveProperty('auth');
@@ -421,6 +418,14 @@ describe('YAML file loader', () => {
 			primary_light_color: '#0f766e',
 			primary_dark_color: '#5eead4'
 		});
+	});
+
+	it('validates the downloadable starter without auth or environment values', async () => {
+		const path = fileURLToPath(new URL('../../../docs/directory.example.yaml', import.meta.url));
+		const config = await loadConfigFile(path, { env: {} });
+		expect(config.version).toBe(1);
+		expect(Object.keys(config.links).length).toBeGreaterThan(0);
+		expect(config).not.toHaveProperty('auth');
 	});
 
 	it('loads an empty directory, flat links, multiline descriptions and native booleans', async () => {

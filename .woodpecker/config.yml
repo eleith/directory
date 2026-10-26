@@ -13,7 +13,6 @@ when:
         - .github/workflows/**
         - .woodpecker/**
         - packages/config/**
-        - apps/web/config/directory.example.yml
   - event: pull_request
     path:
       include:
@@ -23,7 +22,6 @@ when:
         - .github/workflows/**
         - .woodpecker/**
         - packages/config/**
-        - apps/web/config/directory.example.yml
 
 steps:
   prepare:

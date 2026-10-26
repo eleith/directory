@@ -1,0 +1,52 @@
+services:
+  directory-app:
+    # Replace latest with a published version or digest to pin updates.
+    image: ghcr.io/eleith/directory:latest
+    platform: linux/amd64
+    # Optional values for ${VAR} references in directory.yaml.
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      # Localhost only. Use '3000:3000' for LAN access; restrict it with your firewall.
+      # Change the left port to use a different host port, e.g. '127.0.0.1:8080:3000'.
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - ./config:/app/config:ro
+      - ./public:/app/public:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+  directory-cli:
+    # Keep this version matched to the web image if you pin it.
+    image: ghcr.io/eleith/directory-cli:latest
+    platform: linux/amd64
+    profiles:
+      - tools
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./config:/app/config:ro
+    read_only: true
+    network_mode: none
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

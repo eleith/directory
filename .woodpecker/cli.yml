@@ -14,7 +14,6 @@ when:
         - .woodpecker/**
         - apps/cli/**
         - packages/**
-        - apps/web/config/directory.example.yml
   - event: pull_request
     path:
       include:
@@ -25,7 +24,6 @@ when:
         - .woodpecker/**
         - apps/cli/**
         - packages/**
-        - apps/web/config/directory.example.yml
 
   - event: tag
     ref: 'refs/tags/@directory/cli@*'

@@ -1,6 +1,0 @@
-# yaml-language-server: $schema=../../../packages/config/src/config.schema.json
-# Minimal production starter: open access, no credentials or session secret required.
-# Configure authentication before publishing. See docs/config.md for the contract.
-# For the isolated local review demo, see demo/README.md at the repository root.
-version: 1
-links: {}
