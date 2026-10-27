@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=http://localhost:3000/schema.json
 # Replace the placeholder addresses with your own.
 # Sign-in is disabled. Uncomment one auth example below to enable it.
 version: 1

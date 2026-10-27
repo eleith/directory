@@ -132,6 +132,12 @@ We all could use a little validation every now and then.
 We publish a json schema to give you little red squigglies but you can also use
 our cli when you are in a pinch.
 
+Find the schema at `/schema.json`:
+
+```yaml
+# yaml-language-server: $schema=http://localhost:3000/schema.json
+```
+
 From the folder containing `compose.yaml`:
 
 ```sh
