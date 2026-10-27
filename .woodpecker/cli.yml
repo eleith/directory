@@ -37,7 +37,7 @@ steps:
         import { readFileSync, writeFileSync } from 'node:fs';
 
         const tag = process.env.CI_COMMIT_TAG ?? '';
-        const match = /^@directory\/cli@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$/.exec(tag);
+        const match = /^@directory\\/cli@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$/.exec(tag);
         if (!match || match[0] !== tag) {
           throw new Error('Expected a stable @directory/cli@<major>.<minor>.<patch> tag');
         }
