@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">Home automation</title>
-  <rect width="64" height="64" rx="12" fill="#7c2d12"/>
-  <path d="m11 29 21-17 21 17M18 25v26h28V25" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="m34 28-8 11h7l-3 9 10-13h-8Z" fill="#fff"/>
-</svg>

@@ -116,7 +116,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 		).toBe('BF');
 	});
 
-	it('keys separate slugs independently while sharing a named group color', () => {
+	it('uses per-link colors even within the same named group', () => {
 		const logos = renderBookmarkLogos(
 			configuration({
 				photos: { title: 'Photos', group: 'Family' },
@@ -126,7 +126,7 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 		expect(Object.keys(logos)).toEqual(['photos', 'backup']);
 		expect(letters(logos.photos!)).toBe('PH');
 		expect(letters(logos.backup!)).toBe('BF');
-		expect(background(logos.photos!)).toBe(background(logos.backup!));
+		expect(background(logos.photos!)).not.toBe(background(logos.backup!));
 	});
 
 	it('keeps colors stable through group insertion, declaration reordering and accent changes', () => {
@@ -146,6 +146,19 @@ describe('prepared bookmark logos with the current Initials renderer', () => {
 		reordered.appearance.primary_dark_color = '#ffffff';
 		const updated = renderBookmarkLogos(reordered);
 		for (const id of Object.keys(original)) expect(updated[id]).toBe(original[id]);
+	});
+
+	it('keeps a link color stable through title edits, regrouping and ungrouping', () => {
+		const original = renderBookmarkLogos(
+			configuration({ photos: { title: 'Photos', group: 'Family' } })
+		).photos!;
+		for (const group of ['Another group', undefined]) {
+			const updated = renderBookmarkLogos(
+				configuration({ photos: { title: 'Picture library', ...(group ? { group } : {}) } })
+			).photos!;
+			expect(background(updated)).toBe(background(original));
+			expect(letters(updated)).toBe('PL');
+		}
 	});
 
 	it('uses a varied flat palette with opaque high-contrast colors and intrinsic 64px dimensions', () => {

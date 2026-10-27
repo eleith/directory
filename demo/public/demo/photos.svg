@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">Photos</title>
-  <rect width="64" height="64" rx="12" fill="#14532d"/>
-  <rect x="12" y="15" width="40" height="34" rx="3" fill="none" stroke="#fff" stroke-width="3"/>
-  <circle cx="40" cy="25" r="4" fill="#fff"/>
-  <path d="m15 44 12-16 10 12 6-6 6 10Z" fill="#fff"/>
-</svg>
