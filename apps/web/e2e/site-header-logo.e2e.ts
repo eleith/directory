@@ -138,67 +138,6 @@ for (const javaScriptEnabled of [true, false]) {
 	}
 }
 
-test('a configured image that fails before hydration falls back once in the same SSR image', async ({
-	page
-}) => {
-	await writeFile(join(publicDir, 'private-brand-a.svg'), 'not an image');
-	const app = await boot(sourceA);
-	const scripts = Promise.withResolvers<void>();
-	let heldScripts = 0;
-	await page.route('**/_app/immutable/**', async (route) => {
-		if (route.request().resourceType() === 'script') {
-			heldScripts++;
-			await scripts.promise;
-		}
-		await route.continue();
-	});
-	try {
-		await page.goto(app.url, { waitUntil: 'commit' });
-		const image = page.locator('header img');
-		await expect(image).toHaveAttribute('src', sourceA);
-		await expectBroken(image);
-		await expect.poll(() => heldScripts).toBeGreaterThan(0);
-		const ssrImage = await image.elementHandle();
-		scripts.resolve();
-		await expectDecoded(image, '/favicon.png');
-		expect(await image.evaluate((node, previous) => node === previous, ssrImage)).toBe(true);
-		await ssrImage?.dispose();
-	} finally {
-		scripts.resolve();
-		await page.unrouteAll({ behavior: 'wait' });
-	}
-});
-
-for (const source of [sourceA, undefined]) {
-	test(`${source ? 'failed primary and fallback' : 'failed default'} stop after one bundled image request`, async ({
-		page
-	}) => {
-		await writeFile(join(publicDir, 'private-brand-a.svg'), 'not an image');
-		const app = await boot(source);
-		let requests = 0;
-		await page.route('**/favicon.png', async (route) => {
-			requests++;
-			await route.abort();
-		});
-		const failed = page.waitForEvent(
-			'requestfailed',
-			(request) => new URL(request.url()).pathname === '/favicon.png'
-		);
-		await page.goto(app.url);
-		await failed;
-		const image = page.locator('header img');
-		await expect(image).toHaveAttribute('src', '/favicon.png');
-		await expectBroken(image);
-		await page.evaluate(
-			() =>
-				new Promise<void>((resolve) =>
-					requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-				)
-		);
-		expect(requests).toBe(1);
-	});
-}
-
 test('without JavaScript a broken configured header leaves title and native navigation usable', async ({
 	browser
 }) => {

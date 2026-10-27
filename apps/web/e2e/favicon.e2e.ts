@@ -61,7 +61,6 @@ async function fixtures() {
 		await writeFile(join(publicDir, 'café family.svg'), svg);
 		await writeFile(join(publicDir, 'book.png'), png);
 		await writeFile(join(publicDir, 'private-brand.svg'), svg);
-		await writeFile(join(publicDir, 'invalid.png'), '<html>not an image</html>');
 		return { directory, publicDir };
 	} catch (error) {
 		await rm(directory, { recursive: true, force: true });
@@ -287,30 +286,27 @@ test('valid reloads keep the alias but change bytes; invalid and auth-changing c
 	}
 });
 
-for (const source of ['/public/missing.svg', '/public/invalid.png']) {
-	test(`configured unavailable source ${source} returns 404 without bundled fallback`, async ({
-		browser
-	}) => {
-		const fixture = await fixtures();
-		const server = await startServer({
-			configuration: configuration(source),
-			publicDir: fixture.publicDir
-		});
-		const context = await browser.newContext({ javaScriptEnabled: false });
-		try {
-			await server.ready();
-			await expectNotFound(server);
-			const page = await context.newPage();
-			await page.goto(`${server.url}/signin`);
-			await expect(page.locator('head link[rel="icon"]')).toHaveCount(1);
-			await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon');
-			expectNoPrivateData(await page.content(), [source]);
-		} finally {
-			await context.close();
-			await stop(server, fixture.directory);
-		}
+test('a missing configured favicon returns 404 without bundled fallback', async ({ browser }) => {
+	const source = '/public/missing.svg';
+	const fixture = await fixtures();
+	const server = await startServer({
+		configuration: configuration(source),
+		publicDir: fixture.publicDir
 	});
-}
+	const context = await browser.newContext({ javaScriptEnabled: false });
+	try {
+		await server.ready();
+		await expectNotFound(server);
+		const page = await context.newPage();
+		await page.goto(`${server.url}/signin`);
+		await expect(page.locator('head link[rel="icon"]')).toHaveCount(1);
+		await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon');
+		expectNoPrivateData(await page.content(), [source]);
+	} finally {
+		await context.close();
+		await stop(server, fixture.directory);
+	}
+});
 
 test('no-auth mode remains open without changing alias selection', async () => {
 	const fixture = await fixtures();

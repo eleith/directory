@@ -40,7 +40,6 @@ export function createAuthentication(config: DirectoryAuth & { origin: string })
 		secret,
 		trustHost: true,
 		basePath: '/auth',
-		// An empty value prevents Auth.js from enabling an environment-inferred redirect proxy.
 		redirectProxyUrl: '',
 		session: { strategy: 'jwt', maxAge: WEEK_SECONDS },
 		providers: buildProviders(config),

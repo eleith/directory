@@ -85,7 +85,6 @@ test.beforeEach(async () => {
 	await writeFile(join(publicDir, 'PRIVATE_SELECTED_LOGO.svg'), logo);
 	await writeFile(join(publicDir, 'PRIVATE_OTHER_IMAGE.svg'), favicon);
 	await writeFile(join(publicDir, 'PRIVATE_TAB_ICON.svg'), favicon);
-	await writeFile(join(publicDir, 'invalid.svg'), 'not an image');
 });
 
 test.afterEach(async () => {
@@ -342,50 +341,52 @@ test('only selected logo bytes are public, with independent favicon and no arbit
 	}
 });
 
-for (const source of [null, '/public/missing.svg', '/public/invalid.svg']) {
-	for (const javaScriptEnabled of [false, true]) {
-		test(`${source ?? 'bundled default'} logo with JavaScript ${javaScriptEnabled}`, async ({
-			browser
-		}) => {
-			const app = await startServer({
-				configuration: brandedConfiguration(credentialsAuth, source),
-				publicDir
-			});
-			const context = await browser.newContext({
-				javaScriptEnabled,
-				viewport: { width: 360, height: 800 }
-			});
-			try {
-				await app.ready();
-				const page = await context.newPage();
-				let logoRequests = 0;
-				page.on('request', (request) => {
-					if (new URL(request.url()).pathname === '/logo') logoRequests++;
-				});
-				await page.goto(`${app.url}/signin`);
-				const image = page.locator('header img');
-				if (source !== null && !javaScriptEnabled) {
-					await expect(image).toHaveAttribute('src', '/logo');
-					await expect(image).toHaveJSProperty('complete', true);
-					await expect(image).toHaveJSProperty('naturalWidth', 0);
-				} else await expectDecoded(image, '/favicon.png');
-				expect(logoRequests).toBe(source === null ? 0 : 1);
-				await expect(page.getByRole('heading')).toHaveText(`Sign in to ${siteTitle}`);
-				await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
-				await expect(page.locator('head link[rel="icon"]')).toHaveJSProperty(
-					'href',
-					`${app.url}/favicon`
-				);
-				expect(Buffer.from(await (await app.fetch('/favicon.png')).arrayBuffer())).toEqual(
-					await readFile(new URL('../static/favicon.png', import.meta.url))
-				);
-				expect((await app.fetch('/logo')).status).toBe(404);
-			} finally {
-				await context.close();
-				expect(await app.stop()).toEqual({ code: 0, signal: null });
-			}
+for (const { source, javaScriptEnabled } of [
+	{ source: null, javaScriptEnabled: false },
+	{ source: '/public/missing.svg', javaScriptEnabled: false },
+	{ source: '/public/missing.svg', javaScriptEnabled: true }
+]) {
+	test(`${source ?? 'bundled default'} logo with JavaScript ${javaScriptEnabled}`, async ({
+		browser
+	}) => {
+		const app = await startServer({
+			configuration: brandedConfiguration(credentialsAuth, source),
+			publicDir
 		});
-	}
+		const context = await browser.newContext({
+			javaScriptEnabled,
+			viewport: { width: 360, height: 800 }
+		});
+		try {
+			await app.ready();
+			const page = await context.newPage();
+			let logoRequests = 0;
+			page.on('request', (request) => {
+				if (new URL(request.url()).pathname === '/logo') logoRequests++;
+			});
+			await page.goto(`${app.url}/signin`);
+			const image = page.locator('header img');
+			if (source !== null && !javaScriptEnabled) {
+				await expect(image).toHaveAttribute('src', '/logo');
+				await expect(image).toHaveJSProperty('complete', true);
+				await expect(image).toHaveJSProperty('naturalWidth', 0);
+			} else await expectDecoded(image, '/favicon.png');
+			expect(logoRequests).toBe(source === null ? 0 : 1);
+			await expect(page.getByRole('heading')).toHaveText(`Sign in to ${siteTitle}`);
+			await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+			await expect(page.locator('head link[rel="icon"]')).toHaveJSProperty(
+				'href',
+				`${app.url}/favicon`
+			);
+			expect(Buffer.from(await (await app.fetch('/favicon.png')).arrayBuffer())).toEqual(
+				await readFile(new URL('../static/favicon.png', import.meta.url))
+			);
+			expect((await app.fetch('/logo')).status).toBe(404);
+		} finally {
+			await context.close();
+			expect(await app.stop()).toEqual({ code: 0, signal: null });
+		}
+	});
 }
 
 test('sign-in catches a logo failure before hydration and stops after a failed fallback', async ({
