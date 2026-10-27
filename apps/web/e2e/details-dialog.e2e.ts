@@ -310,6 +310,11 @@ for (const width of [360, 1280]) {
 			await page.goto(`${server.url}/?link=alpha`);
 			const dialog = page.getByRole('dialog', { name: 'Alpha service' });
 			await expect(dialog).toBeVisible();
+			const destination = dialog.getByRole('textbox', { name: 'Destination', exact: true });
+			await expect(destination).toHaveCSS(
+				'color',
+				colorScheme === 'light' ? 'rgb(23, 23, 23)' : 'rgb(245, 245, 245)'
+			);
 			const close = dialog.getByRole('button', { name: 'Close', exact: true });
 			const external = dialog.getByRole('link', {
 				name: 'Open Alpha service (opens in a new tab)',

@@ -21,7 +21,7 @@ const logo =
 	'<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="#abcdef"/></svg>';
 const favicon =
 	'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7"/></svg>';
-const light = '#abc';
+const light = '#0f766e';
 const dark = '#13579b';
 let publicDir: string;
 
@@ -127,15 +127,12 @@ for (const strategy of ['credentials', 'sso'] as const) {
 						colorScheme === 'light' ? 'rgb(254, 242, 242)' : 'rgb(69, 10, 10)'
 					);
 					const button = page.getByRole('button');
-					await expect(button).toHaveCSS(
-						'background-color',
-						colorScheme === 'light' ? 'rgb(170, 187, 204)' : 'rgb(19, 87, 155)'
-					);
 					const colors = await button.evaluate((node) => ({
 						foreground: getComputedStyle(node).color,
 						background: getComputedStyle(node).backgroundColor
 					}));
-					expect(contrast(colors.foreground, colors.background)).toBeGreaterThanOrEqual(4.5);
+					expect(colors.background).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
+					expect(contrast(colors.foreground, colors.background)).toBeGreaterThanOrEqual(7);
 					for (const input of await page.locator('input:not([type="hidden"])').all()) {
 						expect((await input.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 					}
@@ -163,6 +160,7 @@ for (const strategy of ['credentials', 'sso'] as const) {
 						expect(Math.abs(card!.y + card!.height / 2 - 450)).toBeLessThan(1);
 					}
 					if (strategy === 'credentials') {
+						await expect(button.locator('svg')).toHaveCount(0);
 						await expect(page.getByLabel('Username')).toBeFocused();
 						await expect(page.getByLabel('Username')).toHaveAttribute('autocomplete', 'username');
 						await expect(page.getByLabel('Password')).toHaveAttribute(
@@ -205,9 +203,7 @@ for (const strategy of ['credentials', 'sso'] as const) {
 						expectPrivate(text, app);
 						for (const value of ['/logo', '/favicon']) expect(text).toContain(value);
 						if (path === '/signin') {
-							expect(text).toContain(
-								`<style>:root{--color-primary:light-dark(${light},${dark});--color-on-primary:light-dark(#171717,#f5f5f5)}</style>`
-							);
+							expect(text).toContain(`--color-primary:light-dark(${light},${dark})`);
 						} else {
 							expect(text).not.toContain('--color-primary');
 						}

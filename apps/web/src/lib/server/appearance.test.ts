@@ -1,6 +1,7 @@
 import { validateConfig } from '@directory/config';
 import { describe, expect, it } from 'vitest';
 import { themeStyleTag } from './appearance.js';
+import { getContrastBackground } from './color.js';
 import { prepareSnapshot } from './directory/snapshot.js';
 
 function snapshot(light: string, dark: string) {
@@ -37,8 +38,10 @@ describe('server-owned theme style', () => {
 			const captured = snapshot(light, dark);
 			const before = JSON.stringify(captured);
 			const style = themeStyleTag(captured.display.appearance);
+			const fillLight = getContrastBackground(light, onLight);
+			const fillDark = getContrastBackground(dark, onDark);
 			expect(style).toBe(
-				`<style>:root{--color-primary:light-dark(${light},${dark});--color-on-primary:light-dark(${onLight},${onDark})}</style>`
+				`<style>:root{--color-primary:light-dark(${light},${dark});--color-on-primary:light-dark(${onLight},${onDark});--color-primary-fill:light-dark(${fillLight},${fillDark})}</style>`
 			);
 			expect(Object.isFrozen(captured.display.appearance)).toBe(true);
 			expect(JSON.stringify(captured)).toBe(before);
@@ -56,8 +59,9 @@ describe('server-owned theme style', () => {
 				throw new Error('Theme must not traverse configuration');
 			}
 		};
+		const fillDark = getContrastBackground('#13579b', '#f5f5f5');
 		expect(themeStyleTag(appearance)).toBe(
-			'<style>:root{--color-primary:light-dark(#abc,#13579b);--color-on-primary:light-dark(#171717,#f5f5f5)}</style>'
+			`<style>:root{--color-primary:light-dark(#abc,#13579b);--color-on-primary:light-dark(#171717,#f5f5f5);--color-primary-fill:light-dark(#abc,${fillDark})}</style>`
 		);
 	});
 

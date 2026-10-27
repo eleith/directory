@@ -23,12 +23,12 @@
 
 .ui-button--primary {
 	--ui-control-focus-color: var(--color-on-primary);
-	--ui-control-focus-background: var(--color-primary);
+	--ui-control-focus-background: var(--color-primary-fill);
 
 	min-width: 80px;
 	font-weight: 600;
 	color: var(--color-on-primary);
-	background: var(--color-primary);
+	background: var(--color-primary-fill);
 }
 
 .ui-button--icon {
@@ -116,7 +116,6 @@
 .ui-input--readonly > .ui-input__control {
 	padding-inline: var(--space-4);
 	font-size: var(--font-size-sm);
-	color: var(--color-text-muted);
 }
 
 .ui-input--trailing > .ui-input__control {
@@ -157,7 +156,7 @@
 }
 
 .ui-button--primary:not(:disabled):hover {
-	background: var(--color-primary);
+	background: var(--color-primary-fill);
 	box-shadow:
 		inset 0 0 0 var(--border-width) var(--color-on-primary),
 		var(--shadow-card);
@@ -185,7 +184,7 @@
 }
 
 .ui-button--primary:not(:disabled):active {
-	background: var(--color-primary);
+	background: var(--color-primary-fill);
 	box-shadow: inset 0 0 0 3px var(--color-on-primary);
 	outline: none;
 }

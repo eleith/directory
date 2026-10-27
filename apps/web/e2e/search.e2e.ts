@@ -39,6 +39,10 @@ test('search finds a bookmark, opens its details and clears back to browsing', a
 	await expect(search).toBeEnabled();
 	await expect(page.getByRole('heading', { level: 2 })).toHaveText(['Media', 'Tools']);
 
+	const label = page.locator('label[for="directory-search"]');
+	await expect(label).toHaveCount(1);
+	await label.click();
+	await expect(search).toBeFocused();
 	await search.fill('photos');
 	await expect(results.getByRole('link')).toHaveCount(1);
 	await expect(results.getByRole('link')).toContainText('Family photos');

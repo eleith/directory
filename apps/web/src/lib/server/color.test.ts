@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getContrastText } from './color.js';
+import { getContrastBackground, getContrastText } from './color.js';
 
 function contrast(primary: string, foreground: string): number {
 	function luminance(hex: string) {
@@ -28,10 +28,14 @@ describe('configured primary foreground', () => {
 	});
 
 	it.each(['#000', '#fff', '#ABC', '#abcdef', '#777777', '#00f', '#ff0000', '#0f766e', '#5eead4'])(
-		'provides at least 4.5:1 contrast against %s in both schemes',
+		'keeps readable accent text and provides a 7:1 filled background for %s in both schemes',
 		(primary) => {
 			for (const preferred of ['#171717', '#f5f5f5']) {
-				expect(contrast(primary, getContrastText(primary, preferred))).toBeGreaterThanOrEqual(4.5);
+				const foreground = getContrastText(primary, preferred);
+				const background = getContrastBackground(primary, foreground);
+				expect(contrast(primary, foreground)).toBeGreaterThanOrEqual(4.5);
+				expect(contrast(background, foreground)).toBeGreaterThanOrEqual(7);
+				if (contrast(primary, foreground) >= 7) expect(background).toBe(primary);
 			}
 		}
 	);

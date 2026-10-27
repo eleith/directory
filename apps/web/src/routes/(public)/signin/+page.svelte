@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import IconWarningCircle from 'virtual:icons/ph/warning-circle';
-	import IconLock from 'virtual:icons/ph/lock';
 	import IconSignIn from 'virtual:icons/ph/sign-in';
 	import Logo from '$lib/components/Logo.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -68,10 +67,7 @@
 						required
 					/>
 				</div>
-				<Button variant="primary" type="submit">
-					<span class="icon"><IconLock aria-hidden="true" focusable="false" /></span>
-					Sign in
-				</Button>
+				<Button variant="primary" type="submit">Sign in</Button>
 			{:else}
 				<p class="sso-description">Use your single sign-on account to access the directory.</p>
 				<Button bind:element={ssoButton} variant="primary" type="submit">

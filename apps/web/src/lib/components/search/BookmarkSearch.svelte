@@ -139,6 +139,7 @@
 		aria-hidden="true"
 		focusable="false"
 	/>
+	<span class="visually-hidden">Search</span>
 {/snippet}
 
 {#snippet clearButton()}
@@ -148,7 +149,6 @@
 {/snippet}
 
 <div class="search">
-	<label class="visually-hidden" for="directory-search">Search</label>
 	<Input
 		class="search-controls"
 		bind:element={input}
