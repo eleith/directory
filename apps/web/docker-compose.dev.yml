@@ -16,10 +16,11 @@ services:
         required: false
     environment:
       NODE_ENV: development
+      PORT: ${PORT:-5173}
       CONFIG_PATH: /m/apps/web/config/directory.yaml
       DIRECTORY_PUBLIC_DIR: /m/apps/web/public
     ports:
-      - '127.0.0.1:5173:5173'
+      - '127.0.0.1:${PORT:-5173}:${PORT:-5173}'
     volumes:
       - ./src:/m/apps/web/src:ro
       - ./static:/m/apps/web/static:ro
@@ -35,7 +36,7 @@ services:
         - CMD
         - node
         - --eval
-        - fetch('http://localhost:5173/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+        - fetch('http://localhost:'+(process.env.PORT || '5173')+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 30s
       timeout: 3s
       start_period: 60s
@@ -57,6 +58,7 @@ services:
         required: false
     environment:
       NODE_ENV: development
+      PORT: ${PORT:-5173}
       CONFIG_PATH: /m/apps/web/config/directory.yaml
       DIRECTORY_PUBLIC_DIR: /m/apps/web/public
     volumes:

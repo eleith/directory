@@ -21,8 +21,8 @@ vi.mock('./logger.js', () => ({ reportDirectoryIssue: mocks.report }));
 const realSnapshot =
 	await vi.importActual<typeof import('./directory/snapshot.js')>('./directory/snapshot.js');
 const sentinel = 'PRIVATE-password-env-filename.yml';
+const origin = 'https://directory.example.com';
 const credentials = {
-	origin: 'https://directory.example.com',
 	credentials: { username: 'family', password: sentinel }
 };
 const authentication: Authentication = {
@@ -34,11 +34,12 @@ const authentication: Authentication = {
 
 function configuration(
 	title = 'boot',
-	auth?: DirectoryConfiguration['auth']
+	auth?: DirectoryConfiguration['auth'],
+	url = origin
 ): DirectoryConfiguration {
 	return validateConfig(
 		{
-			site: { title, logo_path: `/public/${title}.svg` },
+			site: { url, title, logo_path: `/public/${title}.svg` },
 			...(auth === undefined ? {} : { auth }),
 			links: {
 				photos: {
@@ -87,8 +88,11 @@ describe('application startup', () => {
 		const snapshot = app.currentSnapshot();
 		expect(mocks.prepare).toHaveBeenCalledExactlyOnceWith(initial);
 		expect(snapshot).toBe(mocks.prepare.mock.results[0]!.value);
-		expect(mocks.authenticate).toHaveBeenCalledExactlyOnceWith(snapshot.configuration.auth);
-		expect(mocks.authenticate.mock.calls[0]![0]).toBe(snapshot.configuration.auth);
+		expect(mocks.authenticate).toHaveBeenCalledExactlyOnceWith({
+			...snapshot.configuration.auth,
+			origin: snapshot.configuration.site.url
+		});
+		expect(snapshot.configuration.auth).not.toHaveProperty('origin');
 		expect(app.authentication).toBe(authentication);
 		expect(snapshot.configuration.auth?.credentials?.password).toBe(sentinel);
 		expect(snapshot.configuration.auth).not.toHaveProperty('secret');
@@ -165,8 +169,7 @@ describe('application config policy', () => {
 			Object.entries(equivalent.site).reverse()
 		) as DirectoryConfiguration['site'];
 		equivalent.auth = {
-			credentials: { password: sentinel, username: 'family' },
-			origin: credentials.origin
+			credentials: { password: sentinel, username: 'family' }
 		};
 		expect(app.onConfigChange(equivalent, accepted)).toBe(true);
 		expect(app.onConfigChange(configuration('accepted', credentials), equivalent)).toBe(true);
@@ -210,11 +213,6 @@ describe('application config policy', () => {
 		{ change: 'enable auth', before: undefined, after: credentials },
 		{ change: 'disable auth', before: credentials, after: undefined },
 		{
-			change: 'origin',
-			before: credentials,
-			after: { ...credentials, origin: 'https://other.example.com' }
-		},
-		{
 			change: 'password',
 			before: credentials,
 			after: { ...credentials, credentials: { ...credentials.credentials, password: 'changed' } }
@@ -242,6 +240,24 @@ describe('application config policy', () => {
 		expect(app.authentication).toBe(before === undefined ? undefined : authentication);
 		expect(mocks.authenticate).toHaveBeenCalledTimes(before === undefined ? 0 : 1);
 	});
+
+	it.each([undefined, credentials])(
+		'rejects site.url changes until the canonical URL is restored (auth: %j)',
+		(auth) => {
+			const initial = configuration('boot', auth);
+			const app = createApplication(initial);
+			const captured = app.currentSnapshot();
+			const next = configuration('rejected', auth, 'https://other.example.com');
+			expect(app.onConfigChange(next, initial)).toBe(false);
+			expect(app.currentSnapshot()).toBe(captured);
+			expect(mocks.prepare).toHaveBeenCalledOnce();
+			expect(mocks.report).toHaveBeenCalledExactlyOnceWith({ code: 'restart_required' });
+			expect(mocks.authenticate).toHaveBeenCalledTimes(auth === undefined ? 0 : 1);
+			expect(app.onConfigChange(configuration('restored', auth), initial)).toBe(true);
+			expect(app.currentSnapshot().configuration.site.url).toBe(origin);
+			expect(app.currentSnapshot().display.site.title).toBe('restored');
+		}
+	);
 
 	it('throws a safe preparation failure, retains last good, and recovers using the accepted baseline', () => {
 		const initial = configuration();

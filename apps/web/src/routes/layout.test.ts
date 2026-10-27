@@ -1,51 +1,58 @@
-import { IncomingMessage } from 'node:http';
-import { Socket } from 'node:net';
-import { TLSSocket } from 'node:tls';
 import { validateConfig } from '@directory/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prepareSnapshot } from '../lib/server/directory/snapshot.js';
 import { readMountedImage } from '../lib/server/images/read-mounted-image.js';
 import { load } from './+layout.server.js';
 
-const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
-vi.mock('$env/dynamic/private', () => ({ env }));
 vi.mock('../lib/server/images/read-mounted-image.js', () => ({ readMountedImage: vi.fn() }));
 
 function event(
 	site: Record<string, string> = {},
 	{
-		origin = 'https://directory.example.test',
+		siteUrl = 'https://directory.example.test',
 		url = 'https://internal.example.test/signin?callbackUrl=%2Fprivate&link=PRIVATE_QUERY#PRIVATE_FRAGMENT',
-		platform
-	}: { origin?: string | null; url?: string; platform?: App.Platform } = {}
+		withAuth = true,
+		env = {}
+	}: {
+		siteUrl?: string | null;
+		url?: string;
+		withAuth?: boolean;
+		env?: Record<string, string | undefined>;
+	} = {}
 ) {
 	const snapshot = prepareSnapshot(
 		validateConfig(
 			{
 				site: {
+					...(siteUrl === null ? {} : { url: siteUrl }),
 					title: 'Home Server',
-					description: 'PRIVATE_DESCRIPTION',
+					description: 'Public site description',
 					footer: 'PRIVATE_FOOTER',
 					...site
 				},
 				appearance: { primary_light_color: '#13579b', primary_dark_color: '#c4d6e8' },
-				...(origin === null
+				...(!withAuth
 					? {}
 					: {
 							auth: {
-								origin,
 								secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
 								credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
 							}
 						}),
-				links: { private: { title: 'PRIVATE_LINK', url: 'https://private.example.test' } }
+				links: {
+					private: {
+						title: 'PRIVATE_LINK',
+						url: 'https://private.example.test',
+						description: 'PRIVATE_LINK_DESCRIPTION',
+						group: 'PRIVATE_GROUP'
+					}
+				}
 			},
-			{ env: {} }
+			{ env }
 		)
 	);
 	return {
 		url: new URL(url),
-		platform,
 		locals: {
 			snapshot,
 			publicDir: '/PRIVATE_PUBLIC_ROOT',
@@ -62,6 +69,7 @@ function expectedData(faviconPath = '/favicon.png', logoPath = '/favicon.png') {
 		logoPath,
 		document: {
 			title: 'Home Server',
+			description: 'Public site description',
 			url: 'https://directory.example.test/',
 			image: {
 				url: 'https://directory.example.test/images/og.png',
@@ -75,11 +83,10 @@ function expectedData(faviconPath = '/favicon.png', logoPath = '/favicon.png') {
 
 beforeEach(() => {
 	vi.mocked(readMountedImage).mockReset();
-	delete env.PROTOCOL_HEADER;
 });
 
 describe('public branding layout data', () => {
-	it('publishes only branding and title metadata, never private directory data', async () => {
+	it('publishes only public branding metadata, never private directory data', async () => {
 		const captured = event();
 		const before = JSON.stringify(captured.locals);
 		const data = await load(captured);
@@ -89,6 +96,22 @@ describe('public branding layout data', () => {
 		}
 		expect(JSON.stringify(captured.locals)).toBe(before);
 		expect(readMountedImage).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		{ name: 'public text', description: 'Public site description' },
+		{ name: 'empty text', description: '' },
+		{ name: 'whitespace', description: ' \t\n ' },
+		{
+			name: 'full, unescaped text',
+			description: `  <Home> & "family"\n${'Full text. '.repeat(200)}  `
+		}
+	])('publishes the public site description with $name', async ({ description }) => {
+		const data = await load(event({ description }));
+		expect(data).toEqual({
+			...expectedData(),
+			document: { ...expectedData().document, description }
+		});
 	});
 
 	it('preserves explicit bundled favicon and logo selections', async () => {
@@ -122,73 +145,54 @@ describe('public branding layout data', () => {
 	});
 
 	it.each([
-		[
-			'https://directory.example.test',
-			'http://internal.test:8080/signin?callbackUrl=%2Fsecret#private'
-		],
-		['http://localhost:3000', 'https://internal.test/signin?callbackUrl=%2Fsecret#private'],
-		[null, 'https://public.example.test:8443/signin?callbackUrl=%2Fsecret#private'],
-		[null, 'http://localhost:5173/private/path?link=secret#private']
-	] as const)(
-		'uses canonical origin %s for request %s, with no query or path',
-		async (origin, url) => {
-			const captured = event({}, { origin, url });
+		{
+			siteUrl: 'https://directory.example.test',
+			url: 'http://internal.test:8080/signin?callbackUrl=%2Fsecret#private',
+			withAuth: true
+		},
+		{
+			siteUrl: 'http://localhost:3000',
+			url: 'https://internal.test/signin?callbackUrl=%2Fsecret#private',
+			withAuth: true
+		},
+		{
+			siteUrl: 'https://public.example.test:8443',
+			url: 'http://localhost:5173/private/path?link=secret#private',
+			withAuth: false
+		},
+		{
+			siteUrl: 'http://public.test:8080',
+			url: 'https://untrusted.test/private?tracking=ignored#fragment',
+			withAuth: false
+		}
+	])(
+		'uses configured site URL $siteUrl rather than request $url (auth: $withAuth)',
+		async ({ siteUrl, url, withAuth }) => {
+			const captured = event({}, { siteUrl, url, withAuth });
 			const metadata = (await load(captured)).document;
-			expect(metadata.url).toBe(`${origin ?? captured.url.origin}/`);
-			expect(metadata.image.url).toBe(`${origin ?? captured.url.origin}/images/og.png`);
+			expect(metadata.url).toBe(`${siteUrl}/`);
+			expect(metadata.image.url).toBe(`${siteUrl}/images/og.png`);
 		}
 	);
 
 	it.each([
-		{ name: 'native HTTP', tls: false, origin: null, expected: 'http://public.test:8080' },
-		{ name: 'native TLS', tls: true, origin: null, expected: 'https://public.test:8080' },
-		{
-			name: 'auth canonical override',
-			tls: false,
-			origin: 'https://canonical.test',
-			expected: 'https://canonical.test'
-		},
-		{
-			name: 'explicit trusted protocol header',
-			tls: false,
-			origin: null,
-			protocolHeader: 'x-forwarded-proto',
-			expected: 'https://public.test:8080'
-		}
-	])('uses $name for production metadata', async ({ tls, origin, protocolHeader, expected }) => {
-		env.PROTOCOL_HEADER = protocolHeader;
-		const socket = tls ? new TLSSocket(new Socket()) : new Socket();
-		const req = new IncomingMessage(socket);
-		// Unconfigured forwarded headers must not override the actual transport.
-		req.headers['x-forwarded-proto'] = 'https';
-		req.headers.forwarded = 'proto=https;host=untrusted.test';
-		try {
-			const captured = event(
-				{},
-				{
-					origin,
-					url: 'https://public.test:8080/private?tracking=ignored#fragment',
-					platform: { req }
-				}
-			);
-			const metadata = (await load(captured)).document;
-			expect(metadata.url).toBe(`${expected}/`);
-			expect(metadata.image.url).toBe(`${expected}/images/og.png`);
-		} finally {
-			socket.destroy();
-		}
-	});
-
-	it('uses the URL origin in dev without a native request', async () => {
+		{ env: {}, expected: 'http://localhost:3000' },
+		{ env: { PORT: '5173' }, expected: 'http://localhost:5173' },
+		{ env: { PORT: '8080' }, expected: 'http://localhost:8080' }
+	])('uses the resolved default site URL $expected', async ({ env, expected }) => {
 		const captured = event(
 			{},
 			{
-				origin: null,
-				url: 'http://localhost:5173/private?tracking=ignored',
-				platform: {}
+				siteUrl: null,
+				withAuth: false,
+				url: 'https://untrusted.test:8443/private?tracking=ignored#fragment',
+				env
 			}
 		);
-		expect((await load(captured)).document.url).toBe('http://localhost:5173/');
+		expect(captured.locals.snapshot.configuration.site.url).toBe(expected);
+		const metadata = (await load(captured)).document;
+		expect(metadata.url).toBe(`${expected}/`);
+		expect(metadata.image.url).toBe(`${expected}/images/og.png`);
 	});
 
 	it('uses a readable custom image at its own URL, preserving its actual MIME type', async () => {

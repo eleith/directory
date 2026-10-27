@@ -31,7 +31,7 @@ const authJsLogger: NonNullable<SvelteKitAuthConfig['logger']> = {
 	debug() {}
 };
 
-export function createAuthentication(config: DirectoryAuth): Authentication {
+export function createAuthentication(config: DirectoryAuth & { origin: string }): Authentication {
 	const { origin } = config;
 	const secret = config.secret ?? randomBytes(32).toString('base64');
 	const strategy = config.credentials ? 'credentials' : 'oidc';

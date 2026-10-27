@@ -32,7 +32,7 @@ interface ServerOptions {
 	publicDir?: string;
 	/** Explicit YAML secret; omitted by default so the runtime generates its own. */
 	secret?: string;
-	/** Value for the fixture's ${TEST_ORIGIN}; defaults to the allocated localhost URL. */
+	/** Value for an explicit fixture site.url: '${TEST_ORIGIN}'; defaults to the allocated URL. */
 	origin?: string;
 	port?: number;
 	/** Deliberately injected process env, e.g. hostile legacy auth settings. */

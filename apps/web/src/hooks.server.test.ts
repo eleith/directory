@@ -71,10 +71,14 @@ function snapshot(title: string, light = '#13579b', dark = '#c4d6e8') {
 	return realSnapshot.prepareSnapshot(
 		validateConfig(
 			{
-				site: { title, description: `${title} description`, favicon_path: '/public/site.svg' },
+				site: {
+					url: 'https://directory.example.com',
+					title,
+					description: `${title} description`,
+					favicon_path: '/public/site.svg'
+				},
 				appearance: { primary_light_color: light, primary_dark_color: dark },
 				auth: {
-					origin: 'https://directory.example.com',
 					secret: sentinel,
 					credentials: { username: 'family', password: sentinel }
 				},

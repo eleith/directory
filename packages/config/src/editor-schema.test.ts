@@ -7,7 +7,7 @@ import {
 	configurationReferences,
 	HexColorSchema,
 	HttpUrlSchema,
-	AuthOriginSchema,
+	SiteUrlSchema,
 	LocalImagePathSchema,
 	DirectoryConfigurationSchema
 } from './schema.js';
@@ -62,23 +62,24 @@ describe('default-aware editor schema', () => {
 			'client_secret'
 		]);
 		const authBranches = definition(editor, 'Auth').anyOf as ObjectSchema[];
-		expect(authBranches.map((branch) => branch.required)).toEqual([
-			['origin', 'oidc'],
-			['origin', 'credentials']
-		]);
+		expect(authBranches.map((branch) => branch.required)).toEqual([['oidc'], ['credentials']]);
 		expect(authBranches.every((branch) => branch.additionalProperties === false)).toBe(true);
 		expect(property(editor, 'links').additionalProperties).toBe(false);
 		expect(object((definition(editor, 'HttpUrl').anyOf as unknown[])[0]).format).toBe('uri');
 	});
 
-	it('keeps auth origin required and secret optional, constrained and without defaults', () => {
+	it('defaults site.url and keeps auth secret optional, constrained and without defaults', () => {
 		const editor = createEditorSchema();
 		for (const branch of definition(editor, 'Auth').anyOf as ObjectSchema[]) {
-			expect(property(branch, 'origin')).toEqual({ $ref: '#/$defs/AuthOrigin' });
+			expect(object(branch.properties)).not.toHaveProperty('origin');
 			expect(property(branch, 'secret')).toEqual({ $ref: '#/$defs/AuthSecret' });
 			expect(branch.required).not.toContain('secret');
 		}
-		const origin = definition(editor, 'AuthOrigin');
+		const origin = definition(editor, 'SiteUrl');
+		expect(property(definition(editor, 'Site'), 'url')).toEqual({
+			$ref: '#/$defs/SiteUrl',
+			default: 'http://localhost:3000'
+		});
 		const secret = definition(editor, 'AuthSecret');
 		expect(secret).not.toHaveProperty('default');
 		expect((secret.anyOf as ObjectSchema[])[0]).toEqual({
@@ -211,12 +212,7 @@ describe('default-aware editor schema', () => {
 
 	it('separates literal constraints from the environment-token branch', () => {
 		const editor = createEditorSchema();
-		for (const canonical of [
-			HttpUrlSchema,
-			AuthOriginSchema,
-			LocalImagePathSchema,
-			HexColorSchema
-		]) {
+		for (const canonical of [HttpUrlSchema, SiteUrlSchema, LocalImagePathSchema, HexColorSchema]) {
 			const adapted = definition(editor, canonical.$id!);
 			const literal: ObjectSchema = { type: 'string', pattern: canonical.pattern };
 			if (canonical.format) literal.format = 'uri';
@@ -360,7 +356,7 @@ describe('default-aware editor schema', () => {
 	});
 
 	it('leaves canonical validation strict for placeholders and expanded values', () => {
-		for (const schema of [HttpUrlSchema, AuthOriginSchema, LocalImagePathSchema, HexColorSchema]) {
+		for (const schema of [HttpUrlSchema, SiteUrlSchema, LocalImagePathSchema, HexColorSchema]) {
 			expect(Value.Check(schema, '${VALUE}')).toBe(false);
 			expect(Value.Check(schema, false)).toBe(false);
 			expect(Value.Check(schema, 1)).toBe(false);

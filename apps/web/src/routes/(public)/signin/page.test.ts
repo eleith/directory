@@ -12,12 +12,12 @@ function eventFor(query = '', strategy: Authentication['strategy'] = 'credential
 		validateConfig(
 			{
 				site: {
+					url: 'https://private-auth.example.test',
 					title: 'Home Server',
 					description: 'PRIVATE_DESCRIPTION',
 					logo_path: '/public/private.svg'
 				},
 				auth: {
-					origin: 'https://private-auth.example.test',
 					secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
 					credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
 				},

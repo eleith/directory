@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspect } from 'node:util';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createEditorSchema } from './editor-schema.js';
 import { ConfigError } from './errors.js';
 import { configurationReferences, DirectoryConfigurationSchema } from './schema.js';
@@ -68,6 +68,7 @@ describe('default, interpolate, then validate', () => {
 		const config = validateConfig(raw, { env: {} });
 		expect(config.version).toBe(1);
 		expect(config.site).toEqual({
+			url: 'http://localhost:3000',
 			title: 'Directory',
 			description: '',
 			footer: '',
@@ -139,6 +140,7 @@ describe('default, interpolate, then validate', () => {
 		const before = structuredClone(raw);
 		const config = validateConfig(raw, { env: {} });
 		expect(config.site).toEqual({
+			url: 'http://localhost:3000',
 			title: 'Directory',
 			description: '',
 			footer: '',
@@ -275,25 +277,27 @@ describe('default, interpolate, then validate', () => {
 
 	it('loads either complete auth strategy and never fills missing credentials', () => {
 		const credentials = validateConfig(
-			{ links: {}, auth: { origin, credentials: { username: 'family', password: '${PASSWORD}' } } },
+			{
+				links: {},
+				site: { url: origin },
+				auth: { credentials: { username: 'family', password: '${PASSWORD}' } }
+			},
 			{ env: { PASSWORD: sentinel } }
 		);
 		expect(credentials.auth).toEqual({
-			origin,
 			credentials: { username: 'family', password: sentinel }
 		});
 		const oidc = validateConfig(
 			{
 				links: {},
+				site: { url: origin },
 				auth: {
-					origin,
 					oidc: { issuer: '${ISSUER}', client_id: 'directory', client_secret: '${SECRET}' }
 				}
 			},
 			{ env: { ISSUER: 'https://identity.example.com', SECRET: sentinel } }
 		);
 		expect(oidc.auth).toEqual({
-			origin,
 			oidc: {
 				issuer: 'https://identity.example.com',
 				client_id: 'directory',
@@ -327,19 +331,20 @@ describe('default, interpolate, then validate', () => {
 		{ links: {}, site: { favicon_path: false } },
 		{ links: {}, auth: {} },
 		{ links: {}, auth: null },
-		{ links: {}, auth: { origin, credentials: {} } },
+		{ links: {}, site: { url: origin }, auth: { credentials: {} } },
 		{
 			links: {},
-			auth: { origin, oidc: { issuer: 'https://identity.example.com', client_id: 'directory' } }
+			site: { url: origin },
+			auth: { oidc: { issuer: 'https://identity.example.com', client_id: 'directory' } }
 		},
 		{
 			links: {},
-			auth: { origin, credentials: { username: 'family', password: 'test' }, oidc: null }
+			site: { url: origin },
+			auth: { credentials: { username: 'family', password: 'test' }, oidc: null }
 		},
 		{
 			links: {},
 			auth: {
-				origin,
 				credentials: { username: 'family', password: 'test' },
 				oidc: {
 					issuer: 'https://identity.example.com',
@@ -380,7 +385,11 @@ describe('default, interpolate, then validate', () => {
 		expect(invalid.issues[0]?.path).toBe('/links/*/url');
 		const badAuth = configurationError(() =>
 			validateConfig(
-				{ links: {}, auth: { origin, credentials: { username: sentinel, password: {} } } },
+				{
+					links: {},
+					site: { url: origin },
+					auth: { credentials: { username: sentinel, password: {} } }
+				},
 				{ env: {} }
 			)
 		);
@@ -391,6 +400,125 @@ describe('default, interpolate, then validate', () => {
 			)
 		);
 		for (const error of [missing, invalid, badAuth, badKey]) expectRedacted(error);
+	});
+});
+
+describe('runtime site URL defaults', () => {
+	it.each([
+		{ env: {}, url: 'http://localhost:3000' },
+		{ env: { NODE_ENV: 'production' }, url: 'http://localhost:3000' },
+		{ env: { NODE_ENV: 'test' }, url: 'http://localhost:3000' },
+		{ env: { NODE_ENV: 'development' }, url: 'http://localhost:5173' },
+		{ env: { PORT: '8080' }, url: 'http://localhost:8080' },
+		{ env: { PORT: '65535', NODE_ENV: 'development' }, url: 'http://localhost:65535' },
+		{ env: { PORT: '1' }, url: 'http://localhost:1' },
+		{ env: { PORT: '80' }, url: 'http://localhost' },
+		{
+			env: { HOST: 'public.example.com', LISTEN_FDS: '0', SOCKET_PATH: '' },
+			url: 'http://localhost:3000'
+		}
+	])('resolves omissions using only the supplied environment: $env', ({ env, url }) => {
+		for (const site of [undefined, {}, { title: 'Home' }]) {
+			const raw = { links: {}, ...(site ? { site } : {}) };
+			const before = structuredClone(raw);
+			const environment = Object.freeze({ ...env });
+			expect(validateConfig(raw, { env: environment }).site.url).toBe(url);
+			expect(validateConfig(raw, { env: environment }).site.url).toBe(url);
+			expect(raw).toEqual(before);
+			expect(environment).toEqual(env);
+		}
+	});
+
+	it('uses process.env consistently, without leaking it into an injected environment', () => {
+		try {
+			vi.stubEnv('NODE_ENV', 'development');
+			vi.stubEnv('PORT', undefined);
+			vi.stubEnv('SOCKET_PATH', undefined);
+			vi.stubEnv('LISTEN_FDS', undefined);
+			expect(validateConfig({ links: {} }).site.url).toBe('http://localhost:5173');
+			expect(validateConfig({ links: {} }, { env: {} }).site.url).toBe('http://localhost:3000');
+			vi.stubEnv('PORT', '8080');
+			expect(validateConfig({ links: {} }).site.url).toBe('http://localhost:8080');
+			expect(validateConfig({ links: {} }, { env: process.env }).site.url).toBe(
+				'http://localhost:8080'
+			);
+			expect(process.env.PORT).toBe('8080');
+		} finally {
+			vi.unstubAllEnvs();
+		}
+	});
+
+	it.each([
+		'',
+		' ',
+		'-1',
+		'+3000',
+		'65536',
+		'1.5',
+		'1e3',
+		'0x10',
+		'NaN',
+		'Infinity',
+		'3000\n',
+		sentinel
+	])('rejects invalid fallback PORT %j with a redacted site URL error', (PORT) => {
+		const error = configurationError(() => validateConfig({ links: {} }, { env: { PORT } }));
+		expect(error.issues).toMatchObject([{ code: 'invalid_value', path: '/site/url' }]);
+		expectRedacted(error);
+	});
+
+	it.each([
+		{ PORT: '0' },
+		{ PORT: '00' },
+		{ SOCKET_PATH: '/private/socket' },
+		{ LISTEN_FDS: '1' },
+		{ LISTEN_FDS: '2', PORT: '3000' }
+	])('requires an explicit URL for random ports or sockets: %j', (env) => {
+		const error = configurationError(() => validateConfig({ links: {} }, { env }));
+		expect(error.issues).toMatchObject([{ code: 'invalid_value', path: '/site/url' }]);
+		expect(error.message).toContain('Set site.url explicitly');
+		expect(error.message).not.toContain('/private/socket');
+	});
+
+	it.each([
+		{ PORT: '0' },
+		{ PORT: sentinel },
+		{ SOCKET_PATH: '/private/socket' },
+		{ LISTEN_FDS: '3', PORT: '0' },
+		{ NODE_ENV: 'development', PORT: '8080' }
+	])(
+		'preserves explicit and interpolated URLs regardless of listener settings: %j',
+		async (env) => {
+			for (const url of [origin, '${PUBLIC_URL}']) {
+				const config = await loadYaml(`site:\n  url: '${url}'\nlinks: {}\n`, {
+					...env,
+					PUBLIC_URL: origin
+				});
+				expect(config.site.url).toBe(origin);
+			}
+		}
+	);
+
+	it.each([null, '', false, 8080, [], {}, 'not an origin'])(
+		'does not treat an explicit invalid URL as omitted: %j',
+		(url) => {
+			const error = configurationError(() =>
+				validateConfig({ links: {}, site: { url } }, { env: { PORT: '0' } })
+			);
+			expect(error.issues.length).toBeGreaterThan(0);
+			expect(error.issues.every((issue) => issue.path === '/site/url')).toBe(true);
+			expect(error.message).not.toContain('Set site.url explicitly');
+		}
+	);
+
+	it('keeps defaults stable across repeated file loads and resolved configuration validation', async () => {
+		const env = Object.freeze({ NODE_ENV: 'development', PORT: '8080' });
+		const initial = await loadYaml('links: {}', env);
+		const reloaded = await loadYaml('links: {}', env);
+		expect(reloaded).toEqual(initial);
+		expect(validateConfig(initial, { env: { PORT: '0', SOCKET_PATH: '/private/socket' } })).toEqual(
+			initial
+		);
 	});
 });
 
@@ -498,6 +626,7 @@ describe('YAML file loader', () => {
 		expect(config.links).toEqual({});
 		expect(config).not.toHaveProperty('auth');
 		expect(config.site).toEqual({
+			url: 'http://localhost:3000',
 			title: 'Directory',
 			description: '',
 			footer: '',
@@ -523,8 +652,9 @@ describe('YAML file loader', () => {
 		const secret = 'test-only-secret-0123456789abcdef';
 		const config = await loadYaml(
 			`links: {}
+site:
+  url: '\${PUBLIC_ORIGIN}'
 auth:
-  origin: '\${PUBLIC_ORIGIN}'
   secret: '\${SESSION_SECRET}'
   credentials:
     username: family
@@ -532,8 +662,8 @@ auth:
 `,
 			{ PUBLIC_ORIGIN: origin, SESSION_SECRET: secret, PASSWORD: sentinel }
 		);
+		expect(config.site.url).toBe(origin);
 		expect(config.auth).toEqual({
-			origin,
 			secret,
 			credentials: { username: 'family', password: sentinel }
 		});

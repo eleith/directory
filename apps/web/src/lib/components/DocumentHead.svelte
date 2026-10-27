@@ -8,6 +8,9 @@
 	<link rel="icon" href={faviconPath} />
 	<meta property="og:type" content="website" />
 	<meta property="og:title" content={metadata.title} />
+	{#if metadata.description.trim()}
+		<meta property="og:description" content={metadata.description} />
+	{/if}
 	<meta property="og:site_name" content={metadata.title} />
 	<meta property="og:url" content={metadata.url} />
 	<meta property="og:image" content={metadata.image.url} />

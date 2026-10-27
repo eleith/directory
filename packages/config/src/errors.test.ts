@@ -23,9 +23,16 @@ describe('redacted configuration errors', () => {
 			{ code: 'invalid_value', path: '/properties' },
 			{ code: 'invalid_value', path: '/Site' },
 			{ code: 'invalid_value', path: '/Directory' },
-			{ code: 'invalid_value', path: '/site/order' }
+			{ code: 'invalid_value', path: '/site/order' },
+			{ code: 'invalid_value', path: '/auth/origin' }
 		]);
-		expect(error.issues.map((issue) => issue.path)).toEqual(['/*', '/*', '/*', '/site/*']);
+		expect(error.issues.map((issue) => issue.path)).toEqual([
+			'/*',
+			'/*',
+			'/*',
+			'/site/*',
+			'/auth/*'
+		]);
 	});
 
 	it('formats fixed messages with their redacted paths', () => {

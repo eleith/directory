@@ -229,11 +229,9 @@ describe('prepareDirectoryContent', () => {
 
 	it.each([
 		{
-			origin: 'https://directory.example.com',
 			credentials: { username: 'private-user', password: '${PRIVATE_VALUE}' }
 		},
 		{
-			origin: 'https://directory.example.com',
 			oidc: {
 				issuer: 'https://identity.example.com',
 				client_id: 'private-client',
@@ -243,7 +241,7 @@ describe('prepareDirectoryContent', () => {
 	])('does not copy auth, loading metadata, environment or future fields', (auth) => {
 		const sentinel = 'PRIVATE-SENTINEL-DO-NOT-COPY';
 		const config = validateConfig(
-			{ links: { photos: destination }, auth },
+			{ site: { url: 'https://directory.example.com' }, links: { photos: destination }, auth },
 			{
 				env: { PRIVATE_VALUE: sentinel }
 			}

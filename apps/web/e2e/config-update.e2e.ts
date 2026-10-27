@@ -5,8 +5,8 @@ import { expect, test, type APIRequestContext, type Page, type Route } from '@pl
 import {
 	configuration,
 	password,
-	privateDescription,
 	privateSentinels,
+	siteDescription,
 	siteTitle,
 	username
 } from './support/configuration.js';
@@ -23,7 +23,7 @@ const initialConfiguration =
 `;
 const updatedConfiguration = initialConfiguration
 	.replace(siteTitle, updatedTitle)
-	.replace(privateDescription, updatedDescription)
+	.replace(siteDescription, updatedDescription)
 	.replace('#13579b', '#2468ac');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const search = (page: Page) => page.getByRole('searchbox', { name: 'Search', exact: true });
@@ -198,7 +198,7 @@ test('an accepted edit leaves the current document and typed URL alone until nat
 	await expect(page).toHaveTitle(siteTitle);
 	await expect(page.locator('meta[name="description"]')).toHaveAttribute(
 		'content',
-		privateDescription
+		siteDescription
 	);
 	await expect(search(page)).toHaveValue('tag:PRIVATE_C6_TAG');
 	await expect(search(page)).toBeFocused();

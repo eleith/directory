@@ -49,7 +49,6 @@ describe('credentials', () => {
 	it('uses the native Credentials provider and captures configuration', async () => {
 		const configured = { ...credentials };
 		const provider = buildProviders({
-			origin: 'https://directory.example',
 			credentials: configured
 		})[0];
 		expect(provider).toMatchObject({ id: 'credentials', type: 'credentials' });
@@ -70,7 +69,6 @@ describe('credentials', () => {
 it('explicitly requires OIDC PKCE, state and nonce without adding schema fields', () => {
 	expect(
 		buildProviders({
-			origin: 'https://directory.example',
 			oidc: { issuer: 'https://issuer.example', client_id: 'client', client_secret: 'secret' }
 		})
 	).toEqual([

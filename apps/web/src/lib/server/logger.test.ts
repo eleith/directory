@@ -67,20 +67,20 @@ describe('safe server reporting', () => {
 		expect(output).toHaveBeenCalledExactlyOnceWith('Application startup failed (prepare_failed).');
 	});
 
-	it('reports auth schema issue paths without configuration values or legacy hints', () => {
+	it('reports site and auth schema issue paths without configuration values or legacy hints', () => {
 		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
 		reportStartupFailure(
 			new DirectoryError({
 				code: 'load_failed',
 				issues: new ConfigError([
-					{ code: 'invalid_value', path: '/auth/origin' },
+					{ code: 'invalid_value', path: '/site/url' },
 					{ code: 'invalid_value', path: '/auth/secret' }
 				]).issues.map((detail) => ({ ...detail, message: sentinel }))
 			})
 		);
 		expect(output.mock.calls).toEqual([
 			['Application startup failed (load_failed).'],
-			['  /auth/origin (invalid_value)'],
+			['  /site/url (invalid_value)'],
 			['  /auth/secret (invalid_value)']
 		]);
 	});

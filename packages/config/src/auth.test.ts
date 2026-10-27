@@ -2,7 +2,7 @@ import { inspect } from 'node:util';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { ConfigError } from './errors.js';
 import { validateConfig } from './load.js';
-import type { DirectoryAuth } from './types.js';
+import type { DirectoryAuth, DirectorySite } from './types.js';
 
 const origin = 'https://directory.example.com';
 const secret = 'test-only-secret-0123456789abcdef';
@@ -25,8 +25,15 @@ const acceptedOrigins = [
 	'http://localhost',
 	'http://localhost:3000',
 	'http://localhost:443',
-	'http://localhost:0',
 	'http://localhost:65535'
+];
+const insecureAuthOrigins = [
+	'http://directory.example.com',
+	'http://127.0.0.1:3000',
+	'http://[::1]:3000',
+	'http://localhost.example.com',
+	'http://sub.localhost',
+	'http://localhost.'
 ];
 const rejectedOrigins = [
 	'',
@@ -38,12 +45,6 @@ const rejectedOrigins = [
 	'javascript:alert(1)',
 	'https://',
 	'https://[broken',
-	'http://directory.example.com',
-	'http://127.0.0.1:3000',
-	'http://[::1]:3000',
-	'http://localhost.example.com',
-	'http://sub.localhost',
-	'http://localhost.',
 	'https://user:password@directory.example.com',
 	'https://@directory.example.com',
 	'https://directory.example.com/',
@@ -66,6 +67,8 @@ const rejectedOrigins = [
 	'https://directory.example.com:443',
 	'http://localhost:80',
 	'http://localhost:03000',
+	'http://localhost:0',
+	'https://directory.example.com:0',
 	'http://localhost:',
 	'http://localhost:65536',
 	'https://directory.example.com:008443',
@@ -81,17 +84,72 @@ const rejectedOrigins = [
 ];
 
 // These fields share validators across strategies; exercise URL attack classes once.
-describe('canonical auth origins', () => {
+describe('canonical auth site URLs', () => {
 	it.each(acceptedOrigins)('accepts %j', (origin) => {
-		expect(validateConfig({ links: {}, auth: { origin, credentials } }).auth?.origin).toBe(origin);
+		expect(
+			validateConfig({ links: {}, site: { url: origin }, auth: { credentials } }).site.url
+		).toBe(origin);
 	});
 
-	it.each([...rejectedOrigins, null, false, 3000, [], {}])(
+	it.each([...insecureAuthOrigins, ...rejectedOrigins, null, false, 3000, [], {}])(
 		'rejects rather than normalizing %j',
 		(origin) => {
-			expect(() => validateConfig({ links: {}, auth: { origin, credentials } })).toThrow(
-				ConfigError
-			);
+			expect(() =>
+				validateConfig({ links: {}, site: { url: origin }, auth: { credentials } })
+			).toThrow(ConfigError);
+		}
+	);
+});
+
+describe('canonical open site URLs', () => {
+	it.each([
+		...acceptedOrigins,
+		...insecureAuthOrigins,
+		'http://example.com:8080',
+		'http://[2001:db8::1]'
+	])('accepts canonical HTTP(S) without authentication: %j', (url) => {
+		expect(validateConfig({ links: {}, site: { url } }, { env: {} }).site.url).toBe(url);
+	});
+
+	it.each([
+		...rejectedOrigins,
+		'http://example.com:80',
+		'http://example.com/',
+		'http://EXAMPLE.com',
+		null,
+		false,
+		3000,
+		[],
+		{}
+	])('rejects rather than normalizing %j', (url) => {
+		expect(() => validateConfig({ links: {}, site: { url } }, { env: {} })).toThrow(ConfigError);
+	});
+
+	it.each(strategies)('rejects old auth.origin for $name, even with site.url', ({ strategy }) => {
+		for (const site of [undefined, { url: origin }]) {
+			expect(() =>
+				validateConfig(
+					{ links: {}, ...(site ? { site } : {}), auth: { origin, ...strategy } },
+					{ env: {} }
+				)
+			).toThrow(ConfigError);
+		}
+	});
+
+	it.each(strategies)(
+		'reports HTTPS security violations at /site/url for $name',
+		({ strategy }) => {
+			for (const url of insecureAuthOrigins) {
+				try {
+					validateConfig({ links: {}, site: { url }, auth: strategy }, { env: {} });
+					expect.fail('Expected HTTPS requirement');
+				} catch (error) {
+					expect(error).toBeInstanceOf(ConfigError);
+					expect((error as ConfigError).issues).toMatchObject([
+						{ code: 'invalid_value', path: '/site/url' }
+					]);
+				}
+			}
 		}
 	);
 });
@@ -101,7 +159,8 @@ describe('optional auth secrets', () => {
 		'preserves a supplied secret verbatim',
 		(secret) => {
 			expect(
-				validateConfig({ links: {}, auth: { origin, secret, credentials } }).auth?.secret
+				validateConfig({ links: {}, site: { url: origin }, auth: { secret, credentials } }).auth
+					?.secret
 			).toBe(secret);
 		}
 	);
@@ -109,16 +168,17 @@ describe('optional auth secrets', () => {
 	it.each([null, false, 32, [], {}, '', 'x'.repeat(31), ' '.repeat(32)])(
 		'rejects invalid explicit secret %j',
 		(secret) => {
-			expect(() => validateConfig({ links: {}, auth: { origin, secret, credentials } })).toThrow(
-				ConfigError
-			);
+			expect(() =>
+				validateConfig({ links: {}, site: { url: origin }, auth: { secret, credentials } })
+			).toThrow(ConfigError);
 		}
 	);
 });
 
 describe('auth strategy boundary', () => {
-	it('retains required origin and optional secret types', () => {
-		expectTypeOf<DirectoryAuth['origin']>().toEqualTypeOf<string>();
+	it('retains required site URL and originless auth with optional secret types', () => {
+		expectTypeOf<DirectorySite['url']>().toEqualTypeOf<string>();
+		expectTypeOf<DirectoryAuth>().not.toHaveProperty('origin');
 		expectTypeOf<DirectoryAuth['secret']>().toEqualTypeOf<string | undefined>();
 	});
 
@@ -129,17 +189,20 @@ describe('auth strategy boundary', () => {
 	});
 
 	it.each(strategies)(
-		'requires an explicit origin for $name and never generates a secret',
+		'defaults site URL for $name and never generates a secret',
 		({ strategy }) => {
 			const env = { ORIGIN: origin, AUTH_SECRET: secret };
-			expect(() => validateConfig({ links: {}, auth: strategy }, { env })).toThrow(ConfigError);
-			const raw = { links: {}, auth: { origin, ...strategy } };
+			expect(validateConfig({ links: {}, auth: strategy }, { env }).site.url).toBe(
+				'http://localhost:3000'
+			);
+			const raw = { links: {}, site: { url: origin }, auth: { ...strategy } };
 			const before = structuredClone(raw);
 			expect(validateConfig(raw, { env }).auth).toEqual(raw.auth);
 			expect(validateConfig(raw, { env }).auth).not.toHaveProperty('secret');
 			expect(raw).toEqual(before);
-			expect(validateConfig({ links: {}, auth: { origin, secret, ...strategy } }).auth).toEqual({
-				origin,
+			expect(
+				validateConfig({ links: {}, site: { url: origin }, auth: { secret, ...strategy } }).auth
+			).toEqual({
 				secret,
 				...strategy
 			});
@@ -148,10 +211,10 @@ describe('auth strategy boundary', () => {
 
 	it('applies the shared origin and secret constraints to OIDC too', () => {
 		expect(() =>
-			validateConfig({ links: {}, auth: { origin: 'http://directory.example.com', oidc } })
+			validateConfig({ links: {}, site: { url: 'http://directory.example.com' }, auth: { oidc } })
 		).toThrow(ConfigError);
 		expect(() =>
-			validateConfig({ links: {}, auth: { origin, secret: 'x'.repeat(31), oidc } })
+			validateConfig({ links: {}, site: { url: origin }, auth: { secret: 'x'.repeat(31), oidc } })
 		).toThrow(ConfigError);
 	});
 });
@@ -160,23 +223,26 @@ describe('auth interpolation and safe errors', () => {
 	it('expands origin and secret before validation without changing authored input', () => {
 		const raw = {
 			links: {},
-			auth: { origin: '${PUBLIC_ORIGIN:-http://localhost:3000}', secret: '${SECRET}', credentials }
+			site: { url: '${PUBLIC_ORIGIN:-http://localhost:3000}' },
+			auth: { secret: '${SECRET}', credentials }
 		};
 		const before = structuredClone(raw);
+		expect(validateConfig(raw, { env: { PUBLIC_ORIGIN: origin, SECRET: secret } }).site.url).toBe(
+			origin
+		);
+		expect(validateConfig(raw, { env: { SECRET: secret } }).site.url).toBe('http://localhost:3000');
 		expect(validateConfig(raw, { env: { PUBLIC_ORIGIN: origin, SECRET: secret } }).auth).toEqual({
-			origin,
 			secret,
 			credentials
 		});
 		expect(validateConfig(raw, { env: { SECRET: secret } }).auth).toEqual({
-			origin: 'http://localhost:3000',
 			secret,
 			credentials
 		});
 		expect(raw).toEqual(before);
 	});
 
-	it.each(['origin', 'secret'] as const)(
+	it.each(['url', 'secret'] as const)(
 		'redacts invalid literal, expanded and missing %s',
 		(field) => {
 			const sentinel = 'SENTINEL-NEVER-LOG-THIS';
@@ -187,7 +253,11 @@ describe('auth interpolation and safe errors', () => {
 			]) {
 				try {
 					validateConfig(
-						{ links: {}, auth: { origin, secret, credentials, [field]: value } },
+						{
+							links: {},
+							site: { url: field === 'url' ? value : origin },
+							auth: { secret: field === 'secret' ? value : secret, credentials }
+						},
 						{ env }
 					);
 					expect.fail('Expected invalid auth');
@@ -206,7 +276,7 @@ describe('auth interpolation and safe errors', () => {
 					expect(error).not.toHaveProperty('cause');
 					if (value.startsWith('${') && !env.PRIVATE_VALUE) {
 						expect((error as ConfigError).issues).toMatchObject([
-							{ code: 'missing_environment', path: `/auth/${field}` }
+							{ code: 'missing_environment', path: field === 'url' ? '/site/url' : '/auth/secret' }
 						]);
 					}
 				}

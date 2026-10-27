@@ -2,6 +2,7 @@ import { Renderer, type Node } from '@takumi-rs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const branding = {
+	url: 'https://directory.example.com',
 	title: 'Home Server',
 	primaryLightColor: '#0f766e',
 	primaryDarkColor: '#5eead4'
@@ -54,6 +55,38 @@ describe('generated Open Graph images', () => {
 		expect(await generate({ ...branding, primaryDarkColor: '#fbbf24' })).not.toEqual(original);
 	});
 
+	it('renders the description and refreshes the cache when it changes', async () => {
+		const generate = await loadRenderOpenGraph();
+		const draw = vi.spyOn(Renderer.prototype, 'render');
+		const first = await generate({ ...branding, description: 'All your household apps.' });
+		expect(await generate({ ...branding, description: 'All your household apps.' })).toBe(first);
+		expect(textContent(draw.mock.calls[0]![0] as Node)).toBe(
+			branding.title + 'All your household apps.' + branding.url
+		);
+		expect(await generate({ ...branding, description: 'Photos, recipes and more.' })).not.toEqual(
+			first
+		);
+		expect(draw).toHaveBeenCalledTimes(2);
+	});
+
+	it('renders the canonical URL and refreshes the cache when it changes', async () => {
+		const generate = await loadRenderOpenGraph();
+		const draw = vi.spyOn(Renderer.prototype, 'render');
+		const first = await generate(branding);
+		expect(textContent(draw.mock.calls[0]![0] as Node)).toBe(branding.title + branding.url);
+		expect(await generate(branding)).toBe(first);
+		const url = 'https://another.example.com:8443';
+		expect(await generate({ ...branding, url })).not.toEqual(first);
+		expect(textContent(draw.mock.calls[1]![0] as Node)).toBe(branding.title + url);
+		expect(draw).toHaveBeenCalledTimes(2);
+	});
+
+	it('omits blank descriptions without changing the title-only image', async () => {
+		const generate = await loadRenderOpenGraph();
+		const original = await generate(branding);
+		expect(await generate({ ...branding, description: ' \n\t ' })).toBe(original);
+	});
+
 	it('deduplicates simultaneous renders and retains only the most recent image', async () => {
 		const generate = await loadRenderOpenGraph();
 		const draw = vi.spyOn(Renderer.prototype, 'render');
@@ -94,12 +127,14 @@ describe('generated Open Graph images', () => {
 		expectPng(await generate(branding));
 	});
 
-	it('passes the title as escaped text, not HTML or template substitutions', async () => {
+	it('passes branding as escaped text, not HTML or template substitutions', async () => {
 		const generate = await loadRenderOpenGraph();
 		const draw = vi.spyOn(Renderer.prototype, 'render');
-		const title = '<img src="https://example.test"> & {{dark}} $&';
-		await generate({ ...branding, title });
-		expect(textContent(draw.mock.calls[0]![0] as Node)).toBe(title);
+		const title = '<img src="https://example.test"> & {{description}} $&';
+		const description = '<script>not HTML</script> & {{title}} $&';
+		const url = 'https://example.test/?value=<img>&template={{title}}&replace=$&';
+		await generate({ ...branding, url, title, description });
+		expect(textContent(draw.mock.calls[0]![0] as Node)).toBe(title + description + url);
 	});
 
 	it('bounds long titles and keeps their layout on the card', async () => {
@@ -107,9 +142,26 @@ describe('generated Open Graph images', () => {
 		const draw = vi.spyOn(Renderer.prototype, 'render');
 		await generate({ ...branding, title: 'W'.repeat(2000) });
 		const call = draw.mock.calls[0]!;
-		expect(textContent(call[0] as Node)).toBe('W'.repeat(79) + '…');
+		expect(textContent(call[0] as Node)).toBe('W'.repeat(79) + '…' + branding.url);
 		const layout = await new Renderer().measure(call[0], call[1]);
 		expect(layout.children[1]!.height).toBeLessThanOrEqual(240);
+	});
+
+	it('fits a long title, description and URL on the card', async () => {
+		const generate = await loadRenderOpenGraph();
+		const draw = vi.spyOn(Renderer.prototype, 'render');
+		const url = `https://${'w'.repeat(63)}.${'w'.repeat(63)}.example.com:8443`;
+		await generate({ ...branding, url, title: 'W'.repeat(2000), description: 'W'.repeat(2000) });
+		const call = draw.mock.calls[0]!;
+		expect(textContent(call[0] as Node)).toBe('W'.repeat(79) + '…' + 'W'.repeat(159) + '…' + url);
+		const layout = await new Renderer().measure(call[0], call[1]);
+		expect(layout.children[1]!.height).toBeLessThanOrEqual(253);
+		const footer = layout.children[2]!;
+		const address = footer.children[1]!;
+		expect(address.height).toBe(28);
+		expect(address.transform[4] + address.width).toBeLessThanOrEqual(1200 - 88);
+		expect(footer.transform[5] + footer.height).toBeLessThanOrEqual(630 - 88);
+		expect(address.transform[5] + address.height).toBe(630 - 40);
 	});
 
 	it('does not fetch remote images or fonts', async () => {

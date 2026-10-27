@@ -1,18 +1,9 @@
-import { env } from '$env/dynamic/private';
 import { readMountedImage } from '../lib/server/images/read-mounted-image.js';
 import { documentMetadata } from '../lib/server/document.js';
 import type { LayoutServerLoad } from './$types';
 
-export const load = (async ({ locals, url, platform }) => {
-	const { site, auth } = locals.snapshot.configuration;
-	let origin = auth?.origin ?? url.origin;
-	if (!auth && platform?.req && !env.PROTOCOL_HEADER) {
-		// adapter-node defaults to HTTPS even on direct HTTP. Only configured proxies
-		// may override the native socket protocol via the reconstructed URL.
-		const { socket } = platform.req;
-		const protocol = 'encrypted' in socket && socket.encrypted === true ? 'https:' : 'http:';
-		origin = `${protocol}//${url.host}`;
-	}
+export const load = (async ({ locals }) => {
+	const { site } = locals.snapshot.configuration;
 	const supplied = site.og_image_path
 		? await readMountedImage(locals.publicDir, site.og_image_path)
 		: undefined;
@@ -24,8 +15,8 @@ export const load = (async ({ locals, url, platform }) => {
 		faviconPath,
 		logoPath,
 		document: documentMetadata(
-			site.title,
-			origin,
+			site,
+			site.url,
 			supplied && { path: site.og_image_path!, contentType: supplied.contentType }
 		)
 	};

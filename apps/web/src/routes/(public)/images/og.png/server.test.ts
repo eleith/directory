@@ -18,7 +18,9 @@ const favicon = { bytes: new TextEncoder().encode('<svg/>'), contentType: 'image
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 255, 0]);
 const appearance = { primary_light_color: '#123456', primary_dark_color: '#abc' };
 const branding = {
+	url: 'https://private.example',
 	title: 'Captured home',
+	description: 'Useful household services.',
 	primaryLightColor: '#123456',
 	primaryDarkColor: '#abc'
 };
@@ -28,15 +30,15 @@ function snapshot(site: Record<string, string> = {}, colors = appearance) {
 		validateConfig(
 			{
 				site: {
+					url: branding.url,
 					title: branding.title,
-					description: 'PRIVATE_SITE_DESCRIPTION',
+					description: branding.description,
 					footer: 'PRIVATE_FOOTER',
 					logo_path: '/public/private-logo.png',
 					...site
 				},
 				appearance: colors,
 				auth: {
-					origin: 'https://private.example',
 					secret: 'PRIVATE_SESSION_SECRET_12345678901234567890',
 					credentials: { username: 'PRIVATE_USER', password: 'PRIVATE_PASSWORD' }
 				},
@@ -116,7 +118,9 @@ describe('public generated Open Graph image', () => {
 			await expectPNG(await (method === 'HEAD' ? HEAD : GET)(event(method, captured)), method);
 			expect(readMountedImage).not.toHaveBeenCalled();
 			expect(renderOpenGraph).toHaveBeenCalledExactlyOnceWith({
+				url: 'http://localhost:3000',
 				title: 'Directory',
+				description: '',
 				primaryLightColor: '#0f766e',
 				primaryDarkColor: '#5eead4',
 				favicon: undefined
@@ -158,7 +162,7 @@ describe('public generated Open Graph image', () => {
 		'ignores request path, queries and headers for %s',
 		async (method) => {
 			for (const path of [
-				'/images/og.png?file=/public/other.jpg&publicDir=/outside&title=ATTACKER',
+				'/images/og.png?file=/public/other.jpg&publicDir=/outside&title=ATTACKER&url=https://attacker.example',
 				'/images/og.png?favicon_path=/public/other.svg&og_image_path=/public/other.jpg&primary_light_color=%23fff&primary_dark_color=%23000',
 				'/images/other.png?source=%252e%252e%252fsecret.svg&title=OTHER'
 			]) {
@@ -192,7 +196,12 @@ describe('public generated Open Graph image', () => {
 		const replacement = event(
 			'GET',
 			snapshot(
-				{ title: 'Replacement', favicon_path: '/public/replacement.png' },
+				{
+					url: 'https://replacement.example',
+					title: 'Replacement',
+					description: 'Another household.',
+					favicon_path: '/public/replacement.png'
+				},
 				{ primary_light_color: '#fed', primary_dark_color: '#654321' }
 			)
 		);
@@ -218,7 +227,9 @@ describe('public generated Open Graph image', () => {
 			[{ ...branding, favicon: favicon.bytes }],
 			[
 				{
+					url: 'https://replacement.example',
 					title: 'Replacement',
+					description: 'Another household.',
 					primaryLightColor: '#fed',
 					primaryDarkColor: '#654321',
 					favicon: replacementFavicon.bytes

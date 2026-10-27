@@ -5,7 +5,9 @@ import bundledFavicon from '../../../../static/favicon.png?inline';
 import template from './open-graph.html?raw';
 
 interface OpenGraphBranding {
+	readonly url: string;
 	readonly title: string;
+	readonly description?: string | undefined;
 	readonly primaryLightColor: string;
 	readonly primaryDarkColor: string;
 	readonly favicon?: Uint8Array<ArrayBuffer> | undefined;
@@ -18,15 +20,24 @@ let cached: { key: string; image: Promise<Uint8Array<ArrayBuffer>> } | undefined
 export async function renderOpenGraph(
 	branding: OpenGraphBranding
 ): Promise<Uint8Array<ArrayBuffer>> {
-	const title = boundedTitle(branding.title);
+	const title = boundedText(branding.title, 80);
+	const description = boundedText(branding.description ?? '', 160);
 	const favicon = branding.favicon ?? defaultFavicon;
 	const key = createHash('sha256')
-		.update(JSON.stringify([title, branding.primaryLightColor, branding.primaryDarkColor]))
+		.update(
+			JSON.stringify([
+				title,
+				description,
+				branding.url,
+				branding.primaryLightColor,
+				branding.primaryDarkColor
+			])
+		)
 		.update(favicon)
 		.digest('hex');
 	if (cached?.key === key) return cached.image;
 
-	const pending = draw(title, branding, favicon);
+	const pending = draw(title, description, branding, favicon);
 	cached = { key, image: pending };
 	try {
 		return await pending;
@@ -36,19 +47,31 @@ export async function renderOpenGraph(
 	}
 }
 
-async function draw(title: string, branding: OpenGraphBranding, favicon: Uint8Array<ArrayBuffer>) {
+async function draw(
+	title: string,
+	description: string,
+	branding: OpenGraphBranding,
+	favicon: Uint8Array<ArrayBuffer>
+) {
 	const engine = await (renderer ??= import('@takumi-rs/core').then(
 		({ Renderer }) => new Renderer({ cacheMaxBytes: 8 * 1024 * 1024 })
 	));
 	let fontSize = 88;
 	if (title.length > 40) fontSize = 52;
 	else if (title.length > 20) fontSize = 68;
+	if (description) fontSize -= 16;
 	const { node, css } = fromHtml(
 		template
 			.replaceAll('{{light}}', fullHex(branding.primaryLightColor))
 			.replaceAll('{{dark}}', fullHex(branding.primaryDarkColor))
 			.replaceAll('{{fontSize}}', String(fontSize))
-			.replace('{{title}}', () => escapeHtml(title))
+			.replaceAll('{{gap}}', description ? '20' : '28')
+			.replace(/\{\{(title|description|url)\}\}/g, (_match, field: string) => {
+				if (field === 'url') return escapeHtml(branding.url);
+				if (field === 'title') return escapeHtml(title);
+				if (!description) return '';
+				return `<div class="description">${escapeHtml(description)}</div>`;
+			})
 			.replace(/>\s+</g, '><')
 			.trim()
 	);
@@ -68,10 +91,10 @@ async function draw(title: string, branding: OpenGraphBranding, favicon: Uint8Ar
 	}
 }
 
-function boundedTitle(title: string): string {
-	const characters = Array.from(title.replace(/\s+/gu, ' ').trim());
-	if (characters.length <= 80) return characters.join('');
-	return characters.slice(0, 79).join('') + '…';
+function boundedText(value: string, limit: number): string {
+	const characters = Array.from(value.replace(/\s+/gu, ' ').trim());
+	if (characters.length <= limit) return characters.join('');
+	return characters.slice(0, limit - 1).join('') + '…';
 }
 
 function fullHex(color: string): string {

@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 import { credentialsAuth, password, username } from './support/configuration.js';
 import { startServer, type TestServer } from './support/server.js';
 
-const privateDescription = 'PRIVATE_IMAGE_DESCRIPTION';
+const siteDescription = 'Useful services with familiar images.';
 const privateLogo =
 	'<svg xmlns="http://www.w3.org/2000/svg"><text>PRIVATE_IMAGE_BYTES</text></svg>';
 const privateBrand =
@@ -13,7 +13,6 @@ const privateBrand =
 const replacementImage =
 	'<svg xmlns="http://www.w3.org/2000/svg"><text>Replacement image</text></svg>';
 const privateValues = [
-	privateDescription,
 	'PRIVATE_BOOKMARK_DESCRIPTION',
 	'PRIVATE_IMAGE_BYTES',
 	'PRIVATE_BRAND_BYTES',
@@ -29,8 +28,9 @@ test.setTimeout(60_000);
 
 function configuration(auth = credentialsAuth) {
 	return `site:
+  url: '\${TEST_ORIGIN}'
   title: Configured images fixture
-  description: ${privateDescription}
+  description: ${siteDescription}
   logo_path: /public/brand logo.svg
 links:
   photos:

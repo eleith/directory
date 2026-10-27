@@ -4,9 +4,10 @@ import { DirectoryError } from './directory-error.js';
 export async function prepareRuntimeEnvironment(
 	env: NodeJS.ProcessEnv = process.env
 ): Promise<void> {
-	let origin: string | undefined;
+	let origin: string;
 	try {
-		origin = (await loadConfigFile(undefined, { env })).auth?.origin;
+		const config = await loadConfigFile(undefined, { env });
+		origin = config.site.url;
 	} catch (error) {
 		throw new DirectoryError({
 			code: 'load_failed',
@@ -14,13 +15,8 @@ export async function prepareRuntimeEnvironment(
 		});
 	}
 
-	if (origin === undefined) {
-		delete env.ORIGIN;
-		delete env.AUTH_URL;
-	} else {
-		env.ORIGIN = origin;
-		env.AUTH_URL = origin;
-	}
+	env.ORIGIN = origin;
+	env.AUTH_URL = origin;
 	env.NEXTAUTH_URL = '';
 	env.AUTH_REDIRECT_PROXY_URL = '';
 }

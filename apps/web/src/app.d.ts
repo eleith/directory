@@ -1,4 +1,3 @@
-import type { IncomingMessage } from 'node:http';
 import type { Session } from '@auth/sveltekit';
 import type { DirectoryContent } from './lib/display/types.js';
 import type { Authentication } from './lib/server/auth/index.js';
@@ -12,10 +11,6 @@ declare global {
 	}
 
 	namespace App {
-		interface Platform {
-			req?: IncomingMessage;
-		}
-
 		interface PageData {
 			directory?: DirectoryContent;
 		}

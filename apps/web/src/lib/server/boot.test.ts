@@ -27,7 +27,7 @@ const path = '/config/directory.yaml';
 const sentinel = 'PRIVATE-config-credential';
 const origin = 'https://directory.example.com';
 const frameworkEnv = { ORIGIN: origin, AUTH_URL: origin };
-const auth = { origin, credentials: { username: 'family', password: sentinel } };
+const auth = { credentials: { username: 'family', password: sentinel } };
 const authentication: Authentication = {
 	strategy: 'credentials',
 	handle: vi.fn(),
@@ -36,13 +36,13 @@ const authentication: Authentication = {
 };
 
 function configuration(title = 'Home', enabled = false): DirectoryConfiguration {
-	return validateConfig({ site: { title }, links: {}, ...(enabled ? { auth } : {}) });
+	return validateConfig({ site: { url: origin, title }, links: {}, ...(enabled ? { auth } : {}) });
 }
 
 beforeEach(() => {
 	vi.resetAllMocks();
-	vi.stubEnv('ORIGIN', undefined);
-	vi.stubEnv('AUTH_URL', undefined);
+	vi.stubEnv('ORIGIN', origin);
+	vi.stubEnv('AUTH_URL', origin);
 	mocks.path.mockReturnValue(path);
 	mocks.publicDir.mockReturnValue('/mounted/public');
 	mocks.load.mockResolvedValue(configuration());
@@ -113,46 +113,61 @@ describe('application boot wiring', () => {
 		const env = { ORIGIN: sentinel, AUTH_URL: sentinel };
 		const app = await bootApp(env, frameworkEnv);
 		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env });
-		expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(auth);
+		expect(mocks.auth).toHaveBeenCalledExactlyOnceWith({ ...auth, origin });
 		expect(mocks.auth.mock.invocationCallOrder[0]).toBeLessThan(
 			mocks.monitor.mock.invocationCallOrder[0]!
 		);
 		expect(app.authentication).toBe(authentication);
 	});
 
-	it.each([
-		{ name: 'auth added', enabled: true, prepared: undefined, privateEnv: {} },
-		{ name: 'auth removed', enabled: false, prepared: origin, privateEnv: frameworkEnv },
-		{
-			name: 'prepared process origin changed',
-			enabled: true,
-			prepared: 'https://other.example.com',
-			privateEnv: frameworkEnv
-		},
-		{
-			name: 'Kit private ORIGIN differs',
-			enabled: true,
-			prepared: origin,
-			privateEnv: { ...frameworkEnv, ORIGIN: sentinel }
-		},
-		{
-			name: 'Kit private AUTH_URL differs',
-			enabled: true,
-			prepared: origin,
-			privateEnv: { ...frameworkEnv, AUTH_URL: sentinel }
-		}
-	])(
-		'fails closed when $name before auth or monitoring',
-		async ({ enabled, prepared, privateEnv }) => {
-			vi.stubEnv('ORIGIN', prepared);
+	describe.each([false, true])('canonical URL consistency (auth enabled: %s)', (enabled) => {
+		it('boots with the prepared canonical URL regardless of auth state', async () => {
 			mocks.load.mockResolvedValueOnce(configuration('Home', enabled));
-			await expect(bootApp({}, privateEnv)).rejects.toMatchObject({
-				issue: { code: 'auth_failed' }
-			});
-			expect(mocks.auth).not.toHaveBeenCalled();
-			expect(mocks.monitor).not.toHaveBeenCalled();
-		}
-	);
+			const app = await bootApp({}, frameworkEnv);
+			expect(app.currentSnapshot().configuration.site.url).toBe(origin);
+			expect(app.authentication).toBe(enabled ? authentication : undefined);
+		});
+
+		it.each([
+			{ name: 'process ORIGIN missing', prepared: undefined, privateEnv: frameworkEnv },
+			{ name: 'process ORIGIN empty', prepared: '', privateEnv: frameworkEnv },
+			{
+				name: 'prepared process origin changed',
+				prepared: 'https://other.example.com',
+				privateEnv: frameworkEnv
+			},
+			{ name: 'Kit private URLs missing', prepared: origin, privateEnv: {} },
+			{
+				name: 'Kit private ORIGIN differs',
+				prepared: origin,
+				privateEnv: { ...frameworkEnv, ORIGIN: sentinel }
+			},
+			{
+				name: 'Kit private AUTH_URL differs',
+				prepared: origin,
+				privateEnv: { ...frameworkEnv, AUTH_URL: sentinel }
+			},
+			{
+				name: 'site.url changed after preparation',
+				prepared: origin,
+				privateEnv: frameworkEnv,
+				url: 'https://other.example.com'
+			}
+		])(
+			'fails closed when $name before auth or monitoring',
+			async ({ prepared, privateEnv, ...change }) => {
+				vi.stubEnv('ORIGIN', prepared);
+				const config = configuration('Home', enabled);
+				if ('url' in change && change.url) config.site.url = change.url;
+				mocks.load.mockResolvedValueOnce(config);
+				await expect(bootApp({}, privateEnv)).rejects.toMatchObject({
+					issue: { code: 'auth_failed' }
+				});
+				expect(mocks.auth).not.toHaveBeenCalled();
+				expect(mocks.monitor).not.toHaveBeenCalled();
+			}
+		);
+	});
 
 	it('uses the process environment when no environments are injected', async () => {
 		await bootApp();

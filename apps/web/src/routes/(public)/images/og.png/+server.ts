@@ -11,7 +11,9 @@ export const GET: RequestHandler = async ({ locals, request }) => {
 		: undefined;
 	try {
 		const bytes = await renderOpenGraph({
+			url: site.url,
 			title: site.title,
+			description: site.description,
 			primaryLightColor: appearance.primary_light_color,
 			primaryDarkColor: appearance.primary_dark_color,
 			favicon: favicon?.bytes

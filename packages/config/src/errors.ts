@@ -16,7 +16,9 @@ export interface ConfigIssue {
 	readonly message: string;
 }
 
-type IssueLocation = Pick<ConfigIssue, 'code' | 'path'>;
+type IssueLocation = Pick<ConfigIssue, 'code' | 'path'> & {
+	reason?: 'explicit_site_url_required';
+};
 
 const schemaFieldNames = new Set(
 	[DirectoryConfigurationSchema, ...configurationReferences].flatMap(getSchemaFieldNames)
@@ -51,11 +53,11 @@ function getSchemaFieldNames(schema: TSchema): string[] {
 function redactIssue(location: IssueLocation): ConfigIssue {
 	let code = location.code;
 	if (!Object.hasOwn(issueMessages, code)) code = 'invalid_value';
-	return Object.freeze({
-		code,
-		path: redactIssuePath(location.path),
-		message: issueMessages[code]
-	});
+	let message: string = issueMessages[code];
+	if (code === 'invalid_value' && location.reason === 'explicit_site_url_required') {
+		message = 'Set site.url explicitly when using a random port, socket or socket activation.';
+	}
+	return Object.freeze({ code, path: redactIssuePath(location.path), message });
 }
 
 function redactIssuePath(path: string): string {

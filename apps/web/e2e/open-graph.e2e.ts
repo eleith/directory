@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { configuration, privateSentinels, siteTitle } from './support/configuration.js';
+import {
+	configuration,
+	privateSentinels,
+	siteDescription,
+	siteTitle
+} from './support/configuration.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const generatedPath = '/images/og.png';
@@ -40,7 +45,7 @@ function expectNoPrivateData(text: string) {
 function metadata(html: string) {
 	const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
 	expect(head).toBeDefined();
-	expect(head).not.toMatch(/<meta\b[^>]*(?:name|property)=["'](?:twitter:|og:description)/i);
+	expect(head).not.toMatch(/<meta\b[^>]*(?:name|property)=["']twitter:/i);
 	const entries = [
 		...head!.matchAll(/<meta\b[^>]*property="(og:[^"]*)"[^>]*content="([^"]*)"[^>]*>/g)
 	].map((match) => [match[1], match[2]]);
@@ -56,10 +61,11 @@ async function ssr(server: TestServer, path = '/signin', headers: Record<string,
 	return response.text();
 }
 
-function expectGeneratedMetadata(html: string, origin: string) {
+function expectGeneratedMetadata(html: string, origin: string, description = siteDescription) {
 	expect(metadata(html)).toEqual({
 		'og:type': 'website',
 		'og:title': siteTitle,
+		...(description.trim() ? { 'og:description': description } : {}),
 		'og:site_name': siteTitle,
 		'og:url': `${origin}/`,
 		'og:image': `${origin}${generatedPath}`,
@@ -169,18 +175,53 @@ test('missing static image recovers without reload; one reload moves only its pu
 	}
 });
 
-for (const trustedProtocol of [false, true]) {
-	test(`no-auth SSR uses ${trustedProtocol ? 'HTTPS from the explicitly trusted header' : 'HTTP by default'}`, async () => {
+for (const configuredUrl of [false, true]) {
+	test(`no-auth SSR uses ${configuredUrl ? 'configured site.url despite request host and proxy headers' : 'HTTP localhost PORT by default despite PROTOCOL_HEADER'}`, async () => {
+		const description = configuredUrl ? 'Useful links for "family" & friends.' : siteDescription;
+		const blankDescription = configuredUrl ? '' : '   ';
+		let config = configuration('').replace(
+			JSON.stringify(siteDescription),
+			JSON.stringify(description)
+		);
+		// Leave site.url absent to exercise shared config's allocated PORT default.
+		if (!configuredUrl) config = config.replace("  url: '${TEST_ORIGIN}'\n", '');
+		const canonicalUrl = 'https://directory.example.test';
 		const server = await startServer({
-			configuration: configuration(''),
+			configuration: config,
 			publicDir,
-			...(trustedProtocol ? { env: { PROTOCOL_HEADER: 'x-forwarded-proto' } } : {})
+			...(configuredUrl ? { origin: canonicalUrl } : {}),
+			env: {
+				ORIGIN: 'https://legacy-origin.example.test',
+				AUTH_URL: 'https://legacy-auth.example.test',
+				PROTOCOL_HEADER: 'x-forwarded-proto',
+				HOST_HEADER: 'x-forwarded-host',
+				PORT_HEADER: 'x-forwarded-port'
+			}
 		});
+		const headers = {
+			host: 'foreign.example.test',
+			'x-forwarded-host': 'proxy.example.test',
+			'x-forwarded-proto': 'https',
+			'x-forwarded-port': '443',
+			forwarded: 'host=forwarded.example.test;proto=https'
+		};
 		try {
 			await server.ready();
-			const html = await ssr(server, '/', { 'x-forwarded-proto': 'https' });
-			const origin = trustedProtocol ? server.url.replace('http:', 'https:') : server.url;
-			expectGeneratedMetadata(html, origin);
+			const html = await ssr(server, '/', headers);
+			const origin = configuredUrl ? canonicalUrl : server.url;
+			// Check the wire HTML, including attribute escaping, without DOM decoding.
+			expectGeneratedMetadata(
+				html,
+				origin,
+				configuredUrl ? 'Useful links for &quot;family&quot; &amp; friends.' : description
+			);
+			await server.replace(
+				config.replace(JSON.stringify(description), JSON.stringify(blankDescription))
+			);
+			await expect
+				.poll(async () => metadata(await ssr(server, '/', headers)))
+				.not.toHaveProperty('og:description');
+			expectGeneratedMetadata(await ssr(server, '/', headers), origin, blankDescription);
 		} finally {
 			expect(await server.stop()).toEqual({ code: 0, signal: null });
 		}

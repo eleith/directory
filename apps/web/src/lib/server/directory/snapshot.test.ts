@@ -8,9 +8,13 @@ const service = { title: 'Photos', url: 'https://photos.example.com' };
 function configuration() {
 	return validateConfig(
 		{
-			site: { title: 'Home', logo_path: '/public/home.svg', favicon_path: '/public/site-icon.png' },
+			site: {
+				url: 'https://directory.example.com',
+				title: 'Home',
+				logo_path: '/public/home.svg',
+				favicon_path: '/public/site-icon.png'
+			},
 			auth: {
-				origin: 'https://directory.example.com',
 				secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
 				credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
 			},

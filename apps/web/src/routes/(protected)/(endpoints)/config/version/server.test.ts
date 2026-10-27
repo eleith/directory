@@ -9,9 +9,8 @@ function snapshot(title: string) {
 	return prepareSnapshot(
 		validateConfig(
 			{
-				site: { title, description: sentinel },
+				site: { url: 'https://private-auth.example.test', title, description: sentinel },
 				auth: {
-					origin: 'https://private-auth.example.test',
 					secret: `${sentinel}-session-secret`,
 					credentials: { username: sentinel, password: sentinel }
 				},

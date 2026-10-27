@@ -7,6 +7,7 @@ import { actions, load } from './+page.server.js';
 function eventFor(query = '', withAuth = false) {
 	const configuration: Record<string, unknown> = {
 		site: {
+			...(withAuth ? { url: 'https://private-auth.example.test' } : {}),
 			title: 'Home Server',
 			description: 'Useful things running at home.',
 			footer: 'Ask the household for help.',
@@ -33,7 +34,6 @@ function eventFor(query = '', withAuth = false) {
 	};
 	if (withAuth) {
 		configuration.auth = {
-			origin: 'https://private-auth.example.test',
 			secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
 			credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
 		};

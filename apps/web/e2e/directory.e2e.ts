@@ -3,12 +3,13 @@ import { credentialsAuth, password, username } from './support/configuration.js'
 import { startServer } from './support/server.js';
 
 const title = 'Family directory';
-const description = 'Things running at home.';
+const siteDescription = 'Things running at home.';
 
 function configuration(auth = '') {
 	return `site:
+  url: '\${TEST_ORIGIN}'
   title: ${title}
-  description: ${description}
+  description: ${siteDescription}
   footer: Ask your household maintainer.
 links:
   photos:
@@ -92,13 +93,8 @@ test('actual bookmark HTML and Kit data remain private until sign-in', async ({ 
 		await server.ready();
 		const anonymous = await server.fetch('/signin');
 		const publicHtml = await anonymous.text();
-		for (const value of [
-			description,
-			'photos.example.test',
-			'Store your originals.',
-			username,
-			password
-		]) {
+		expect(publicHtml).toContain(siteDescription);
+		for (const value of ['photos.example.test', 'Store your originals.', username, password]) {
 			expect(publicHtml).not.toContain(value);
 		}
 		expect((await server.fetch('/__data.json')).status).toBe(401);

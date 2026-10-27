@@ -6,7 +6,7 @@ import { assertSafeInput } from './input.js';
 import { interpolate } from './interpolate.js';
 import { resolveConfigPath } from './paths.js';
 import { configurationReferences, DirectoryConfigurationSchema } from './schema.js';
-import type { ConfigLoadOptions, DirectoryConfiguration } from './types.js';
+import type { ConfigEnvironment, ConfigLoadOptions, DirectoryConfiguration } from './types.js';
 
 export async function loadConfigFile(
 	path?: string,
@@ -29,19 +29,42 @@ export function validateConfig(
 ): DirectoryConfiguration {
 	assertSafeInput(raw);
 	try {
-		const copy: unknown = structuredClone(raw);
+		const copy = structuredClone(raw) as Record<string, unknown>;
+		const env = options.env ?? process.env;
+		defaultSiteUrl(copy, env);
 		const defaulted: unknown = Value.Default(
 			DirectoryConfigurationSchema,
 			[...configurationReferences],
 			copy
 		);
 		assertArrayShapesPreserved(raw, defaulted);
-		const expanded = interpolate(defaulted, options.env ?? process.env);
+		const expanded = interpolate(defaulted, env);
 		return checkSchema(expanded);
 	} catch (error) {
 		if (error instanceof ConfigError) throw error;
 		throw new ConfigError([{ code: 'invalid_value', path: '/' }]);
 	}
+}
+
+// Resolve only omissions before TypeBox applies its static/editor defaults.
+function defaultSiteUrl(copy: Record<string, unknown>, env: ConfigEnvironment): void {
+	if (!Object.hasOwn(copy, 'site')) copy.site = {};
+	const site = copy.site;
+	if (typeof site !== 'object' || site === null || Array.isArray(site)) return;
+	if (Object.hasOwn(site, 'url')) return;
+	const port = env.PORT ?? (env.NODE_ENV === 'development' ? '5173' : '3000');
+	const portNumber = Number(port);
+	const isDecimal = port.length > 0 && !/[^0-9]/.test(port);
+	if ((isDecimal && portNumber === 0) || env.SOCKET_PATH || Number(env.LISTEN_FDS) > 0) {
+		throw new ConfigError([
+			{ code: 'invalid_value', path: '/site/url', reason: 'explicit_site_url_required' }
+		]);
+	}
+	if (!isDecimal || !Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+		throw new ConfigError([{ code: 'invalid_value', path: '/site/url' }]);
+	}
+	(site as Record<string, unknown>).url =
+		portNumber === 80 ? 'http://localhost' : `http://localhost:${portNumber}`;
 }
 
 function assertArrayShapesPreserved(raw: unknown, defaulted: unknown, path = ''): void {
@@ -98,5 +121,12 @@ function checkSchema(value: unknown): DirectoryConfiguration {
 		locations.push({ code: 'invalid_value', path: error.path });
 	}
 	if (locations.length > 0) throw new ConfigError(locations);
-	return value as DirectoryConfiguration;
+	const config = value as DirectoryConfiguration;
+	if (config.auth) {
+		const url = new URL(config.site.url);
+		if (url.protocol !== 'https:' && url.hostname !== 'localhost') {
+			throw new ConfigError([{ code: 'invalid_value', path: '/site/url' }]);
+		}
+	}
+	return config;
 }

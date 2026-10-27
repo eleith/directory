@@ -4,6 +4,7 @@ import { startServer } from './support/server.js';
 
 function configuration(auth = '') {
 	return `site:
+  url: '\${TEST_ORIGIN}'
   title: Bookmark logo directory
 links:
   photos:

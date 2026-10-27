@@ -8,13 +8,13 @@ function snapshot(light: string, dark: string) {
 		validateConfig(
 			{
 				site: {
+					url: 'https://private-auth.example.test',
 					title: 'PRIVATE_TITLE',
 					description: 'PRIVATE_DESCRIPTION',
 					logo_path: '/public/PRIVATE_LOGO.svg'
 				},
 				appearance: { primary_light_color: light, primary_dark_color: dark },
 				auth: {
-					origin: 'https://private-auth.example.test',
 					secret: 'PRIVATE_SESSION_SECRET_AT_LEAST_32_CHARACTERS',
 					credentials: { username: 'PRIVATE_USERNAME', password: 'PRIVATE_PASSWORD' }
 				},

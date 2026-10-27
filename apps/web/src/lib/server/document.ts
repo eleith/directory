@@ -1,5 +1,6 @@
 export interface DocumentMetadata {
 	title: string;
+	description: string;
 	url: string;
 	image: {
 		url: string;
@@ -10,7 +11,7 @@ export interface DocumentMetadata {
 }
 
 export function documentMetadata(
-	title: string,
+	site: { title: string; description: string },
 	origin: string,
 	supplied?: { path: string; contentType: string }
 ): DocumentMetadata {
@@ -28,5 +29,10 @@ export function documentMetadata(
 			height: 630
 		};
 	}
-	return { title, url: new URL('/', origin).href, image };
+	return {
+		title: site.title,
+		description: site.description,
+		url: new URL('/', origin).href,
+		image
+	};
 }

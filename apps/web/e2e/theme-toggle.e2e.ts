@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { credentialsAuth, password, username } from './support/configuration.js';
 import { startServer, type TestServer } from './support/server.js';
 
+const siteDescription = 'Useful household services in your preferred theme.';
 const configuration = `site:
   title: Theme fixture
-  description: Private theme description
+  description: ${siteDescription}
   logo_path: /public/private-theme-logo.svg
 appearance:
   primary_light_color: '#13579b'
@@ -296,12 +297,8 @@ test('saved theme on public sign-in and sign-out retains the public configured a
 			} else {
 				expect(text).not.toContain('--color-primary');
 			}
-			for (const value of [
-				'Private theme description',
-				'/public/private-theme-logo.svg',
-				username,
-				password
-			]) {
+			if (path !== '/__data.json') expect(text).toContain(siteDescription);
+			for (const value of ['/public/private-theme-logo.svg', username, password]) {
 				expect(text).not.toContain(value);
 			}
 		}

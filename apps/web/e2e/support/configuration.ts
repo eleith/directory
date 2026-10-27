@@ -3,13 +3,12 @@ export const username = 'PRIVATE_C6_USERNAME';
 export const password = 'PRIVATE_C6_PASSWORD_!a7';
 export const clientId = 'PRIVATE_C6_OIDC_CLIENT';
 export const clientSecret = 'PRIVATE_C6_CLIENT_SECRET_!q9';
-export const privateDescription = 'PRIVATE_C6_SITE_DESCRIPTION';
+export const siteDescription = 'Useful services for the C6 family and friends.';
 export const privateSentinels = [
 	username,
 	password,
 	clientId,
 	clientSecret,
-	privateDescription,
 	'PRIVATE_C6_FOOTER',
 	'PRIVATE_C6_SERVICE',
 	'PRIVATE_C6_LINK_DESCRIPTION',
@@ -18,7 +17,6 @@ export const privateSentinels = [
 ];
 
 export const credentialsAuth = `auth:
-  origin: '\${TEST_ORIGIN}'
   credentials:
     username: ${JSON.stringify(username)}
     password: ${JSON.stringify(password)}
@@ -26,7 +24,6 @@ export const credentialsAuth = `auth:
 
 export function oidcAuth(issuer: string): string {
 	return `auth:
-  origin: '\${TEST_ORIGIN}'
   oidc:
     issuer: ${JSON.stringify(issuer)}
     client_id: ${JSON.stringify(clientId)}
@@ -37,8 +34,9 @@ export function oidcAuth(issuer: string): string {
 export function configuration(auth = credentialsAuth, title = siteTitle): string {
 	return `version: 1
 site:
+  url: '\${TEST_ORIGIN}'
   title: ${JSON.stringify(title)}
-  description: ${privateDescription}
+  description: ${JSON.stringify(siteDescription)}
   footer: PRIVATE_C6_FOOTER
 links:
   household:

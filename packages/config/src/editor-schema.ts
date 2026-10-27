@@ -112,7 +112,7 @@ function adaptSchemaForEditor(
 		resolveReference(node.$ref, context);
 		node.$ref = context.referenceTargets.get(node.$ref) ?? node.$ref;
 	}
-	if (node.format === 'directory-http-url' || node.format === 'directory-auth-origin') {
+	if (node.format === 'directory-http-url' || node.format === 'directory-site-url') {
 		node.format = 'uri';
 	}
 	removeDefaultedPropertiesFromRequired(node, context);

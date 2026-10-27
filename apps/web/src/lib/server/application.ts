@@ -20,7 +20,9 @@ export function createApplication(initial: DirectoryConfiguration) {
 	let authentication: Authentication | undefined;
 	try {
 		const auth = snapshot.configuration.auth;
-		if (auth !== undefined) authentication = createAuthentication(auth);
+		if (auth !== undefined) {
+			authentication = createAuthentication({ ...auth, origin: snapshot.configuration.site.url });
+		}
 	} catch {
 		throw new DirectoryError({ code: 'auth_failed' });
 	}
@@ -29,7 +31,7 @@ export function createApplication(initial: DirectoryConfiguration) {
 		currentSnapshot: () => snapshot,
 		authentication,
 		onConfigChange(next: DirectoryConfiguration, previous: DirectoryConfiguration): boolean {
-			if (!isDeepStrictEqual(next.auth, previous.auth)) {
+			if (!isDeepStrictEqual(startupSettings(next), startupSettings(previous))) {
 				reportDirectoryIssue({ code: 'restart_required' });
 				return false;
 			}
@@ -38,6 +40,10 @@ export function createApplication(initial: DirectoryConfiguration) {
 			return true;
 		}
 	};
+}
+
+function startupSettings(config: DirectoryConfiguration) {
+	return { siteUrl: config.site.url, auth: config.auth };
 }
 
 function prepare(config: DirectoryConfiguration) {

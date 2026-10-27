@@ -22,11 +22,12 @@ FormatRegistry.Set('directory-http-url', (value) => {
 	}
 });
 
-FormatRegistry.Set('directory-auth-origin', (value) => {
+FormatRegistry.Set('directory-site-url', (value) => {
 	try {
 		const url = new URL(value);
 		return (
-			(url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')) &&
+			(url.protocol === 'https:' || url.protocol === 'http:') &&
+			url.port !== '0' &&
 			value === url.origin
 		);
 	} catch {
@@ -47,13 +48,13 @@ export const HttpUrlSchema = Type.String({
 	description: 'An absolute HTTP or HTTPS URL. Relative and executable URLs are not accepted.'
 });
 
-export const AuthOriginSchema = Type.String({
-	$id: 'AuthOrigin',
-	format: 'directory-auth-origin',
+export const SiteUrlSchema = Type.String({
+	$id: 'SiteUrl',
+	format: 'directory-site-url',
 	// Editors cannot run the URL canonicalization check, but can enforce the origin shape.
-	pattern: `^(?:https://(?:[^\\s/\\\\?#@:\\[\\]A-Z%]+|\\[[0-9a-f:.]+\\])(?::(?!443${end})[0-9]+)?|http://localhost(?::(?!80${end})[0-9]+)?)${end}`,
+	pattern: `^(?:https://(?:[^\\s/\\\\?#@:\\[\\]A-Z%]+|\\[[0-9a-f:.]+\\])(?::(?!443${end})[1-9][0-9]*)?|http://(?:[^\\s/\\\\?#@:\\[\\]A-Z%]+|\\[[0-9a-f:.]+\\])(?::(?!80${end})[1-9][0-9]*)?)${end}`,
 	description:
-		'The canonical public origin of Directory. HTTPS is required except for http://localhost[:port]. No credentials, path, trailing slash, query, fragment, or noncanonical URL spelling.'
+		'The canonical public HTTP(S) origin of Directory. No credentials, path, trailing slash, query, fragment, or noncanonical URL spelling. Authentication requires HTTPS except for http://localhost[:port]. Omitted values use localhost with PORT, or 5173 in development and 3000 otherwise.'
 });
 
 export const AuthSecretSchema = Type.String({
@@ -116,6 +117,7 @@ export const LinkSchema = Type.Object(
 
 export const SiteSchema = Type.Object(
 	{
+		url: ref(SiteUrlSchema, { default: 'http://localhost:3000' }),
 		title: Type.String({ ...nonEmptyText, default: 'Directory' }),
 		description: Type.String({ default: '' }),
 		logo_path: ref(SiteImagePathSchema, { default: '/favicon.png' }),
@@ -164,7 +166,6 @@ export const AuthSchema = Type.Union(
 	[
 		Type.Object(
 			{
-				origin: ref(AuthOriginSchema),
 				secret: Type.Optional(ref(AuthSecretSchema)),
 				oidc: ref(OidcAuthSchema),
 				credentials: Type.Optional(Type.Never())
@@ -173,7 +174,6 @@ export const AuthSchema = Type.Union(
 		),
 		Type.Object(
 			{
-				origin: ref(AuthOriginSchema),
 				secret: Type.Optional(ref(AuthSecretSchema)),
 				credentials: ref(CredentialsAuthSchema),
 				oidc: Type.Optional(Type.Never())
@@ -200,7 +200,7 @@ export const DirectoryConfigurationSchema = Type.Object(
 
 export const configurationReferences: TSchema[] = [
 	HttpUrlSchema,
-	AuthOriginSchema,
+	SiteUrlSchema,
 	AuthSecretSchema,
 	LocalImagePathSchema,
 	SiteImagePathSchema,

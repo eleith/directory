@@ -28,7 +28,7 @@ RUN mkdir -p /m/packages/config/dist /m/apps/web/.svelte-kit \
 USER ${LOCAL_UID}:${LOCAL_GID}
 WORKDIR /m/apps/web
 EXPOSE 5173
-CMD ["sh", "-c", "pnpm --filter @directory/config build && exec node_modules/.bin/vite --host 0.0.0.0 --port 5173 --strictPort"]
+CMD ["sh", "-c", "pnpm --filter @directory/config build && exec node_modules/.bin/vite --host 0.0.0.0 --strictPort"]
 
 FROM base AS builder
 

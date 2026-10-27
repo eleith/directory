@@ -20,15 +20,16 @@ Defaults apply when you leave a field out. Unknown fields and `null` are errors.
 
 ### site
 
-| Field                   | Value                                                               | Default        |
-| ----------------------- | ------------------------------------------------------------------- | -------------- |
-| `title`                 | Nonblank text, e.g. `Home`.                                         | `Directory`    |
-| `description`           | Text below the title.                                               | Empty          |
-| `footer`                | Text at the bottom of the page.                                     | Empty          |
-| `logo_path`             | [Image path](#images), e.g. `/public/house.svg`, or `/favicon.png`. | `/favicon.png` |
-| `favicon_path`          | Browser tab icon. Same path options as `logo_path`.                 | `/favicon.png` |
-| `og_image_path`         | Public Open Graph [image path](#images), e.g. `/public/share.png`.  | Auto-generated |
-| `open_links_in_new_tab` | `true` or `false`. Applies to every destination.                    | `true`         |
+| Field                   | Value                                                                                                   | Default                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `url`                   | Public HTTP(S) origin; no credentials, path, query, fragment or trailing slash. Restart after changing. | `http://localhost:PORT` (dev `5173`, otherwise `3000`) |
+| `title`                 | Nonblank text, e.g. `Home`.                                                                             | `Directory`                                            |
+| `description`           | Text below the title; public in Open Graph previews.                                                    | Empty                                                  |
+| `footer`                | Text at the bottom of the page.                                                                         | Empty                                                  |
+| `logo_path`             | [Image path](#images), e.g. `/public/house.svg`, or `/favicon.png`.                                     | `/favicon.png`                                         |
+| `favicon_path`          | Browser tab icon. Same path options as `logo_path`.                                                     | `/favicon.png`                                         |
+| `og_image_path`         | Public Open Graph [image path](#images), e.g. `/public/share.png`.                                      | Auto-generated                                         |
+| `open_links_in_new_tab` | `true` or `false`. Applies to every destination.                                                        | `true`                                                 |
 
 ### appearance
 
@@ -74,18 +75,18 @@ Omit this section to share your directory with the world.
 Use `credentials` for a basic username and password or `oidc` to turn it up to
 11 and wire into your authentication fiefdom. Choose one.
 
-| Field                  | Value                                                                                                                      | Default                       |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `origin`               | Your directory's public origin, e.g. `https://home.example.com`. No credentials, path, query, fragment, or trailing slash. | Required when auth is enabled |
-| `secret`               | Optional random string of at least 32 characters. Keeps sessions across restarts.                                          | Generated at each startup     |
-| `credentials.username` | Shared username, e.g. `family`.                                                                                            | Required for credentials      |
-| `credentials.password` | Password, or `'${DIRECTORY_PASSWORD}'`.                                                                                    | Required for credentials      |
-| `oidc.issuer`          | Your provider’s full HTTP(S) issuer URL.                                                                                   | Required for OIDC             |
-| `oidc.client_id`       | Client ID registered with your provider.                                                                                   | Required for OIDC             |
-| `oidc.client_secret`   | Secret, or `'${DIRECTORY_OIDC_CLIENT_SECRET}'`.                                                                            | Required for OIDC             |
+| Field                  | Value                                                                             | Default                   |
+| ---------------------- | --------------------------------------------------------------------------------- | ------------------------- |
+| `secret`               | Optional random string of at least 32 characters. Keeps sessions across restarts. | Generated at each startup |
+| `credentials.username` | Shared username, e.g. `family`.                                                   | Required for credentials  |
+| `credentials.password` | Password, or `'${DIRECTORY_PASSWORD}'`.                                           | Required for credentials  |
+| `oidc.issuer`          | Your provider’s full HTTP(S) issuer URL.                                          | Required for OIDC         |
+| `oidc.client_id`       | Client ID registered with your provider.                                          | Required for OIDC         |
+| `oidc.client_secret`   | Secret, or `'${DIRECTORY_OIDC_CLIENT_SECRET}'`.                                   | Required for OIDC         |
 
-Use HTTPS, except for local testing at `http://localhost:3000` (or your dev port).
-OIDC's callback is your `origin` followed by `/auth/callback/oidc`.
+With auth enabled, `site.url` must use HTTPS, except for local testing at
+`http://localhost:3000` (or your dev port).
+OIDC's callback is your `site.url` followed by `/auth/callback/oidc`.
 
 By default, restarting Directory signs everyone out. Set `secret` if you'd rather
 keep sessions; generate it once with `openssl rand -base64 32`. Changing it signs

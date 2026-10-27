@@ -2,6 +2,8 @@
 # Sign-in is disabled. Uncomment one auth example below to enable it.
 version: 1
 site:
+  # Set your public origin when deploying beyond localhost (no trailing slash).
+  # url: https://directory.example.com
   title: Home Server
   description: Useful things running at home.
   footer: Something not working? Ask your household maintainer.
@@ -12,10 +14,9 @@ appearance:
   primary_light_color: '#0f766e'
   primary_dark_color: '#5eead4'
 
-# Shared sign-in. Use your directory's HTTPS address, with no trailing slash.
+# Shared sign-in. Set site.url above to your directory's HTTPS origin.
 # HTTP localhost is allowed for local testing. Restart after changing auth.
 # auth:
-#   origin: https://directory.example.com
 #   credentials:
 #     username: admin
 #     password: replace-with-your-own-password
@@ -23,7 +24,6 @@ appearance:
 # Or SSO. Register this callback with your provider:
 # https://directory.example.com/auth/callback/oidc
 # auth:
-#   origin: https://directory.example.com
 #   oidc:
 #     issuer: https://identity.example.com
 #     client_id: directory

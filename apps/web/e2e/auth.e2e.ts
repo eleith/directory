@@ -6,8 +6,8 @@ import {
 	credentialsAuth,
 	oidcAuth,
 	password,
-	privateDescription,
 	privateSentinels,
+	siteDescription,
 	siteTitle,
 	username
 } from './support/configuration.js';
@@ -275,7 +275,7 @@ test('native SSR credentials and named root signout work without JavaScript', as
 		);
 		expectPublic(await page.getByRole('alert').innerText());
 		await signIn(page, server);
-		await expect(page.getByText(privateDescription)).toBeVisible();
+		await expect(page.getByText(siteDescription)).toBeVisible();
 		const form = page.locator('form', { has: page.getByRole('button', { name: 'Sign out' }) });
 		await expect(form).toHaveAttribute('method', 'POST');
 		await expect(form).toHaveAttribute('action', '?/signout');
@@ -293,7 +293,7 @@ test('native SSR credentials and named root signout work without JavaScript', as
 		const data = await context.request.get(`${server.url}/__data.json?x-sveltekit-invalidated=11`);
 		expect(data.status()).toBe(200);
 		const payload = await data.text();
-		expect(payload).toContain(privateDescription);
+		expect(payload).toContain(siteDescription);
 		expect(payload).not.toContain(username);
 		expect(payload).not.toContain(password);
 		expect(payload).not.toContain(secret);
@@ -368,14 +368,14 @@ test('SDK rejects wrong, missing and non-string credentials and does not forward
 		const refreshed = sessionCookie(root);
 		expect(refreshed.name).toBe(cookie.name);
 		expect(refreshed.header).not.toMatch(/; Secure(?:;|$)/i);
-		expect(await root.text()).toContain(privateDescription);
+		expect(await root.text()).toContain(siteDescription);
 		expectSafeLogs(server, ['PRIVATE_C6_EVIL']);
 	} finally {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
 	}
 });
 
-test('YAML origin overrides legacy env, return paths and untrusted proxy headers', async ({
+test('site.url overrides legacy env, return paths and untrusted proxy headers', async ({
 	page
 }) => {
 	const server = await startServer({
@@ -503,7 +503,7 @@ test('raw auth APIs stay blocked and same-origin checks cover every POST content
 	}
 });
 
-test('HTTPS origin sets Secure SDK cookies even when the trusted upstream transport is HTTP', async () => {
+test('HTTPS site.url sets Secure SDK cookies even when the trusted upstream transport is HTTP', async () => {
 	const server = await startServer({
 		configuration: configuration(),
 		origin: 'https://directory.example.test',
@@ -540,7 +540,7 @@ test('generated sessions expire on restart even when a legacy AUTH_SECRET is set
 			headers: { cookie: cookie.pair }
 		});
 		expect(authenticated.status).toBe(200);
-		expect(await authenticated.text()).toContain(privateDescription);
+		expect(await authenticated.text()).toContain(siteDescription);
 		expectSafeLogs(server, [cookie.value]);
 		const { port } = server;
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
@@ -555,7 +555,7 @@ test('generated sessions expire on restart even when a legacy AUTH_SECRET is set
 			headers: { cookie: freshCookie.pair }
 		});
 		expect(freshSession.status).toBe(200);
-		expect(await freshSession.text()).toContain(privateDescription);
+		expect(await freshSession.text()).toContain(siteDescription);
 		expectSafeLogs(server, [cookie.value, freshCookie.value]);
 	} finally {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
@@ -589,7 +589,7 @@ test('tamper, expiry and secret rotation deny sessions while same-secret restart
 		await server.ready();
 		const preserved = await server.fetch('/__data.json', { headers: { cookie: cookie.pair } });
 		expect(preserved.status).toBe(200);
-		expect(await preserved.text()).toContain(privateDescription);
+		expect(await preserved.text()).toContain(siteDescription);
 		expectSafeLogs(server, [cookie.value]);
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
 
@@ -609,24 +609,47 @@ test('tamper, expiry and secret rotation deny sessions while same-secret restart
 	}
 });
 
-test('auth edits reject the entire reload; restoring auth allows display updates and old providers keep working', async () => {
+test('auth and site.url edits reject the entire snapshot; restoring auth allows display updates and old providers keep working', async () => {
 	const server = await startServer({ configuration: configuration() });
 	try {
 		await server.ready();
 		const cookie = sessionCookie(await postCredentials(server));
-		await server.replace(
+		const readSnapshot = async () => {
+			const response = await server.fetch('/config/version', { headers: { cookie: cookie.pair } });
+			expect(response.status).toBe(200);
+			return response.json();
+		};
+		const snapshot = await readSnapshot();
+		for (const rejected of [
 			configuration(
 				credentialsAuth.replace(password, 'PRIVATE_C6_REJECTED_PASSWORD'),
 				'Rejected title'
+			),
+			configuration(credentialsAuth, 'Rejected title').replace(
+				'${TEST_ORIGIN}',
+				'https://rejected.example.test'
 			)
-		);
-		await expect
-			.poll(() => server.output(), { timeout: 10_000, intervals: [100, 250, 500] })
-			.toContain('restart_required');
-		const signin = await server.fetch('/signin');
-		const html = await signin.text();
-		expect(html).toContain(siteTitle);
-		expect(html).not.toContain('Rejected title');
+		]) {
+			const rejections = server.output().match(/restart_required/g)?.length ?? 0;
+			await server.replace(rejected);
+			await expect
+				.poll(() => server.output().match(/restart_required/g)?.length ?? 0, {
+					timeout: 10_000,
+					intervals: [100, 250, 500]
+				})
+				.toBeGreaterThan(rejections);
+			expect(await readSnapshot()).toEqual(snapshot);
+			const signin = await server.fetch('/signin');
+			const html = await signin.text();
+			expect(html).toContain(siteTitle);
+			expect(html).not.toContain('Rejected title');
+			const root = await server.fetch('/', { headers: { cookie: cookie.pair } });
+			expect(root.status).toBe(200);
+			const rootHtml = await root.text();
+			expect(rootHtml).toContain(siteTitle);
+			expect(rootHtml).not.toContain('Rejected title');
+			expect(rootHtml).not.toContain('rejected.example.test');
+		}
 		const oldProvider = await postCredentials(server);
 		expect([302, 303]).toContain(oldProvider.status);
 		expect(expectLocalLocation(oldProvider, server).pathname).toBe('/');
@@ -657,7 +680,7 @@ test('auth edits reject the entire reload; restoring auth allows display updates
 	}
 });
 
-test('omitting auth needs no AUTH_SECRET, ORIGIN or AUTH_URL and exposes no signout control', async ({
+test('omitting auth needs no operator AUTH_SECRET, ORIGIN or AUTH_URL and exposes no signout control', async ({
 	browser
 }) => {
 	const server = await startServer({
@@ -669,13 +692,13 @@ test('omitting auth needs no AUTH_SECRET, ORIGIN or AUTH_URL and exposes no sign
 		const page = await context.newPage();
 		await page.goto(server.url);
 		await expect(page.getByRole('heading', { name: siteTitle, exact: true })).toBeVisible();
-		await expect(page.getByText(privateDescription)).toBeVisible();
+		await expect(page.getByText(siteDescription)).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
 		await page.goto(`${server.url}/signin`);
 		await expect(page).toHaveURL(`${server.url}/`);
 		const data = await server.fetch('/__data.json');
 		expect(data.status).toBe(200);
-		expect(await data.text()).toContain(privateDescription);
+		expect(await data.text()).toContain(siteDescription);
 		expectSafeLogs(server);
 	} finally {
 		await context.close();
@@ -683,7 +706,7 @@ test('omitting auth needs no AUTH_SECRET, ORIGIN or AUTH_URL and exposes no sign
 	}
 });
 
-test('real OIDC discovery and browser roundtrip use YAML origin, PKCE, state and nonce despite legacy env', async ({
+test('real OIDC discovery and browser roundtrip use site.url, PKCE, state and nonce despite legacy env', async ({
 	browser
 }) => {
 	const issuer = await startIssuer();
@@ -741,7 +764,7 @@ test('real OIDC discovery and browser roundtrip use YAML origin, PKCE, state and
 		expect(data.status).toBe(200);
 		const payload = await data.text();
 		expect(payload).toContain(siteTitle);
-		expect(payload).toContain(privateDescription);
+		expect(payload).toContain(siteDescription);
 		expect(payload).not.toContain('PRIVATE_C6_IDENTITY');
 		expect(payload).not.toContain('roles');
 		for (const value of [

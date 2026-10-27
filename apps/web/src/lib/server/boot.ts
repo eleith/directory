@@ -31,9 +31,9 @@ export async function bootApp(
 
 	// Reject changes between framework URL preparation and the initial application load.
 	if (
-		config.auth?.origin !== (process.env.ORIGIN || undefined) ||
-		config.auth?.origin !== (frameworkEnv.ORIGIN || undefined) ||
-		config.auth?.origin !== (frameworkEnv.AUTH_URL || undefined)
+		config.site.url !== process.env.ORIGIN ||
+		config.site.url !== frameworkEnv.ORIGIN ||
+		config.site.url !== frameworkEnv.AUTH_URL
 	) {
 		throw new DirectoryError({ code: 'auth_failed' });
 	}

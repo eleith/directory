@@ -7,7 +7,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest';
 const serverModule = new URL('../../../build/bootstrap/start.js', import.meta.url).href;
 const sentinel = 'PRIVATE_CONFIG_CREDENTIAL_LINK';
 const bookmarkTitle = 'Visible household bookmark';
-const credentialsConfiguration = `links: {}\nauth:\n  origin: http://localhost\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`;
+const credentialsConfiguration = `site:\n  url: http://localhost\nlinks: {}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`;
 const hostileEnvironment = {
 	ORIGIN: `https://foreign.example.com/${sentinel}`,
 	AUTH_URL: `malformed-${sentinel}`,
@@ -19,6 +19,7 @@ const hostileEnvironment = {
 function source(title: string): string {
 	return `
 site:
+  url: http://localhost
   title: ${title}
   description: ${title} description
 links:
@@ -115,16 +116,25 @@ describe('production configuration startup', () => {
 	it.each([
 		{ name: 'missing file', code: 'load_failed', contents: undefined },
 		{ name: 'invalid YAML', code: 'load_failed', contents: `links: [\n${sentinel}` },
-		{ name: 'invalid auth', code: 'load_failed', contents: 'links: {}\nauth: {}' },
+		{
+			name: 'invalid auth',
+			code: 'load_failed',
+			contents: 'site:\n  url: http://localhost\nlinks: {}\nauth: {}'
+		},
 		{
 			name: 'missing environment value',
 			code: 'load_failed',
-			contents: `links:\n  photos:\n    title: Photos\n    url: '\${${sentinel}}'`
+			contents: `site:\n  url: http://localhost\nlinks:\n  photos:\n    title: Photos\n    url: '\${${sentinel}}'`
 		},
 		{
-			name: 'credentials auth missing YAML origin',
+			name: 'open directory missing site.url with PORT=0',
 			code: 'load_failed',
-			contents: credentialsConfiguration.replace('  origin: http://localhost\n', '')
+			contents: 'links: {}'
+		},
+		{
+			name: 'credentials auth missing site.url with PORT=0',
+			code: 'load_failed',
+			contents: credentialsConfiguration.replace('site:\n  url: http://localhost\n', '')
 		}
 	])('rejects $name before opening a socket', async ({ contents, code }) => {
 		const server = await launchServer(contents, hostileEnvironment);
@@ -174,7 +184,7 @@ it.each([
 		name: 'with explicit legacy-named environment references',
 		environment: { ORIGIN: 'http://localhost', AUTH_SECRET: sentinel },
 		contents: credentialsConfiguration
-			.replace('origin: http://localhost', 'origin: ${ORIGIN}')
+			.replace('url: http://localhost', 'url: ${ORIGIN}')
 			.replace(`password: ${sentinel}`, 'password: ${AUTH_SECRET}')
 	}
 ])('starts YAML credentials auth $name', async ({ environment, contents }) => {
@@ -274,9 +284,22 @@ it('polls atomic and ctime-only saves, retains last good across invalid/deleted 
 	await vi.waitFor(() => expectPage(origin, 'third'), { timeout: 5000, interval: 50 });
 	await writeFile(
 		server.path,
-		`${source('rejected')}\nauth:\n  origin: http://localhost\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`
+		source('rejected URL').replace('url: http://localhost', 'url: https://other.example.com')
 	);
 	await vi.waitFor(() => expect(server.output()).toContain('restart_required'), { timeout: 5000 });
+	await expectPage(origin, 'third');
+	await expectHealthy(origin);
+
+	const beforeAuthChange = server.output().split('restart_required').length;
+	await writeFile(
+		server.path,
+		`${source('rejected')}\nauth:\n  credentials:\n    username: ${sentinel}\n    password: ${sentinel}`
+	);
+	await vi.waitFor(
+		() =>
+			expect(server.output().split('restart_required').length).toBeGreaterThan(beforeAuthChange),
+		{ timeout: 5000 }
+	);
 	await expectPage(origin, 'third');
 	await expectHealthy(origin);
 

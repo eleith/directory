@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import { startServer, type TestServer } from './support/server.js';
 
 const title = 'Favicon fixture';
+const siteDescription = 'Useful services with familiar browser icons.';
 const username = 'PRIVATE_FAVICON_USER';
 const password = 'PRIVATE_FAVICON_PASSWORD';
 const sourceA = '/public/café family.svg';
@@ -17,7 +18,6 @@ const png = Buffer.from(
 const privateValues = [
 	username,
 	password,
-	'PRIVATE_DESCRIPTION',
 	'PRIVATE_FOOTER',
 	'PRIVATE_BOOKMARK',
 	'https://private.example.test',
@@ -34,15 +34,15 @@ function configuration(source?: string, auth = true, selectedPassword = password
 	let authentication = '';
 	if (auth) {
 		authentication = `auth:
-  origin: '\${TEST_ORIGIN}'
   credentials:
     username: ${username}
     password: ${selectedPassword}
 `;
 	}
 	return `site:
+  url: '\${TEST_ORIGIN}'
   title: ${title}
-  description: PRIVATE_DESCRIPTION
+  description: ${siteDescription}
   footer: PRIVATE_FOOTER
   logo_path: /public/private-brand.svg
 ${favicon}links:

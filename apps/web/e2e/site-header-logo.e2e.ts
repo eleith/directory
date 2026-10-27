@@ -6,7 +6,7 @@ import { navigateQuery } from './support/navigation.js';
 import { startServer, type TestServer } from './support/server.js';
 
 const title = 'A household directory with a very long unbroken title HouseholdDirectoryForEveryone';
-const description = 'PRIVATE_HEADER_DESCRIPTION';
+const siteDescription = 'Useful services for everyone in the household.';
 const username = 'PRIVATE_HEADER_USER';
 const password = 'PRIVATE_HEADER_PASSWORD';
 const sourceA = '/public/private-brand-a.svg';
@@ -24,15 +24,15 @@ function configuration(source?: string, auth = false) {
 	const logo = source === undefined ? '' : `  logo_path: ${source}\n`;
 	const authentication = auth
 		? `auth:
-  origin: '\${TEST_ORIGIN}'
   credentials:
     username: ${username}
     password: ${password}
 `
 		: '';
 	return `site:
+  url: '\${TEST_ORIGIN}'
   title: ${title}
-  description: ${description}
+  description: ${siteDescription}
   favicon_path: /public/tab.svg
 ${logo}links:
   book:
@@ -74,7 +74,7 @@ async function expectBroken(image: Locator) {
 }
 
 function expectNoPrivateData(text: string) {
-	for (const value of [sourceA, sourceB, description, username, password, icon]) {
+	for (const value of [sourceA, sourceB, username, password, icon]) {
 		expect(text).not.toContain(value);
 	}
 }
@@ -124,7 +124,7 @@ for (const javaScriptEnabled of [true, false]) {
 				await page.goto(app.url);
 				await expectDecoded(page.locator('header img'), source ?? '/favicon.png');
 				await expect(page.locator('header h1')).toHaveText(title);
-				await expect(page.locator('header .description')).toHaveText(description);
+				await expect(page.locator('header .description')).toHaveText(siteDescription);
 				await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
 				await expect(page.locator('head link[rel="icon"]')).toHaveJSProperty(
 					'href',
@@ -213,7 +213,7 @@ test('without JavaScript a broken configured header leaves title and native navi
 		await expect(page.locator('header h1')).toHaveText(title);
 		await page.locator('a[href="/?link=book"]').click();
 		await expect(page).toHaveURL(`${app.url}/?link=book`);
-		await expect(page.locator('header .description')).toHaveText(description);
+		await expect(page.locator('header .description')).toHaveText(siteDescription);
 	} finally {
 		await context.close();
 	}
@@ -268,7 +268,7 @@ test('source changes retry A to B to repaired A in place, and hydrated errors us
 	}
 });
 
-test('logo source and metadata stay private while selected bytes brand sign-in and the narrow header', async ({
+test('logo source and credentials stay private while selected bytes brand sign-in and the narrow header', async ({
 	browser
 }) => {
 	const app = await boot(sourceA, true);
