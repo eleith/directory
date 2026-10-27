@@ -1,7 +1,7 @@
 import { validateConfig } from '@directory/config';
 import { describe, expect, it } from 'vitest';
 import { themeStyleTag } from './appearance.js';
-import { prepareSnapshot } from './config/snapshot.js';
+import { prepareSnapshot } from './directory/snapshot.js';
 
 function snapshot(light: string, dark: string) {
 	return prepareSnapshot(

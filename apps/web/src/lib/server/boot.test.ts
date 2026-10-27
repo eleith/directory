@@ -1,459 +1,208 @@
-import { inspect } from 'node:util';
-import { resolve } from 'node:path';
 import { ConfigError, validateConfig } from '@directory/config';
 import type { DirectoryConfiguration } from '@directory/config/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { reportConfigError } from './logger.js';
 import type { Authentication } from './auth/index.js';
 import { bootApp } from './boot.js';
-import type { Directory } from './config/load-directory.js';
 import { DirectoryError } from './directory-error.js';
-import { prepareSnapshot } from './config/snapshot.js';
-import { logger, reportDirectoryIssue, reportStartupFailure } from './logger.js';
 
 const mocks = vi.hoisted(() => ({
-	auth: vi.fn<typeof import('./auth/index.js').createAuthentication>(),
 	path: vi.fn<typeof import('@directory/config').resolveConfigPath>(),
 	publicDir: vi.fn<typeof import('@directory/config').resolvePublicDir>(),
 	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
-	directory: vi.fn<typeof import('./config/load-directory.js').loadDirectory>(),
-	watch: vi.fn<typeof import('./config/watch.js').watchConfig>(),
-	stopWatching: vi.fn<() => void>()
+	monitor: vi.fn<typeof import('@directory/config').startConfigReloading>(),
+	auth: vi.fn<typeof import('./auth/index.js').createAuthentication>(),
+	stop: vi.fn<() => void>()
 }));
-
 vi.mock('@directory/config', async (importOriginal) => ({
 	...(await importOriginal<typeof import('@directory/config')>()),
 	resolveConfigPath: mocks.path,
 	resolvePublicDir: mocks.publicDir,
-	loadConfigFile: mocks.load
+	loadConfigFile: mocks.load,
+	startConfigReloading: mocks.monitor
 }));
-vi.mock('./config/load-directory.js', async (importOriginal) => ({
-	...(await importOriginal<typeof import('./config/load-directory.js')>()),
-	loadDirectory: mocks.directory
-}));
-vi.mock('./config/watch.js', () => ({ watchConfig: mocks.watch }));
 vi.mock('./auth/index.js', () => ({ createAuthentication: mocks.auth }));
 
-const realDirectory = await vi.importActual<typeof import('./config/load-directory.js')>(
-	'./config/load-directory.js'
-);
-const realConfig = await vi.importActual<typeof import('@directory/config')>('@directory/config');
-const sentinel = 'PRIVATE-environment-password-filename.yaml';
+const path = '/config/directory.yaml';
+const sentinel = 'PRIVATE-config-credential';
 const origin = 'https://directory.example.com';
 const frameworkEnv = { ORIGIN: origin, AUTH_URL: origin };
-const authCases = [
-	{
-		strategy: 'credentials',
-		auth: { origin, credentials: { username: sentinel, password: sentinel } }
-	},
-	{
-		strategy: 'oidc',
-		auth: {
-			origin,
-			oidc: {
-				issuer: 'https://identity.example.com',
-				client_id: sentinel,
-				client_secret: sentinel
-			}
-		}
-	}
-] satisfies { strategy: Authentication['strategy']; auth: DirectoryConfiguration['auth'] }[];
+const auth = { origin, credentials: { username: 'family', password: sentinel } };
+const authentication: Authentication = {
+	strategy: 'credentials',
+	handle: vi.fn(),
+	signIn: vi.fn(),
+	signOut: vi.fn()
+};
 
-function authentication(strategy: Authentication['strategy']): Authentication {
-	return {
-		strategy,
-		handle: vi.fn<Authentication['handle']>().mockResolvedValue(new Response()),
-		signIn: vi.fn<Authentication['signIn']>().mockResolvedValue(undefined),
-		signOut: vi.fn<Authentication['signOut']>().mockResolvedValue(undefined)
-	};
-}
-
-function configuration(auth?: DirectoryConfiguration['auth']): DirectoryConfiguration {
-	const input: Record<string, unknown> = {
-		site: { title: 'Family', description: 'Welcome' },
-		links: { photos: { title: 'Photos', url: 'https://photos.example.com' } }
-	};
-	if (auth !== undefined) input.auth = auth;
-	return validateConfig(input, { env: {} });
-}
-
-function loadedDirectory(config = configuration()) {
-	return {
-		currentSnapshot: vi.fn().mockReturnValue(prepareSnapshot(config)),
-		reload: vi.fn<Directory['reload']>().mockResolvedValue(undefined),
-		stop: vi.fn<Directory['stop']>()
-	};
-}
-
-function expectRedacted(error: unknown): void {
-	for (const text of [String(error), inspect(error), JSON.stringify(error)]) {
-		expect(text).not.toContain(sentinel);
-	}
-	if (error instanceof Error) expect(error.stack).not.toContain(sentinel);
-	expect(error).not.toHaveProperty('cause');
+function configuration(title = 'Home', enabled = false): DirectoryConfiguration {
+	return validateConfig({ site: { title }, links: {}, ...(enabled ? { auth } : {}) });
 }
 
 beforeEach(() => {
-	vi.clearAllMocks();
+	vi.resetAllMocks();
 	vi.stubEnv('ORIGIN', undefined);
 	vi.stubEnv('AUTH_URL', undefined);
-	mocks.auth.mockReset();
-	mocks.path.mockReset().mockReturnValue(`/config/${sentinel}`);
-	mocks.publicDir.mockReset().mockReturnValue('/mounted/public');
-	mocks.load.mockReset().mockResolvedValue(configuration());
-	mocks.directory.mockReset().mockResolvedValue(loadedDirectory());
-	mocks.watch.mockReset().mockReturnValue(mocks.stopWatching);
+	mocks.path.mockReturnValue(path);
+	mocks.publicDir.mockReturnValue('/mounted/public');
+	mocks.load.mockResolvedValue(configuration());
+	mocks.monitor.mockResolvedValue(mocks.stop);
+	mocks.auth.mockReturnValue(authentication);
 });
-
 afterEach(() => vi.unstubAllEnvs());
 
-describe('bootApp', () => {
-	it('waits for valid startup, pins one path for loading and watching, then closes the save gap', async () => {
-		const pending = Promise.withResolvers<Directory>();
-		const directory = loadedDirectory();
-		mocks.directory.mockReturnValueOnce(pending.promise);
-		const env = {
-			CONFIG_PATH: `/config/${sentinel}`,
-			DIRECTORY_PUBLIC_DIR: '/mounted/public',
-			SECRET: sentinel
-		};
-		const boot = bootApp(env);
+describe('application boot wiring', () => {
+	it('resolves paths once and connects the loader, application reaction and diagnostics', async () => {
+		const initial = configuration();
+		const pending = Promise.withResolvers<DirectoryConfiguration>();
+		mocks.load.mockReturnValueOnce(pending.promise);
+		const env = { CONFIG_PATH: path, DIRECTORY_PUBLIC_DIR: '/mounted/public' };
+		const startup = bootApp(env);
 		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env });
-		expect(mocks.publicDir).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, { env });
-		expect(mocks.directory).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {
-			env,
-			report: reportDirectoryIssue
-		});
-		expect(mocks.watch).not.toHaveBeenCalled();
+		expect(mocks.publicDir).toHaveBeenCalledExactlyOnceWith(path, { env });
+		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env });
+		expect(mocks.monitor).not.toHaveBeenCalled();
+
 		env.CONFIG_PATH = '/config/changed.yaml';
 		env.DIRECTORY_PUBLIC_DIR = '/mounted/changed';
-		pending.resolve(directory);
-		const app = await boot;
-		expect(mocks.path).toHaveBeenCalledTimes(1);
-		expect(directory.currentSnapshot).toHaveBeenCalledTimes(1);
-		expect(mocks.watch).toHaveBeenCalledExactlyOnceWith(
-			`/config/${sentinel}`,
-			expect.any(Function)
-		);
-		expect(mocks.watch.mock.invocationCallOrder[0]).toBeLessThan(
-			directory.reload.mock.invocationCallOrder[0]!
-		);
-		expect(directory.reload).toHaveBeenCalledTimes(1);
-		expect(app.directory).toBe(directory);
+		pending.resolve(initial);
+		const app = await startup;
+		expect(mocks.monitor).toHaveBeenCalledExactlyOnceWith({
+			path,
+			initial,
+			load: expect.any(Function),
+			onChange: app.onConfigChange,
+			onError: reportConfigError
+		});
 		expect(app.publicDir).toBe('/mounted/public');
-		expect(mocks.publicDir).toHaveBeenCalledTimes(1);
-		expect(app.authentication).toBeUndefined();
-		expect(mocks.auth).not.toHaveBeenCalled();
-		expect(app.directory.currentSnapshot()).toBe(directory.currentSnapshot.mock.results[0]?.value);
-		await mocks.watch.mock.calls[0]![1]();
-		await app.directory.reload();
-		expect(directory.reload).toHaveBeenCalledTimes(3);
+		expect(app.currentSnapshot().display.site.title).toBe('Home');
+		expect(mocks.path).toHaveBeenCalledOnce();
+		expect(mocks.publicDir).toHaveBeenCalledOnce();
+
+		const options = mocks.monitor.mock.calls[0]![0];
+		mocks.load.mockResolvedValueOnce(configuration('Updated'));
+		const next = await options.load(options.path);
+		expect(mocks.load).toHaveBeenLastCalledWith(path, { env });
+		expect(options.onChange(next, options.initial)).toBe(true);
+		expect(app.currentSnapshot().display.site.title).toBe('Updated');
+		expect(app.stop).toBe(mocks.stop);
 		app.stop();
-		expect(mocks.stopWatching).toHaveBeenCalledOnce();
-		expect(directory.stop).toHaveBeenCalledOnce();
+		expect(mocks.stop).toHaveBeenCalledOnce();
 	});
 
-	it.each([
-		[{}, '/deployment/public'],
-		[{ DIRECTORY_PUBLIC_DIR: 'mounted/images' }, resolve('mounted/images')],
-		[{ DIRECTORY_PUBLIC_DIR: '/mounted/images' }, '/mounted/images']
-	])(
-		'pins the resolved public directory without requiring it to exist: %j',
-		async (env, expected) => {
-			mocks.path.mockReturnValue('/deployment/config/directory.yaml');
-			mocks.publicDir.mockImplementation(realConfig.resolvePublicDir);
-			const app = await bootApp(env);
-			expect(app.publicDir).toBe(expected);
-			expect(mocks.publicDir).toHaveBeenCalledExactlyOnceWith('/deployment/config/directory.yaml', {
-				env
-			});
-			app.stop();
-		}
-	);
-
-	it('passes the same default options to both path resolvers', async () => {
-		const app = await bootApp();
-		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env: process.env });
-		expect(mocks.directory).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {
-			env: process.env,
-			report: reportDirectoryIssue
-		});
-		expect(mocks.directory.mock.calls[0]![1]!.env).toBe(process.env);
-		expect(mocks.publicDir).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {
-			env: process.env
-		});
-		app.stop();
-	});
-
-	it('does not resolve boot until the post-watch reload finishes', async () => {
-		const pending = Promise.withResolvers<void>();
-		const reloading = Promise.withResolvers<void>();
-		const directory = loadedDirectory();
-		directory.reload.mockImplementationOnce(() => {
-			reloading.resolve();
+	it('waits for monitor reconciliation before returning the application', async () => {
+		const entered = Promise.withResolvers<void>();
+		const pending = Promise.withResolvers<() => void>();
+		mocks.monitor.mockImplementationOnce(() => {
+			entered.resolve();
 			return pending.promise;
 		});
-		mocks.directory.mockResolvedValueOnce(directory);
-		let ready = false;
-		const boot = bootApp().then((app) => {
-			ready = true;
-			return app;
-		});
-		await reloading.promise;
-		expect(directory.reload).toHaveBeenCalledOnce();
-		expect(ready).toBe(false);
-		pending.resolve();
-		const app = await boot;
-		expect(ready).toBe(true);
-		app.stop();
+		const ready = vi.fn();
+		const startup = bootApp().then(ready);
+		await entered.promise;
+		expect(ready).not.toHaveBeenCalled();
+		pending.resolve(mocks.stop);
+		await startup;
+		expect(ready).toHaveBeenCalledOnce();
 	});
 
-	it('propagates redacted invalid startup without starting a watcher', async () => {
-		const error = new DirectoryError({
-			code: 'load_failed',
-			issues: new ConfigError([{ code: 'missing_environment', path: `/links/${sentinel}/url` }])
-				.issues
-		});
-		mocks.directory.mockRejectedValueOnce(error);
-		await expect(bootApp()).rejects.toBe(error);
-		expectRedacted(error);
-		expect(mocks.watch).not.toHaveBeenCalled();
-	});
-
-	it('redacts unknown startup errors', async () => {
-		mocks.directory.mockRejectedValueOnce(new Error(sentinel));
-		const error: unknown = await bootApp().catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expect((error as DirectoryError).issue).toEqual({ code: 'load_failed' });
-		expectRedacted(error);
-		expect(mocks.watch).not.toHaveBeenCalled();
-	});
-
-	it('redacts path resolution errors before loading or watching', async () => {
-		mocks.path.mockImplementationOnce(() => {
-			throw new Error(sentinel);
-		});
-		const error: unknown = await bootApp().catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expectRedacted(error);
-		expect(mocks.directory).not.toHaveBeenCalled();
-		expect(mocks.watch).not.toHaveBeenCalled();
-	});
-
-	it('redacts public directory resolution errors before loading or watching', async () => {
-		mocks.publicDir.mockImplementationOnce(() => {
-			throw new Error(sentinel);
-		});
-		const error: unknown = await bootApp({}).catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expect((error as DirectoryError).issue).toEqual({ code: 'load_failed' });
-		expectRedacted(error);
-		expect(mocks.directory).not.toHaveBeenCalled();
-		expect(mocks.watch).not.toHaveBeenCalled();
-	});
-
-	it.each(authCases)(
-		'creates $strategy authentication once before watching, retaining it across the post-watch reload',
-		async ({ strategy, auth }) => {
-			vi.stubEnv('ORIGIN', origin);
-			const config = configuration(auth);
-			const replacement = validateConfig(
-				{ ...config, site: { ...config.site, title: 'Replacement' } },
-				{ env: {} }
-			);
-			const ready = authentication(strategy);
-			const env = {
-				AUTH_SECRET: sentinel.repeat(2),
-				ORIGIN: 'https://directory.example.com',
-				AUTH_URL: 'https://directory.example.com'
-			};
-			mocks.load.mockResolvedValueOnce(config).mockResolvedValue(replacement);
-			mocks.directory.mockImplementationOnce(realDirectory.loadDirectory);
-			mocks.auth.mockImplementationOnce((input) => {
-				expect(input).toEqual(config.auth);
-				expect(input).not.toBe(config.auth);
-				expect(Object.isFrozen(input)).toBe(true);
-				expect(Object.isFrozen('credentials' in input ? input.credentials : input.oidc)).toBe(true);
-				expect(mocks.watch).not.toHaveBeenCalled();
-				return ready;
-			});
-			const app = await bootApp(env, frameworkEnv);
-			expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(expect.any(Object));
-			expect(mocks.auth.mock.invocationCallOrder[0]).toBeLessThan(
-				mocks.watch.mock.invocationCallOrder[0]!
-			);
-			expect(mocks.load).toHaveBeenCalledTimes(2);
-			expect(app.directory.currentSnapshot().display.site.title).toBe('Replacement');
-			expect(app.authentication).toBe(ready);
-			await app.directory.reload();
-			expect(app.authentication).toBe(ready);
-			expect(mocks.auth).toHaveBeenCalledOnce();
-			app.stop();
-			expect(mocks.stopWatching).toHaveBeenCalledOnce();
-		}
-	);
-
-	it.each([
-		{ name: 'auth enabled after preparation', auth: authCases[0]!.auth, env: {} },
-		{ name: 'auth disabled after preparation', auth: undefined, env: frameworkEnv },
-		{
-			name: 'origin changed after preparation',
-			auth: authCases[0]!.auth,
-			env: {
-				ORIGIN: `https://${sentinel}.example.com`,
-				AUTH_URL: `https://${sentinel}.example.com`
-			}
-		},
-		{
-			name: 'Kit private ORIGIN mismatch',
-			auth: authCases[0]!.auth,
-			env: { ORIGIN: sentinel, AUTH_URL: origin }
-		},
-		{
-			name: 'Kit private AUTH_URL mismatch',
-			auth: authCases[0]!.auth,
-			env: { ORIGIN: origin, AUTH_URL: sentinel }
-		}
-	])('rejects $name before authentication, watching or reloading', async ({ auth, env }) => {
-		vi.stubEnv('ORIGIN', auth?.origin);
-		const directory = loadedDirectory(configuration(auth));
-		mocks.directory.mockResolvedValueOnce(directory);
-		const error: unknown = await bootApp({}, env).catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
-		expectRedacted(error);
-		expect(mocks.auth).not.toHaveBeenCalled();
-		expect(directory.stop).toHaveBeenCalledOnce();
-		expect(directory.reload).not.toHaveBeenCalled();
-		expect(mocks.watch).not.toHaveBeenCalled();
-		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
-		try {
-			reportStartupFailure(error);
-			expect(output).toHaveBeenCalledExactlyOnceWith('Application startup failed (auth_failed).');
-		} finally {
-			output.mockRestore();
-		}
-	});
-
-	it('accepts empty framework origins when authentication is absent', async () => {
-		const app = await bootApp({}, { ORIGIN: '', AUTH_URL: '' });
-		expect(app.authentication).toBeUndefined();
-		expect(mocks.auth).not.toHaveBeenCalled();
-		app.stop();
-	});
-
-	it('passes explicit source env to the loader separately from prepared process and Kit private origins', async () => {
-		const source = { ORIGIN: sentinel, AUTH_URL: sentinel, PASSWORD: sentinel };
+	it('constructs auth before monitoring and uses Kit private URLs, not interpolation values', async () => {
 		vi.stubEnv('ORIGIN', origin);
-		vi.stubEnv('AUTH_URL', 'https://different.example.com');
-		const directory = loadedDirectory(configuration(authCases[0]!.auth));
-		mocks.directory.mockResolvedValueOnce(directory);
-		const ready = authentication('credentials');
-		mocks.auth.mockReturnValueOnce(ready);
-		const app = await bootApp(source, frameworkEnv);
-		expect(mocks.directory).toHaveBeenCalledExactlyOnceWith(`/config/${sentinel}`, {
-			env: source,
-			report: reportDirectoryIssue
-		});
-		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env: source });
-		expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(
-			directory.currentSnapshot().configuration.auth
+		vi.stubEnv('AUTH_URL', 'https://not-kit.example.com');
+		mocks.load.mockResolvedValueOnce(configuration('Home', true));
+		const env = { ORIGIN: sentinel, AUTH_URL: sentinel };
+		const app = await bootApp(env, frameworkEnv);
+		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env });
+		expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(auth);
+		expect(mocks.auth.mock.invocationCallOrder[0]).toBeLessThan(
+			mocks.monitor.mock.invocationCallOrder[0]!
 		);
-		expect(app.authentication).toBe(ready);
-		app.stop();
+		expect(app.authentication).toBe(authentication);
 	});
 
-	it('rejects a process origin mismatch even when Kit private env matches YAML', async () => {
-		vi.stubEnv('ORIGIN', `https://${sentinel}.example.com`);
-		const directory = loadedDirectory(configuration(authCases[0]!.auth));
-		mocks.directory.mockResolvedValueOnce(directory);
-		const error: unknown = await bootApp({}, frameworkEnv).catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
-		expectRedacted(error);
-		expect(directory.stop).toHaveBeenCalledOnce();
-		expect(directory.reload).not.toHaveBeenCalled();
-		expect(mocks.auth).not.toHaveBeenCalled();
-		expect(mocks.watch).not.toHaveBeenCalled();
-	});
-
-	it('checks process.env by default rather than source interpolation origins', async () => {
-		// Keep the adapter origin valid so only the default SDK environment can reject this boot.
-		vi.stubEnv('ORIGIN', origin);
-		const directory = loadedDirectory(configuration(authCases[0]!.auth));
-		mocks.directory.mockResolvedValueOnce(directory);
-		const error: unknown = await bootApp(frameworkEnv).catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
-		expectRedacted(error);
-		expect(directory.stop).toHaveBeenCalledOnce();
-		expect(mocks.auth).not.toHaveBeenCalled();
-		expect(mocks.watch).not.toHaveBeenCalled();
-	});
-
-	it.each(authCases)(
-		'redacts unknown $strategy provider initialization failures before watching or reloading',
-		async ({ auth }) => {
-			vi.stubEnv('ORIGIN', origin);
-			const directory = loadedDirectory(configuration(auth));
-			mocks.directory.mockResolvedValueOnce(directory);
-			mocks.auth.mockImplementationOnce(() => {
-				throw new Error(sentinel, { cause: sentinel });
+	it.each([
+		{ name: 'auth added', enabled: true, prepared: undefined, privateEnv: {} },
+		{ name: 'auth removed', enabled: false, prepared: origin, privateEnv: frameworkEnv },
+		{
+			name: 'prepared process origin changed',
+			enabled: true,
+			prepared: 'https://other.example.com',
+			privateEnv: frameworkEnv
+		},
+		{
+			name: 'Kit private ORIGIN differs',
+			enabled: true,
+			prepared: origin,
+			privateEnv: { ...frameworkEnv, ORIGIN: sentinel }
+		},
+		{
+			name: 'Kit private AUTH_URL differs',
+			enabled: true,
+			prepared: origin,
+			privateEnv: { ...frameworkEnv, AUTH_URL: sentinel }
+		}
+	])(
+		'fails closed when $name before auth or monitoring',
+		async ({ enabled, prepared, privateEnv }) => {
+			vi.stubEnv('ORIGIN', prepared);
+			mocks.load.mockResolvedValueOnce(configuration('Home', enabled));
+			await expect(bootApp({}, privateEnv)).rejects.toMatchObject({
+				issue: { code: 'auth_failed' }
 			});
-			const error: unknown = await bootApp({}, frameworkEnv).catch((error: unknown) => error);
-			expect(mocks.auth).toHaveBeenCalledExactlyOnceWith(
-				directory.currentSnapshot.mock.results[0]?.value.configuration.auth
-			);
-			expect(error).toBeInstanceOf(DirectoryError);
-			expect((error as DirectoryError).issue).toEqual({ code: 'auth_failed' });
-			expectRedacted(error);
-			const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
-			try {
-				reportStartupFailure(error);
-				expect(output).toHaveBeenCalledExactlyOnceWith('Application startup failed (auth_failed).');
-			} finally {
-				output.mockRestore();
-			}
-			expect(directory.stop).toHaveBeenCalledOnce();
-			expect(directory.reload).not.toHaveBeenCalled();
-			expect(mocks.watch).not.toHaveBeenCalled();
+			expect(mocks.auth).not.toHaveBeenCalled();
+			expect(mocks.monitor).not.toHaveBeenCalled();
 		}
 	);
 
-	it('stops the loaded directory and redacts a watcher setup failure', async () => {
-		const directory = loadedDirectory();
-		mocks.directory.mockResolvedValueOnce(directory);
-		mocks.watch.mockImplementationOnce(() => {
-			throw new Error(sentinel);
-		});
-		const error: unknown = await bootApp().catch((error: unknown) => error);
-		expect(error).toBeInstanceOf(DirectoryError);
-		expect((error as DirectoryError).issue).toEqual({ code: 'watch_failed' });
-		expectRedacted(error);
-		expect(directory.stop).toHaveBeenCalledOnce();
-		expect(directory.reload).not.toHaveBeenCalled();
+	it('uses the process environment when no environments are injected', async () => {
+		await bootApp();
+		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env: process.env });
+		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env: process.env });
 	});
 
-	it('stops watching and prevents a pending real directory reload from publishing', async () => {
-		mocks.directory.mockImplementationOnce(realDirectory.loadDirectory);
-		const app = await bootApp({});
-		expect(app.authentication).toBeUndefined();
-		expect(mocks.auth).not.toHaveBeenCalled();
-		const original = app.directory.currentSnapshot();
-		const pending = Promise.withResolvers<DirectoryConfiguration>();
-		const loading = Promise.withResolvers<void>();
-		mocks.load.mockImplementationOnce(() => {
-			loading.resolve();
-			return pending.promise;
+	it('retains safe loader diagnostics without starting monitoring', async () => {
+		const failure = new ConfigError([
+			{ code: 'missing_environment', path: `/links/${sentinel}/url` }
+		]);
+		mocks.load.mockRejectedValueOnce(failure);
+		const error: unknown = await bootApp().catch((error: unknown) => error);
+		expect(error).toBeInstanceOf(DirectoryError);
+		expect(error).toMatchObject({ issue: { code: 'load_failed', issues: failure.issues } });
+		expect(JSON.stringify(error)).not.toContain(sentinel);
+		expect(mocks.monitor).not.toHaveBeenCalled();
+	});
+
+	it.each(['path', 'publicDir', 'load'] as const)(
+		'redacts unexpected %s failures',
+		async (stage) => {
+			mocks[stage].mockImplementationOnce(() => {
+				throw new Error(sentinel);
+			});
+			const error: unknown = await bootApp().catch((error: unknown) => error);
+			expect(error).toMatchObject({ issue: { code: 'load_failed' } });
+			expect(String(error)).not.toContain(sentinel);
+			expect(error).not.toHaveProperty('cause');
+			expect(mocks.monitor).not.toHaveBeenCalled();
+		}
+	);
+
+	it('does not start monitoring when authentication initialization fails', async () => {
+		vi.stubEnv('ORIGIN', origin);
+		mocks.load.mockResolvedValueOnce(configuration('Home', true));
+		mocks.auth.mockImplementationOnce(() => {
+			throw new Error(sentinel);
 		});
-		const reload = mocks.watch.mock.calls[0]![1]();
-		await loading.promise;
-		app.stop();
-		pending.resolve(validateConfig({ site: { title: 'Replacement' }, links: {} }, { env: {} }));
-		await reload;
-		expect(mocks.stopWatching).toHaveBeenCalledOnce();
-		expect(app.directory.currentSnapshot()).toBe(original);
-		expect(original.display.site.title).toBe('Family');
-		await app.directory.reload();
-		expect(mocks.load).toHaveBeenCalledTimes(3);
+		await expect(bootApp({}, frameworkEnv)).rejects.toMatchObject({
+			issue: { code: 'auth_failed' }
+		});
+		expect(mocks.monitor).not.toHaveBeenCalled();
+	});
+
+	it('redacts monitor setup errors at the application boundary', async () => {
+		mocks.monitor.mockRejectedValueOnce(new Error(sentinel));
+		const error: unknown = await bootApp().catch((error: unknown) => error);
+		expect(error).toMatchObject({ issue: { code: 'watch_failed' } });
+		expect(String(error)).not.toContain(sentinel);
+		expect(error).not.toHaveProperty('cause');
 	});
 });

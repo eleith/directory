@@ -1,6 +1,6 @@
 import { validateConfig } from '@directory/config';
 import { describe, expect, it } from 'vitest';
-import { prepareSnapshot } from '../lib/server/config/snapshot.js';
+import { prepareSnapshot } from '../lib/server/directory/snapshot.js';
 import { load } from './+layout.server.js';
 
 function event(site: Record<string, string> = {}) {

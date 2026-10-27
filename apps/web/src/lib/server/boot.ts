@@ -1,11 +1,14 @@
-import { resolveConfigPath, resolvePublicDir } from '@directory/config';
-import type { ConfigEnvironment } from '@directory/config/types';
-import { createAuthentication, type Authentication } from './auth/index.js';
-import { loadDirectory, type Directory } from './config/load-directory.js';
+import {
+	ConfigError,
+	loadConfigFile,
+	resolveConfigPath,
+	resolvePublicDir,
+	startConfigReloading
+} from '@directory/config';
+import type { ConfigEnvironment, DirectoryConfiguration } from '@directory/config/types';
+import { createApplication, type Application } from './application.js';
 import { DirectoryError } from './directory-error.js';
-import type { Application } from './lifecycle/application.js';
-import { watchConfig } from './config/watch.js';
-import { reportDirectoryIssue } from './logger.js';
+import { reportConfigError } from './logger.js';
 
 export async function bootApp(
 	env: ConfigEnvironment = process.env,
@@ -14,50 +17,39 @@ export async function bootApp(
 	const options = { env };
 	let path: string;
 	let publicDir: string;
-	let directory: Directory;
+	let config: DirectoryConfiguration;
 	try {
 		path = resolveConfigPath(options);
 		publicDir = resolvePublicDir(path, options);
-		directory = await loadDirectory(path, { ...options, report: reportDirectoryIssue });
+		config = await loadConfigFile(path, options);
 	} catch (error) {
-		if (error instanceof DirectoryError) throw error;
-		throw new DirectoryError({ code: 'load_failed' });
+		throw new DirectoryError({
+			code: 'load_failed',
+			...(error instanceof ConfigError ? { issues: error.issues } : {})
+		});
 	}
 
-	let authentication: Authentication | undefined;
-	try {
-		const auth = directory.currentSnapshot().configuration.auth;
-		// Reject edits between URL preparation and Kit startup, including enabling/disabling auth.
-		if (
-			auth?.origin !== (process.env.ORIGIN || undefined) ||
-			auth?.origin !== (frameworkEnv.ORIGIN || undefined) ||
-			auth?.origin !== (frameworkEnv.AUTH_URL || undefined)
-		) {
-			throw new DirectoryError({ code: 'auth_failed' });
-		}
-		if (auth !== undefined) authentication = createAuthentication(auth);
-	} catch {
-		directory.stop();
+	// Reject changes between framework URL preparation and the initial application load.
+	if (
+		config.auth?.origin !== (process.env.ORIGIN || undefined) ||
+		config.auth?.origin !== (frameworkEnv.ORIGIN || undefined) ||
+		config.auth?.origin !== (frameworkEnv.AUTH_URL || undefined)
+	) {
 		throw new DirectoryError({ code: 'auth_failed' });
 	}
 
-	let stopWatching: () => void;
+	const application = createApplication(config);
+	let stop: () => void;
 	try {
-		stopWatching = watchConfig(path, () => directory.reload());
+		stop = await startConfigReloading({
+			path,
+			initial: config,
+			load: (path) => loadConfigFile(path, options),
+			onChange: application.onConfigChange,
+			onError: reportConfigError
+		});
 	} catch {
-		directory.stop();
 		throw new DirectoryError({ code: 'watch_failed' });
 	}
-
-	// Catch a save between the initial read and installation of the path watcher.
-	await directory.reload();
-	return {
-		directory,
-		publicDir,
-		authentication,
-		stop() {
-			stopWatching();
-			directory.stop();
-		}
-	};
+	return { ...application, publicDir, stop };
 }

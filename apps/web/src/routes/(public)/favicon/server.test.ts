@@ -1,7 +1,7 @@
 import { validateConfig } from '@directory/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readMountedImage } from '../../../lib/server/images/read-mounted-image.js';
-import { prepareSnapshot } from '../../../lib/server/config/snapshot.js';
+import { prepareSnapshot } from '../../../lib/server/directory/snapshot.js';
 import { GET, HEAD } from './+server.js';
 
 vi.mock('../../../lib/server/images/read-mounted-image.js', () => ({ readMountedImage: vi.fn() }));

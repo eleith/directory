@@ -1,6 +1,6 @@
 import { validateConfig } from '@directory/config';
 import { describe, expect, it } from 'vitest';
-import { prepareSnapshot } from '../../../../../lib/server/config/snapshot.js';
+import { prepareSnapshot } from '../../../../../lib/server/directory/snapshot.js';
 import { GET } from './+server.js';
 
 const sentinel = 'PRIVATE-version-endpoint-config';

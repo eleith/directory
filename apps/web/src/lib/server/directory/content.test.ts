@@ -2,7 +2,7 @@ import { validateConfig } from '@directory/config';
 import type { DirectoryConfiguration } from '@directory/config/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { DisplaySite } from '../../display/types.js';
-import { getSite, prepareDirectoryContent } from './directory-content.js';
+import { getSite, prepareDirectoryContent } from './content.js';
 
 const destination = { title: 'Photos', url: 'https://photos.example.com' };
 

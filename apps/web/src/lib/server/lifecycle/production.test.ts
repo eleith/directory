@@ -1,8 +1,7 @@
 import { validateConfig } from '@directory/config';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
-import type { Directory } from '../config/load-directory.js';
-import { prepareSnapshot } from '../config/snapshot.js';
-import type { Application, ServerState } from './application.js';
+import { prepareSnapshot } from '../directory/snapshot.js';
+import type { Application, ServerState } from '../application.js';
 import { startProduction } from './production.js';
 
 const adapterEvents: NodeJS.EventEmitter = process;
@@ -14,15 +13,12 @@ vi.mock('../boot.js', () => ({ bootApp: mocks.boot }));
 
 function application(title: string) {
 	return {
-		directory: {
-			currentSnapshot: vi
-				.fn()
-				.mockReturnValue(
-					prepareSnapshot(validateConfig({ site: { title }, links: {} }, { env: {} }))
-				),
-			reload: vi.fn<Directory['reload']>(),
-			stop: vi.fn<Directory['stop']>()
-		},
+		currentSnapshot: vi
+			.fn<Application['currentSnapshot']>()
+			.mockReturnValue(
+				prepareSnapshot(validateConfig({ site: { title }, links: {} }, { env: {} }))
+			),
+		onConfigChange: vi.fn<Application['onConfigChange']>().mockReturnValue(true),
 		publicDir: '/mounted/public',
 		authentication: undefined,
 		stop: vi.fn<Application['stop']>()
@@ -72,7 +68,7 @@ describe('production lifecycle', () => {
 		await startup;
 		expect(server.application).toBe(ready);
 		expect(ready.stop).not.toHaveBeenCalled();
-		expect(ready.directory.currentSnapshot).not.toHaveBeenCalled();
+		expect(ready.currentSnapshot).not.toHaveBeenCalled();
 		adapterEvents.emit('sveltekit:shutdown');
 		expect(ready.stop).toHaveBeenCalledOnce();
 	});

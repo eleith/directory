@@ -1,6 +1,6 @@
 import type { ConfigEnvironment } from '@directory/config/types';
 import { bootApp } from '../boot.js';
-import type { Application, ServerState } from './application.js';
+import type { Application, ServerState } from '../application.js';
 
 interface DevelopmentAttempt {
 	readonly server: ServerState;

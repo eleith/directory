@@ -1,12 +1,42 @@
 import { ConfigError } from '@directory/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DirectoryError } from './directory-error.js';
-import { logger, reportDirectoryIssue, reportStartupFailure } from './logger.js';
+import { logger, reportConfigError, reportDirectoryIssue, reportStartupFailure } from './logger.js';
 
 const sentinel = 'PRIVATE-secret-environment-name-filename.yaml';
 afterEach(() => vi.restoreAllMocks());
 
 describe('safe server reporting', () => {
+	it('reports application reload failures without relabeling them as load failures', () => {
+		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
+		reportConfigError(new DirectoryError({ code: 'prepare_failed' }));
+		expect(output).toHaveBeenCalledExactlyOnceWith(
+			'Configuration update rejected (prepare_failed).'
+		);
+	});
+
+	it('reports config load failures without private link identifiers', () => {
+		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
+		reportConfigError(
+			new ConfigError([{ code: 'missing_environment', path: `/links/${sentinel}/url` }])
+		);
+		expect(output.mock.calls).toEqual([
+			['Configuration update rejected (load_failed).'],
+			['  /links/*/url (missing_environment)']
+		]);
+	});
+
+	it.each([new Error(sentinel), sentinel, { cause: sentinel, value: sentinel }])(
+		'never inspects or prints unknown reload errors',
+		(error) => {
+			const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
+			reportConfigError(error);
+			expect(output).toHaveBeenCalledExactlyOnceWith(
+				'Configuration update rejected (load_failed).'
+			);
+		}
+	);
+
 	it('reports only diagnostic codes and redacted issue paths, never whole errors or messages', () => {
 		const output = vi.spyOn(logger, 'error').mockReturnValue(undefined);
 		const issue = {

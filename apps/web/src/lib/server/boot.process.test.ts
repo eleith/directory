@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -232,20 +232,33 @@ it('keeps application environment references and fallbacks stable across bootstr
 	expect(await server.stop()).toEqual({ code: 0, signal: null });
 });
 
-it('polls atomic saves, retains last good across invalid/deleted files, and shuts down cleanly', async () => {
+it('polls atomic and ctime-only saves, retains last good across invalid/deleted files, and shuts down cleanly', async () => {
 	const server = await launchServer(source('first'));
 	const origin = await server.ready();
 	await expectHealthy(origin);
 	await expectPage(origin, 'first');
 
 	const replacement = `${server.path}.replacement`;
+	const fixedTime = new Date('2020-01-01T00:00:00Z');
 	await writeFile(replacement, source('second'));
+	await utimes(replacement, fixedTime, fixedTime);
 	await rename(replacement, server.path);
 	await vi.waitFor(() => expectPage(origin, 'second'), { timeout: 5000, interval: 50 });
 
+	// The HTTP response confirms the watcher observed the atomic save's fixed-mtime baseline.
+	const beforeEdit = await stat(server.path);
+	await writeFile(server.path, source('edited'));
+	await utimes(server.path, fixedTime, fixedTime);
+	const afterEdit = await stat(server.path);
+	expect(afterEdit.ino).toBe(beforeEdit.ino);
+	expect(afterEdit.size).toBe(beforeEdit.size);
+	expect(afterEdit.mtimeMs).toBe(beforeEdit.mtimeMs);
+	expect(afterEdit.ctimeMs).not.toBe(beforeEdit.ctimeMs);
+	await vi.waitFor(() => expectPage(origin, 'edited'), { timeout: 5000, interval: 50 });
+
 	await writeFile(server.path, `links: [\n${sentinel}`);
 	await vi.waitFor(() => expect(server.output()).toContain('load_failed'), { timeout: 5000 });
-	await expectPage(origin, 'second');
+	await expectPage(origin, 'edited');
 	await expectHealthy(origin);
 
 	const beforeDeletion = server.output().split('load_failed').length;
@@ -254,7 +267,7 @@ it('polls atomic saves, retains last good across invalid/deleted files, and shut
 		() => expect(server.output().split('load_failed').length).toBeGreaterThan(beforeDeletion),
 		{ timeout: 5000 }
 	);
-	await expectPage(origin, 'second');
+	await expectPage(origin, 'edited');
 	await expectHealthy(origin);
 
 	await writeFile(server.path, source('third'));

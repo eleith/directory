@@ -1,7 +1,7 @@
 import type { Session } from '@auth/sveltekit';
 import type { DirectoryContent } from './lib/display/types.js';
 import type { Authentication } from './lib/server/auth/index.js';
-import type { PreparedSnapshot } from './lib/server/config/snapshot.js';
+import type { PreparedSnapshot } from './lib/server/directory/snapshot.js';
 
 declare global {
 	namespace NodeJS {

@@ -1,3 +1,4 @@
+import { ConfigError } from '@directory/config';
 import { Logger } from 'tslog';
 import { DirectoryError, type DirectoryIssue } from './directory-error.js';
 
@@ -13,6 +14,17 @@ export const logger = new Logger({
 export function reportDirectoryIssue(issue: DirectoryIssue): void {
 	logger.error(`Configuration update rejected (${issue.code}).`);
 	reportIssueDetails(issue);
+}
+
+export function reportConfigError(error: unknown): void {
+	if (error instanceof DirectoryError) {
+		reportDirectoryIssue(error.issue);
+	} else {
+		reportDirectoryIssue({
+			code: 'load_failed',
+			...(error instanceof ConfigError ? { issues: error.issues } : {})
+		});
+	}
 }
 
 export function reportStartupFailure(error: unknown): void {

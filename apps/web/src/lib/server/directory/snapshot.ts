@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DirectoryConfiguration } from '@directory/config/types';
 import type { DirectoryContent } from '../../display/types.js';
 import { freezeData, type Immutable } from './immutable.js';
-import { prepareDirectoryContent } from './directory-content.js';
+import { prepareDirectoryContent } from './content.js';
 import { renderBookmarkLogos } from '../images/render-bookmark-logos.js';
 
 export interface PreparedSnapshot {

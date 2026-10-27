@@ -1,6 +1,6 @@
 import type { ConfigEnvironment } from '@directory/config/types';
 import { bootApp } from '../boot.js';
-import type { Application, ServerState } from './application.js';
+import type { Application, ServerState } from '../application.js';
 
 export async function startProduction(server: ServerState, env?: ConfigEnvironment): Promise<void> {
 	const application = await bootApp(undefined, env);

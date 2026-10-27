@@ -1,8 +1,7 @@
 import { validateConfig } from '@directory/config';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
-import type { Directory } from '../config/load-directory.js';
-import { prepareSnapshot } from '../config/snapshot.js';
-import type { Application, ServerState } from './application.js';
+import { prepareSnapshot } from '../directory/snapshot.js';
+import type { Application, ServerState } from '../application.js';
 
 const mocks = vi.hoisted(() => ({
 	boot: vi.fn<typeof import('../boot.js').bootApp>()
@@ -11,15 +10,12 @@ vi.mock('../boot.js', () => ({ bootApp: mocks.boot }));
 
 function application(title: string) {
 	return {
-		directory: {
-			currentSnapshot: vi
-				.fn()
-				.mockReturnValue(
-					prepareSnapshot(validateConfig({ site: { title }, links: {} }, { env: {} }))
-				),
-			reload: vi.fn<Directory['reload']>(),
-			stop: vi.fn<Directory['stop']>()
-		},
+		currentSnapshot: vi
+			.fn<Application['currentSnapshot']>()
+			.mockReturnValue(
+				prepareSnapshot(validateConfig({ site: { title }, links: {} }, { env: {} }))
+			),
+		onConfigChange: vi.fn<Application['onConfigChange']>().mockReturnValue(true),
 		publicDir: '/mounted/public',
 		authentication: undefined,
 		stop: vi.fn<Application['stop']>()
@@ -134,7 +130,7 @@ describe('development lifecycle', () => {
 		await startup;
 		shutdown();
 		expect(stopped.stop).toHaveBeenCalledOnce();
-		expect(stopped.directory.currentSnapshot).not.toHaveBeenCalled();
+		expect(stopped.currentSnapshot).not.toHaveBeenCalled();
 		expect(server.application).toBeUndefined();
 	});
 
@@ -154,7 +150,7 @@ describe('development lifecycle', () => {
 		expect(first.stop).toHaveBeenCalledOnce();
 		expect(second.stop).not.toHaveBeenCalled();
 		expect(server.application).toBe(second);
-		expect(server.application?.directory.currentSnapshot().display.site.title).toBe('Current');
+		expect(server.application?.currentSnapshot().display.site.title).toBe('Current');
 		process.emit('directory:dev-stop');
 		expect(second.stop).toHaveBeenCalledOnce();
 	});

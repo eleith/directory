@@ -3,7 +3,7 @@ import { env } from '$env/dynamic/private';
 import type { Handle, ServerInit } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { themeStyleTag } from './lib/server/appearance.js';
-import type { ServerState } from './lib/server/lifecycle/application.js';
+import type { ServerState } from './lib/server/application.js';
 import { startDevelopment } from './lib/server/lifecycle/development.js';
 import { startProduction } from './lib/server/lifecycle/production.js';
 import { reportStartupFailure } from './lib/server/logger.js';
@@ -30,7 +30,7 @@ const applicationHandle: Handle = ({ event, resolve }) => {
 			headers: { 'cache-control': 'no-store' }
 		});
 	}
-	event.locals.snapshot = application.directory.currentSnapshot();
+	event.locals.snapshot = application.currentSnapshot();
 	event.locals.publicDir = application.publicDir;
 	event.locals.authentication = application.authentication;
 	event.locals.session = null;

@@ -1,7 +1,7 @@
 import { validateConfig } from '@directory/config';
 import { describe, expect, it, vi } from 'vitest';
 import type { Authentication } from '../../../lib/server/auth/index.js';
-import { prepareSnapshot } from '../../../lib/server/config/snapshot.js';
+import { prepareSnapshot } from '../../../lib/server/directory/snapshot.js';
 import { logger } from '../../../lib/server/logger.js';
 import { actions, load } from './+page.server.js';
 

@@ -7,8 +7,7 @@ import { requireSignIn } from './lib/server/auth/access.js';
 import { readMountedImage } from './lib/server/images/read-mounted-image.js';
 import { GET as mountedImage } from './routes/(protected)/(endpoints)/public/[...file]/+server.js';
 import { GET as bookmarkLogo } from './routes/(protected)/(endpoints)/bookmarks/[id]/logo/+server.js';
-import type { Application } from './lib/server/lifecycle/application.js';
-import type { Directory } from './lib/server/config/load-directory.js';
+import type { Application } from './lib/server/application.js';
 
 const adapterEvents: NodeJS.EventEmitter = process;
 
@@ -20,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 	report: vi.fn<typeof import('./lib/server/logger.js').reportStartupFailure>(),
 	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
 	path: vi.fn<typeof import('@directory/config').resolveConfigPath>(),
-	prepare: vi.fn<typeof import('./lib/server/config/snapshot.js').prepareSnapshot>()
+	prepare: vi.fn<typeof import('./lib/server/directory/snapshot.js').prepareSnapshot>()
 }));
 
 vi.mock('$env/dynamic/private', () => ({ env: mocks.env }));
@@ -60,10 +59,10 @@ vi.mock('@directory/config', async (importOriginal) => ({
 	loadConfigFile: mocks.load,
 	resolveConfigPath: mocks.path
 }));
-vi.mock('./lib/server/config/snapshot.js', () => ({ prepareSnapshot: mocks.prepare }));
+vi.mock('./lib/server/directory/snapshot.js', () => ({ prepareSnapshot: mocks.prepare }));
 
-const realSnapshot = await vi.importActual<typeof import('./lib/server/config/snapshot.js')>(
-	'./lib/server/config/snapshot.js'
+const realSnapshot = await vi.importActual<typeof import('./lib/server/directory/snapshot.js')>(
+	'./lib/server/directory/snapshot.js'
 );
 const sentinel = 'PRIVATE-config-password-not-for-browser';
 type Resolve = Parameters<Handle>[0]['resolve'];
@@ -98,11 +97,8 @@ function event(): RequestEvent {
 
 function application(title: string, authentication?: Authentication) {
 	return {
-		directory: {
-			currentSnapshot: vi.fn().mockReturnValue(snapshot(title)),
-			reload: vi.fn<Directory['reload']>(),
-			stop: vi.fn<Directory['stop']>()
-		},
+		currentSnapshot: vi.fn<Application['currentSnapshot']>().mockReturnValue(snapshot(title)),
+		onConfigChange: vi.fn<Application['onConfigChange']>().mockReturnValue(true),
 		publicDir: '/mounted/public',
 		authentication,
 		stop: vi.fn<Application['stop']>()
@@ -169,7 +165,7 @@ describe('server hooks', () => {
 		expect(unavailable.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
 		expect(await unavailable.text()).toBe('Service unavailable');
 		expect(resolve).not.toHaveBeenCalled();
-		expect(ready.directory.currentSnapshot).not.toHaveBeenCalled();
+		expect(ready.currentSnapshot).not.toHaveBeenCalled();
 		pending.resolve(ready);
 		await startup;
 		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith(undefined, mocks.env);
@@ -264,9 +260,7 @@ describe('server hooks', () => {
 			const authentication: Authentication = {
 				strategy,
 				handle: vi.fn<Handle>().mockImplementation(async ({ event }) => {
-					expect(event.locals.snapshot).toBe(
-						ready.directory.currentSnapshot.mock.results[0]?.value
-					);
+					expect(event.locals.snapshot).toBe(ready.currentSnapshot.mock.results[0]?.value);
 					expect(event.locals.publicDir).toBe(ready.publicDir);
 					expect(event.locals.authentication).toBe(authentication);
 					expect(event.locals.session).toBeNull();
@@ -290,7 +284,7 @@ describe('server hooks', () => {
 				event: expect.objectContaining({ locals: request.locals }),
 				resolve: expect.any(Function)
 			});
-			expect(ready.directory.currentSnapshot).toHaveBeenCalledOnce();
+			expect(ready.currentSnapshot).toHaveBeenCalledOnce();
 			expect(resolve).not.toHaveBeenCalled();
 			expect(authentication.signIn).not.toHaveBeenCalled();
 			expect(authentication.signOut).not.toHaveBeenCalled();
@@ -409,8 +403,8 @@ describe('server hooks', () => {
 				};
 			}
 			const ready = application('Initial', authentication);
-			const captured = ready.directory.currentSnapshot();
-			ready.directory.currentSnapshot.mockClear();
+			const captured = ready.currentSnapshot();
+			ready.currentSnapshot.mockClear();
 			const before = JSON.stringify(captured);
 			const replacement = snapshot('Replacement', '#abc', '#def');
 			mocks.boot.mockResolvedValueOnce(ready);
@@ -420,7 +414,7 @@ describe('server hooks', () => {
 			const resolve = vi.fn<Resolve>().mockImplementation(async (event, options) => {
 				expect(event.locals).toBe(request.locals);
 				expect(event.locals.snapshot).toBe(captured);
-				ready.directory.currentSnapshot.mockReturnValue(replacement);
+				ready.currentSnapshot.mockReturnValue(replacement);
 				const transform = options?.transformPageChunk;
 				if (transform === undefined) throw new Error('Missing theme transform');
 				if (strategy !== 'none') {
@@ -446,7 +440,7 @@ describe('server hooks', () => {
 			expect(html).not.toContain('Replacement');
 			expect(html).not.toContain('#abc');
 			expect(html).not.toContain('--directory-');
-			expect(ready.directory.currentSnapshot).toHaveBeenCalledOnce();
+			expect(ready.currentSnapshot).toHaveBeenCalledOnce();
 			expect(request.locals.snapshot).toBe(captured);
 			expect(JSON.stringify(captured)).toBe(before);
 			expect(mocks.load).not.toHaveBeenCalled();
@@ -465,13 +459,9 @@ describe('server hooks', () => {
 		const initial = snapshot('Initial');
 		const replacement = snapshot('Replacement');
 		let published = initial;
-		const directory = {
-			currentSnapshot: vi.fn(() => published),
-			reload: vi.fn<Directory['reload']>(),
-			stop: vi.fn()
-		};
 		const app = {
-			directory,
+			currentSnapshot: vi.fn<Application['currentSnapshot']>(() => published),
+			onConfigChange: vi.fn<Application['onConfigChange']>().mockReturnValue(true),
 			publicDir: '/mounted/public',
 			authentication: undefined,
 			stop: vi.fn<Application['stop']>()
@@ -494,7 +484,7 @@ describe('server hooks', () => {
 		});
 		const firstEvent = event();
 		const first = await hooks.handle({ event: firstEvent, resolve });
-		expect(directory.currentSnapshot).toHaveBeenCalledOnce();
+		expect(app.currentSnapshot).toHaveBeenCalledOnce();
 		expect(firstEvent.locals.snapshot).toBe(initial);
 		expect(firstEvent.locals.authentication).toBeUndefined();
 		expect(firstEvent.locals.session).toBeNull();
@@ -509,7 +499,7 @@ describe('server hooks', () => {
 		expect(capturedPaths).toEqual([app.publicDir, app.publicDir]);
 		const secondEvent = event();
 		const second = await hooks.handle({ event: secondEvent, resolve });
-		expect(directory.currentSnapshot).toHaveBeenCalledTimes(2);
+		expect(app.currentSnapshot).toHaveBeenCalledTimes(2);
 		expect(secondEvent.locals.snapshot).toBe(replacement);
 		expect(await second.json()).toEqual({ first: 'Replacement', second: 'Replacement' });
 		expect(capturedPaths).toEqual(Array<string>(4).fill(app.publicDir));
@@ -517,6 +507,6 @@ describe('server hooks', () => {
 		expect(mocks.path).not.toHaveBeenCalled();
 		expect(mocks.load).not.toHaveBeenCalled();
 		expect(mocks.prepare).not.toHaveBeenCalled();
-		expect(directory.reload).not.toHaveBeenCalled();
+		expect(app.onConfigChange).not.toHaveBeenCalled();
 	});
 });

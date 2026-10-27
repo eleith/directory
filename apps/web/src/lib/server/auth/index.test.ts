@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isHttpError, isRedirect, redirect, type Handle, type RequestEvent } from '@sveltejs/kit';
 import type { Session, SvelteKitAuthConfig } from '@auth/sveltekit';
 import { validateConfig } from '@directory/config';
-import { prepareSnapshot } from '../config/snapshot.js';
+import { prepareSnapshot } from '../directory/snapshot.js';
 import { GET as mountedImage } from '../../../routes/(protected)/(endpoints)/public/[...file]/+server.js';
 import { createAuthentication } from './index.js';
 
