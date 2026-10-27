@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Locator } from '@playwright/test';
@@ -368,7 +368,7 @@ for (const source of [null, '/public/missing.svg', '/public/invalid.svg']) {
 					await expect(image).toHaveAttribute('src', '/logo');
 					await expect(image).toHaveJSProperty('complete', true);
 					await expect(image).toHaveJSProperty('naturalWidth', 0);
-				} else await expectDecoded(image, '/favicon.svg');
+				} else await expectDecoded(image, '/favicon.png');
 				expect(logoRequests).toBe(source === null ? 0 : 1);
 				await expect(page.getByRole('heading')).toHaveText(`Sign in to ${siteTitle}`);
 				await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
@@ -376,7 +376,9 @@ for (const source of [null, '/public/missing.svg', '/public/invalid.svg']) {
 					'href',
 					`${app.url}/favicon`
 				);
-				expect(await (await app.fetch('/favicon.svg')).text()).toContain('🗂️');
+				expect(Buffer.from(await (await app.fetch('/favicon.png')).arrayBuffer())).toEqual(
+					await readFile(new URL('../static/favicon.png', import.meta.url))
+				);
 				expect((await app.fetch('/logo')).status).toBe(404);
 			} finally {
 				await context.close();
@@ -416,15 +418,15 @@ test('sign-in catches a logo failure before hydration and stops after a failed f
 		await expect(image).toHaveJSProperty('complete', true);
 		await expect(image).toHaveJSProperty('naturalWidth', 0);
 		releaseScript();
-		await expectDecoded(image, '/favicon.svg');
+		await expectDecoded(image, '/favicon.png');
 		await page.unroute('**/_app/**/*.js');
 		let fallbackRequests = 0;
-		await page.route('**/favicon.svg', async (route) => {
+		await page.route('**/favicon.png', async (route) => {
 			fallbackRequests++;
 			await route.abort();
 		});
 		await page.reload();
-		await expect(image).toHaveAttribute('src', '/favicon.svg');
+		await expect(image).toHaveAttribute('src', '/favicon.png');
 		await expect(image).toHaveJSProperty('complete', true);
 		await expect(image).toHaveJSProperty('naturalWidth', 0);
 		await page.waitForTimeout(200);

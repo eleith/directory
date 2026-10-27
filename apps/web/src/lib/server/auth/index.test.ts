@@ -232,6 +232,46 @@ describe('mounted image access', () => {
 	);
 });
 
+describe('configured public share image access', () => {
+	it.each(['GET', 'HEAD'])(
+		'permits the selected static OG image for %s without a session',
+		async (method) => {
+			const event = eventFor('/public/images/share.svg?ignored=1', {
+				method,
+				routeId: '/(protected)/(endpoints)/public/[...file]'
+			});
+			event.params = { file: 'images/share.svg' };
+			event.locals.snapshot = prepareSnapshot(
+				validateConfig(
+					{ site: { og_image_path: '/public/images/share.svg' }, links: {} },
+					{ env: {} }
+				)
+			);
+			expect((await responseFor(event)).status).toBe(200);
+			expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith(event);
+			expect(mocks.session).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each(['other.svg', 'images/share.svg/other'])(
+		'keeps %s outside the public selection',
+		async (file) => {
+			const event = eventFor(`/public/${file}`, {
+				routeId: '/(protected)/(endpoints)/public/[...file]'
+			});
+			event.params = { file };
+			event.locals.snapshot = prepareSnapshot(
+				validateConfig(
+					{ site: { og_image_path: '/public/images/share.svg' }, links: {} },
+					{ env: {} }
+				)
+			);
+			expect((await responseFor(event)).status).toBe(401);
+			expect(mocks.resolve).not.toHaveBeenCalled();
+		}
+	);
+});
+
 describe('boot factory', () => {
 	it('constructs one SDK instance and seven-day native JWT pipeline per application', async () => {
 		const authentication = authenticate();
@@ -313,7 +353,7 @@ describe('whole-directory gate', () => {
 		}
 	});
 
-	it.each(['/signin', '/healthz', '/favicon.svg', '/_app/immutable/missing.js'])(
+	it.each(['/signin', '/healthz', '/favicon.png', '/_app/immutable/missing.js'])(
 		'does not make unresolved URLs public: %s',
 		async (path) => {
 			const response = await responseFor(

@@ -2,6 +2,7 @@
 	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import ConfigUpdateNotice from '$lib/components/ConfigUpdateNotice.svelte';
+	import DocumentHead from '$lib/components/DocumentHead.svelte';
 	import type { LayoutData } from './$types';
 	import '../lib/styles/reset.css';
 	import '../lib/styles/theme.css';
@@ -21,9 +22,7 @@
 	});
 </script>
 
-<svelte:head>
-	<link rel="icon" href={data.faviconPath} />
-</svelte:head>
+<DocumentHead metadata={data.document} faviconPath={data.faviconPath} />
 
 <ConfigUpdateNotice snapshotId={page.data.directory?.snapshotId} />
 {@render children()}

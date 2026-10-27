@@ -74,13 +74,13 @@
 			]
 		},
 		"SiteImagePath": {
-			"description": "A mounted image path or the bundled /favicon.svg mark.",
+			"description": "A mounted image path or the bundled /favicon.png mark.",
 			"anyOf": [
 				{ "$ref": "#/$defs/LocalImagePath" },
 				{
 					"type": "string",
 					"anyOf": [
-						{ "type": "string", "const": "/favicon.svg" },
+						{ "type": "string", "const": "/favicon.png" },
 						{
 							"type": "string",
 							"pattern": "(?:^|[^$])(?:\\$\\$)*\\$\\{[A-Z_][A-Z0-9_]*(?::-[^}]*)?\\}"
@@ -178,8 +178,12 @@
 					]
 				},
 				"description": { "default": "", "type": "string" },
-				"logo_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
-				"favicon_path": { "default": "/favicon.svg", "$ref": "#/$defs/SiteImagePath" },
+				"logo_path": { "default": "/favicon.png", "$ref": "#/$defs/SiteImagePath" },
+				"favicon_path": { "default": "/favicon.png", "$ref": "#/$defs/SiteImagePath" },
+				"og_image_path": {
+					"description": "Optional public Open Graph image, including when authentication is enabled. Use a /public/ image path, not an external URL; PNG or JPEG at 1200×630 is recommended. Omit or supply a missing image to generate a 1200×630 PNG from the site title, favicon and appearance only.",
+					"$ref": "#/$defs/LocalImagePath"
+				},
 				"footer": { "default": "", "type": "string" },
 				"open_links_in_new_tab": {
 					"default": true,

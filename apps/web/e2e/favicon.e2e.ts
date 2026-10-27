@@ -276,10 +276,10 @@ test('valid reloads keep the alias but change bytes; invalid and auth-changing c
 		await expect.poll(async () => (await server.fetch('/favicon')).status).toBe(404);
 		await expectNotFound(server);
 		await page.reload();
-		await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
-		const bundled = await server.fetch('/favicon.svg');
+		await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon.png');
+		const bundled = await server.fetch('/favicon.png');
 		expect(bundled.status).toBe(200);
-		expect(bundled.headers.get('content-type')).toContain('image/svg+xml');
+		expect(bundled.headers.get('content-type')).toContain('image/png');
 		await expectRawPrivate(server);
 	} finally {
 		await context.close();

@@ -82,8 +82,8 @@ describe('prepareDirectoryContent', () => {
 				title: 'Directory',
 				description: '',
 				footer: '',
-				logo_path: '/favicon.svg',
-				favicon_path: '/favicon.svg',
+				logo_path: '/favicon.png',
+				favicon_path: '/favicon.png',
 				open_links_in_new_tab: true
 			},
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
@@ -155,7 +155,7 @@ describe('prepareDirectoryContent', () => {
 		const display = prepareDirectoryContent(config, 'independent');
 		expect(config).toEqual(original);
 		expect(display.site).toHaveProperty('favicon_path', '/public/site.png');
-		expect(display.site).toHaveProperty('logo_path', '/favicon.svg');
+		expect(display.site).toHaveProperty('logo_path', '/favicon.png');
 		const link = display.groups[0]!.links[0]!;
 		expect(link).toHaveProperty('description', '');
 		expect(link).toHaveProperty('logo_path', '/public/photo.svg');

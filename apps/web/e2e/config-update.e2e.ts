@@ -174,7 +174,7 @@ test('an accepted edit leaves the current document and typed URL alone until nat
 	await expect(search(page)).toBeEnabled();
 	await expect.poll(() => versionRequests.length).toBe(1);
 	const original = await readVersion(page.request);
-	await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.svg');
+	await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.png');
 	await expect.poll(() => imageRequests.length).toBe(1);
 	await page.evaluate(() => {
 		document.body.dataset.updateDocument = 'original';
@@ -204,7 +204,7 @@ test('an accepted edit leaves the current document and typed URL alone until nat
 	await expect(search(page)).toBeFocused();
 	await expect(search(page).locator('..')).toHaveCSS('outline-color', 'rgb(19, 87, 155)');
 	await expect(page.locator('body')).toHaveAttribute('data-update-document', 'original');
-	await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.svg');
+	await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.png');
 	expect(imageRequests).toHaveLength(1);
 	await expect(page).toHaveURL(address);
 	const checksAtNotice = versionRequests.length;

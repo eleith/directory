@@ -115,14 +115,14 @@ for (const javaScriptEnabled of [true, false]) {
 			const html = await (await app.fetch('/')).text();
 			expect(html).toMatch(
 				new RegExp(
-					`<img[^>]*src="${source ?? '/favicon.svg'}"[^>]*alt=""[^>]*width="48"[^>]*height="48"[^>]*loading="eager"`
+					`<img[^>]*src="${source ?? '/favicon.png'}"[^>]*alt=""[^>]*width="48"[^>]*height="48"[^>]*loading="eager"`
 				)
 			);
 			const context = await browser.newContext({ javaScriptEnabled });
 			try {
 				const page = await context.newPage();
 				await page.goto(app.url);
-				await expectDecoded(page.locator('header img'), source ?? '/favicon.svg');
+				await expectDecoded(page.locator('header img'), source ?? '/favicon.png');
 				await expect(page.locator('header h1')).toHaveText(title);
 				await expect(page.locator('header .description')).toHaveText(description);
 				await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
@@ -160,7 +160,7 @@ test('a configured image that fails before hydration falls back once in the same
 		await expect.poll(() => heldScripts).toBeGreaterThan(0);
 		const ssrImage = await image.elementHandle();
 		scripts.resolve();
-		await expectDecoded(image, '/favicon.svg');
+		await expectDecoded(image, '/favicon.png');
 		expect(await image.evaluate((node, previous) => node === previous, ssrImage)).toBe(true);
 		await ssrImage?.dispose();
 	} finally {
@@ -176,18 +176,18 @@ for (const source of [sourceA, undefined]) {
 		await writeFile(join(publicDir, 'private-brand-a.svg'), 'not an image');
 		const app = await boot(source);
 		let requests = 0;
-		await page.route('**/favicon.svg', async (route) => {
+		await page.route('**/favicon.png', async (route) => {
 			requests++;
 			await route.abort();
 		});
 		const failed = page.waitForEvent(
 			'requestfailed',
-			(request) => new URL(request.url()).pathname === '/favicon.svg'
+			(request) => new URL(request.url()).pathname === '/favicon.png'
 		);
 		await page.goto(app.url);
 		await failed;
 		const image = page.locator('header img');
-		await expect(image).toHaveAttribute('src', '/favicon.svg');
+		await expect(image).toHaveAttribute('src', '/favicon.png');
 		await expectBroken(image);
 		await page.evaluate(
 			() =>
@@ -230,7 +230,7 @@ test('source changes retry A to B to repaired A in place, and hydrated errors us
 	});
 	await page.goto(app.url);
 	const image = page.locator('header img');
-	await expectDecoded(image, '/favicon.svg');
+	await expectDecoded(image, '/favicon.png');
 	expect(primaryARequests).toBe(1);
 	await page.evaluate(() => Reflect.set(window, 'headerNavigationMarker', true));
 	const originalImage = await image.elementHandle();
@@ -258,7 +258,7 @@ test('source changes retry A to B to repaired A in place, and hydrated errors us
 		);
 		await navigateQuery(page, '/?link=book');
 		expect((await failedPrimary).status()).toBe(404);
-		await expectDecoded(image, '/favicon.svg');
+		await expectDecoded(image, '/favicon.png');
 		expect(await page.evaluate(() => Reflect.get(window, 'headerNavigationMarker'))).toBe(true);
 		expect(
 			await image.evaluate((node, previous) => node === previous && node.isConnected, originalImage)

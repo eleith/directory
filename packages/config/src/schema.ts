@@ -72,8 +72,8 @@ export const LocalImagePathSchema = Type.String({
 });
 
 export const SiteImagePathSchema = Type.Union(
-	[ref(LocalImagePathSchema), Type.Literal('/favicon.svg')],
-	{ $id: 'SiteImagePath', description: 'A mounted image path or the bundled /favicon.svg mark.' }
+	[ref(LocalImagePathSchema), Type.Literal('/favicon.png')],
+	{ $id: 'SiteImagePath', description: 'A mounted image path or the bundled /favicon.png mark.' }
 );
 
 export const HexColorSchema = Type.String({
@@ -118,8 +118,14 @@ export const SiteSchema = Type.Object(
 	{
 		title: Type.String({ ...nonEmptyText, default: 'Directory' }),
 		description: Type.String({ default: '' }),
-		logo_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
-		favicon_path: ref(SiteImagePathSchema, { default: '/favicon.svg' }),
+		logo_path: ref(SiteImagePathSchema, { default: '/favicon.png' }),
+		favicon_path: ref(SiteImagePathSchema, { default: '/favicon.png' }),
+		og_image_path: Type.Optional(
+			ref(LocalImagePathSchema, {
+				description:
+					'Optional public Open Graph image, including when authentication is enabled. Use a /public/ image path, not an external URL; PNG or JPEG at 1200×630 is recommended. Omit or supply a missing image to generate a 1200×630 PNG from the site title, favicon and appearance only.'
+			})
+		),
 		footer: Type.String({ default: '' }),
 		open_links_in_new_tab: Type.Boolean({
 			default: true,

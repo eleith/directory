@@ -199,7 +199,7 @@
 		<div class="site-brand">
 			<Logo
 				source={data.directory.site.logo_path}
-				fallback="/favicon.svg"
+				fallback="/favicon.png"
 				size={48}
 				loading="eager"
 			/>

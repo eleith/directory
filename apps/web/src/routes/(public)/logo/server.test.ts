@@ -48,8 +48,8 @@ describe('public selected-logo alias', () => {
 	it.each([
 		['GET', undefined],
 		['HEAD', undefined],
-		['GET', '/favicon.svg'],
-		['HEAD', '/favicon.svg']
+		['GET', '/favicon.png'],
+		['HEAD', '/favicon.png']
 	] as const)('returns 404 before I/O for %s with bundled selection %s', async (method, source) => {
 		const response = await GET(event(method, snapshot(source)));
 		expect(readMountedImage).not.toHaveBeenCalled();

@@ -95,7 +95,7 @@ describe('default-aware editor schema', () => {
 		for (const field of ['logo_path', 'favicon_path']) {
 			expect(property(definition(editor, 'Site'), field)).toEqual({
 				$ref: '#/$defs/SiteImagePath',
-				default: '/favicon.svg'
+				default: '/favicon.png'
 			});
 		}
 		expect(property(definition(editor, 'Link'), 'logo_path')).toEqual({
@@ -106,9 +106,17 @@ describe('default-aware editor schema', () => {
 		expect(choices[0]).toEqual({ $ref: '#/$defs/LocalImagePath' });
 		expect((choices[1]!.anyOf as ObjectSchema[])[0]).toEqual({
 			type: 'string',
-			const: '/favicon.svg'
+			const: '/favicon.png'
 		});
 		expect(interpolationPattern(choices[1]!).test('${SITE_IMAGE}')).toBe(true);
+	});
+
+	it('keeps the Open Graph image optional, local-only and without a default', () => {
+		const site = definition(createEditorSchema(), 'Site');
+		const image = property(site, 'og_image_path');
+		expect(image.$ref).toBe('#/$defs/LocalImagePath');
+		expect(image).not.toHaveProperty('default');
+		expect(site.required).toBeUndefined();
 	});
 
 	it('produces only resolvable local references, with no invented publication URL', () => {

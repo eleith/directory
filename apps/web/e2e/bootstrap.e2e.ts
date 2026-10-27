@@ -16,8 +16,8 @@ test.describe('without JavaScript', () => {
 		await expect(page.getByRole('heading', { name: 'Directory' })).toBeVisible();
 		await expect(page.getByText("A small directory for your family's homelab.")).toBeVisible();
 		await expect(page.getByText('No bookmarks yet.')).toBeVisible();
-		const favicon = await request.get('/favicon.svg');
+		const favicon = await request.get('/favicon.png');
 		expect(favicon.ok()).toBe(true);
-		expect(favicon.headers()['content-type']).toContain('image/svg+xml');
+		expect(favicon.headers()['content-type']).toContain('image/png');
 	});
 });

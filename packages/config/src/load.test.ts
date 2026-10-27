@@ -71,8 +71,8 @@ describe('default, interpolate, then validate', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			logo_path: '/favicon.svg',
-			favicon_path: '/favicon.svg',
+			logo_path: '/favicon.png',
+			favicon_path: '/favicon.png',
 			open_links_in_new_tab: true
 		});
 		expect(config.appearance).toEqual({
@@ -131,9 +131,9 @@ describe('default, interpolate, then validate', () => {
 		{ title: 'Home' },
 		{ logo_path: '/public/home.svg' },
 		{ favicon_path: '/public/site.png' },
-		{ logo_path: '/favicon.svg' },
-		{ favicon_path: '/favicon.svg' },
-		{ logo_path: '/favicon.svg', favicon_path: '/favicon.svg' }
+		{ logo_path: '/favicon.png' },
+		{ favicon_path: '/favicon.png' },
+		{ logo_path: '/favicon.png', favicon_path: '/favicon.png' }
 	])('normalizes independent site image selections without mutating input: %j', (site) => {
 		const raw = { site, links: { photos: link } };
 		const before = structuredClone(raw);
@@ -142,8 +142,8 @@ describe('default, interpolate, then validate', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			logo_path: '/favicon.svg',
-			favicon_path: '/favicon.svg',
+			logo_path: '/favicon.png',
+			favicon_path: '/favicon.png',
 			open_links_in_new_tab: true,
 			...site
 		});
@@ -151,7 +151,7 @@ describe('default, interpolate, then validate', () => {
 		expect(config.links.photos).not.toHaveProperty('favicon_path');
 		config.site.logo_path = '/public/changed.svg';
 		expect(validateConfig(raw, { env: {} }).site.favicon_path).toBe(
-			site.favicon_path ?? '/favicon.svg'
+			site.favicon_path ?? '/favicon.png'
 		);
 		expect(raw).toEqual(before);
 	});
@@ -199,11 +199,11 @@ describe('default, interpolate, then validate', () => {
 
 	it('interpolates site image selections before applying the strict image boundary', () => {
 		const raw = { site: { logo_path: '${LOGO}', favicon_path: '${ICON}' }, links: {} };
-		const config = validateConfig(raw, { env: { LOGO: '/favicon.svg', ICON: '/public/icon.png' } });
-		expect(config.site.logo_path).toBe('/favicon.svg');
+		const config = validateConfig(raw, { env: { LOGO: '/favicon.png', ICON: '/public/icon.png' } });
+		expect(config.site.logo_path).toBe('/favicon.png');
 		expect(config.site.favicon_path).toBe('/public/icon.png');
 		expect(() =>
-			validateConfig(raw, { env: { LOGO: '/favicon.svg?x', ICON: '/public/icon.png' } })
+			validateConfig(raw, { env: { LOGO: '/favicon.png?x', ICON: '/public/icon.png' } })
 		).toThrow(ConfigError);
 		expect(() => validateConfig(raw, { env: {} })).toThrow(ConfigError);
 	});
@@ -394,6 +394,85 @@ describe('default, interpolate, then validate', () => {
 	});
 });
 
+describe('optional Open Graph image', () => {
+	it.each([undefined, {}, { title: 'Home' }])(
+		'leaves an omitted image absent after defaults: %j',
+		(site) => {
+			const config = validateConfig({ links: {}, ...(site ? { site } : {}) }, { env: {} });
+			expect(config.site).not.toHaveProperty('og_image_path');
+		}
+	);
+
+	it.each([
+		'/public/share.png',
+		'/public/cards/home.JPEG',
+		'/public/family photo.jpg',
+		'/public/图标/家.webp',
+		'/public/share.svg',
+		'/public/share.gif',
+		'/public/missing.png'
+	])('preserves a local image without requiring the file to exist: %s', (og_image_path) => {
+		const raw = { site: { og_image_path }, links: {} };
+		const before = structuredClone(raw);
+		expect(validateConfig(raw, { env: {} }).site.og_image_path).toBe(og_image_path);
+		expect(raw).toEqual(before);
+	});
+
+	it.each(
+		[
+			null,
+			false,
+			1,
+			[],
+			{},
+			'',
+			'/favicon.png',
+			'https://example.com/share.png',
+			'//example.com/share.png',
+			'data:image/png;base64,AAAA',
+			'file:///public/share.png',
+			'public/share.png',
+			'/share.png',
+			'/public/../share.png',
+			'/public/./share.png',
+			'/public//share.png',
+			'/public/%2e%2e/share.png',
+			'/public/a\\b.png',
+			'/public/share.png?size=large',
+			'/public/share.png#image',
+			'/public/share.html',
+			'/public/share.png\n',
+			'/public/share\u0000.png'
+		].map((og_image_path) => ({ og_image_path }))
+	)('rejects invalid, remote and bundled image selections: $og_image_path', ({ og_image_path }) => {
+		const error = configurationError(() =>
+			validateConfig({ site: { og_image_path }, links: {} }, { env: {} })
+		);
+		expect(error.issues).toMatchObject([{ path: '/site/og_image_path' }]);
+	});
+
+	it('validates interpolated paths with the same local-only boundary', () => {
+		const raw = { site: { og_image_path: '${IMAGE}' }, links: {} };
+		expect(validateConfig(raw, { env: { IMAGE: '/public/share.png' } }).site.og_image_path).toBe(
+			'/public/share.png'
+		);
+		for (const env of [{}, { IMAGE: '/favicon.png' }, { IMAGE: 'https://example.com/share.png' }]) {
+			expect(() => validateConfig(raw, { env })).toThrow(ConfigError);
+		}
+	});
+
+	it('loads an optional image from YAML without changing other site defaults', async () => {
+		const config = await loadYaml('site:\n  og_image_path: /public/share.png\nlinks: {}\n');
+		expect(config.site).toEqual({
+			...validateConfig({ links: {} }, { env: {} }).site,
+			og_image_path: '/public/share.png'
+		});
+		await expect(loadYaml('site: {og_image_path: null}\nlinks: {}\n')).rejects.toBeInstanceOf(
+			ConfigError
+		);
+	});
+});
+
 describe('YAML file loader', () => {
 	it.each([
 		{ site: '', expected: true },
@@ -422,8 +501,8 @@ describe('YAML file loader', () => {
 			title: 'Directory',
 			description: '',
 			footer: '',
-			logo_path: '/favicon.svg',
-			favicon_path: '/favicon.svg',
+			logo_path: '/favicon.png',
+			favicon_path: '/favicon.png',
 			open_links_in_new_tab: true
 		});
 		expect(config.appearance).toEqual({

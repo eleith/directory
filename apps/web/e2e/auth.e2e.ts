@@ -191,7 +191,7 @@ test('enabled authentication gates HTML, actual Kit data, HEAD, unknown routes a
 		expect(scriptPath).toBeDefined();
 		for (const method of ['GET', 'HEAD']) {
 			for (const [path, contentType] of [
-				['/favicon.svg', 'image/svg+xml'],
+				['/favicon.png', 'image/png'],
 				[`/${scriptPath!}`, 'javascript']
 			] as const) {
 				const asset = await server.fetch(path, { method });

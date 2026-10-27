@@ -1,0 +1,41 @@
+<style>
+	.card {
+	  width: 1200px;
+	  height: 630px;
+	  display: flex;
+	  flex-direction: column;
+	  justify-content: center;
+	  align-items: flex-start;
+	  padding: 88px;
+	  gap: 40px;
+	  background: radial-gradient(ellipse at 100% 0%, {{light}}80, transparent 70%), radial-gradient(ellipse at 100% 100%, {{dark}}26, transparent 65%), #101719;
+	  color: #f5f7f7;
+	}
+	.favicon {
+	  width: 132px;
+	  height: 132px;
+	  flex-shrink: 0;
+	  display: flex;
+	  align-items: center;
+	  justify-content: center;
+	  border-radius: 30px;
+	  background: #ffffff0d;
+	  border: 1px solid #ffffff26;
+	  box-shadow: 0 16px 48px #00000026;
+	}
+	img { width: 88px; height: 88px; object-fit: contain; }
+	.title {
+	  font-size: {{fontSize}}px;
+	  font-weight: 650;
+	  letter-spacing: -2px;
+	  line-height: 1.12;
+	  max-width: 100%;
+	  word-break: break-word;
+	}
+	.accent { width: 64px; height: 5px; flex-shrink: 0; border-radius: 3px; background: {{dark}}; }
+</style>
+<div class="card">
+	<div class="favicon"><img src="favicon" /></div>
+	<div class="title">{{title}}</div>
+	<div class="accent"></div>
+</div>

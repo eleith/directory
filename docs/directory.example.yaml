@@ -5,6 +5,8 @@ site:
   title: Home Server
   description: Useful things running at home.
   footer: Something not working? Ask your household maintainer.
+  # Optional public Open Graph image; generated when omitted.
+  # og_image_path: /public/share.png
 
 appearance:
   primary_light_color: '#0f766e'

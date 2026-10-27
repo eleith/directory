@@ -135,7 +135,7 @@ test('mounted files and generated bookmark logos require a real session, includi
 				}
 			}
 		}
-		for (const path of ['/healthz', '/favicon.svg', '/signin']) {
+		for (const path of ['/healthz', '/favicon.png', '/signin']) {
 			const response = await server.fetch(path);
 			expect(response.status).toBe(200);
 			await expectNoPrivateData(response);

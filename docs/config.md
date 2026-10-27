@@ -25,8 +25,9 @@ Defaults apply when you leave a field out. Unknown fields and `null` are errors.
 | `title`                 | Nonblank text, e.g. `Home`.                                         | `Directory`    |
 | `description`           | Text below the title.                                               | Empty          |
 | `footer`                | Text at the bottom of the page.                                     | Empty          |
-| `logo_path`             | [Image path](#images), e.g. `/public/house.svg`, or `/favicon.svg`. | `/favicon.svg` |
-| `favicon_path`          | Browser tab icon. Same path options as `logo_path`.                 | `/favicon.svg` |
+| `logo_path`             | [Image path](#images), e.g. `/public/house.svg`, or `/favicon.png`. | `/favicon.png` |
+| `favicon_path`          | Browser tab icon. Same path options as `logo_path`.                 | `/favicon.png` |
+| `og_image_path`         | Public Open Graph [image path](#images), e.g. `/public/share.png`.  | Auto-generated |
 | `open_links_in_new_tab` | `true` or `false`. Applies to every destination.                    | `true`         |
 
 ### appearance

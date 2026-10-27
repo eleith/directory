@@ -26,7 +26,7 @@
 <div class="signin-container">
 	<main class="signin-card">
 		<header>
-			<Logo source={data.logoPath} fallback="/favicon.svg" size={48} loading="eager" />
+			<Logo source={data.logoPath} fallback="/favicon.png" size={48} loading="eager" />
 			<h1>Sign in to {data.title}</h1>
 			<p>Your family's directory of services.</p>
 		</header>

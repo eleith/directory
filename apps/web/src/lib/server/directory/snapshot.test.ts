@@ -107,6 +107,15 @@ describe('private prepared snapshots', () => {
 		}
 	});
 
+	it('tracks a configured Open Graph image as branding without adding its path to display data', () => {
+		const config = configuration();
+		config.site.og_image_path = '/public/share.png';
+		const snapshot = prepareSnapshot(config);
+		expect(snapshot.assets.brandingPaths).toContain('/public/share.png');
+		expect(snapshot.assets.referencedPaths).toContain('/public/share.png');
+		expect(JSON.stringify(snapshot.display)).not.toContain('/public/share.png');
+	});
+
 	it('keeps authentication private while assigning a fresh non-secret display identity', () => {
 		const input = configuration();
 		const first = prepareSnapshot(input);
@@ -148,7 +157,7 @@ describe('private prepared snapshots', () => {
 		expect(generate).toHaveBeenCalledTimes(2);
 	});
 
-	it.each([{}, { logo_path: '/favicon.svg', favicon_path: '/favicon.svg' }])(
+	it.each([{}, { logo_path: '/favicon.png', favicon_path: '/favicon.png' }])(
 		'excludes default and explicit bundled site images from mounted assets: %j',
 		(site) => {
 			const snapshot = prepareSnapshot(validateConfig({ site, links: {} }, { env: {} }));
@@ -157,8 +166,8 @@ describe('private prepared snapshots', () => {
 				brandingPaths: [],
 				bookmarkLogos: {}
 			});
-			expect(snapshot.display.site.logo_path).toBe('/favicon.svg');
-			expect(snapshot.display.site.favicon_path).toBe('/favicon.svg');
+			expect(snapshot.display.site.logo_path).toBe('/favicon.png');
+			expect(snapshot.display.site.favicon_path).toBe('/favicon.png');
 			expect(Object.isFrozen(snapshot.display.site)).toBe(true);
 			expect(snapshot.display.groups.flatMap((group) => group.links)).toEqual([]);
 		}
@@ -168,7 +177,7 @@ describe('private prepared snapshots', () => {
 		const snapshot = prepareSnapshot(
 			validateConfig(
 				{
-					site: { logo_path: '/favicon.svg', favicon_path: '/public/site.png' },
+					site: { logo_path: '/favicon.png', favicon_path: '/public/site.png' },
 					links: {
 						photos: { ...service, logo_path: '/public/photos.png' },
 						plain: service

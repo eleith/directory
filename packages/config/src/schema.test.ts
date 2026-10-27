@@ -40,8 +40,8 @@ describe('configuration defaults and inferred types', () => {
 				title: 'Directory',
 				description: '',
 				footer: '',
-				logo_path: '/favicon.svg',
-				favicon_path: '/favicon.svg',
+				logo_path: '/favicon.png',
+				favicon_path: '/favicon.png',
 				open_links_in_new_tab: true
 			},
 			appearance: { primary_light_color: '#0f766e', primary_dark_color: '#5eead4' },
@@ -56,6 +56,7 @@ describe('configuration defaults and inferred types', () => {
 		const value = defaultFixture({ links: {} });
 		expect(accepts({ links: {} })).toBe(true);
 		expect(value).not.toHaveProperty('auth');
+		expect(value).not.toHaveProperty('site.og_image_path');
 		expect(defaultFixture(raw)).not.toHaveProperty('links.photos.group');
 		expect(accepts({})).toBe(false);
 	});
@@ -89,6 +90,7 @@ describe('configuration defaults and inferred types', () => {
 		expectTypeOf<DirectoryConfiguration['site']['logo_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectoryConfiguration['site']['favicon_path']>().toEqualTypeOf<string>();
 		expectTypeOf<DirectorySite['open_links_in_new_tab']>().toEqualTypeOf<boolean>();
+		expectTypeOf<DirectorySite['og_image_path']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryLink['logo_path']>().toEqualTypeOf<string | undefined>();
 		expectTypeOf<DirectoryConfiguration['auth']>().toBeNullable();
 		expectTypeOf<DirectoryLink['tags']>().toEqualTypeOf<string[]>();
@@ -349,15 +351,16 @@ describe('URL, image and color constraints', () => {
 		'https://example.com/logo.svg',
 		'//example.com/logo.svg',
 		'/favicon.svg',
-		'/favicon.svg/',
-		'/favicon.svg?x',
-		'/favicon.svg#x',
-		'/favicon%2esvg',
-		'/Favicon.svg',
-		'/favicon.svg\n',
+		'/favicon.png',
+		'/favicon.png/',
+		'/favicon.png?x',
+		'/favicon.png#x',
+		'/favicon%2epng',
+		'/Favicon.png',
+		'/favicon.png\n',
 		'data:image/svg+xml,test',
-		'file:///favicon.svg',
-		'favicon.svg',
+		'file:///favicon.png',
+		'favicon.png',
 		'/public/logo\u0000.svg',
 		'/public/logo\t.svg',
 		'/public/logo\u007f.svg',
@@ -374,7 +377,7 @@ describe('URL, image and color constraints', () => {
 		'/public/logo.svg\n'
 	])('rejects unsafe/non-image path %j', (path) => {
 		expect(Value.Check(LocalImagePathSchema, path)).toBe(false);
-		if (path !== '/favicon.svg') {
+		if (path !== '/favicon.png') {
 			expect(Value.Check(SiteImagePathSchema, configurationReferences, path)).toBe(false);
 			for (const field of ['logo_path', 'favicon_path']) {
 				expect(accepts({ ...raw, site: { [field]: path } })).toBe(false);
@@ -383,9 +386,9 @@ describe('URL, image and color constraints', () => {
 	});
 	it('accepts the bundled mark only for site images, not bookmark logos', () => {
 		for (const field of ['logo_path', 'favicon_path']) {
-			expect(accepts({ ...raw, site: { [field]: '/favicon.svg' } })).toBe(true);
+			expect(accepts({ ...raw, site: { [field]: '/favicon.png' } })).toBe(true);
 		}
-		expect(accepts({ links: { photos: { ...link, logo_path: '/favicon.svg' } } })).toBe(false);
+		expect(accepts({ links: { photos: { ...link, logo_path: '/favicon.png' } } })).toBe(false);
 	});
 	it.each(['#fff', '#0f766e', '#ABCDEF'])('accepts hex color %s', (color) => {
 		expect(Value.Check(HexColorSchema, color)).toBe(true);
