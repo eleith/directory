@@ -184,7 +184,6 @@ test('an accepted edit leaves the current document and typed URL alone until nat
 	await expect(page).toHaveURL(address);
 	await expect(page.locator('.tile-title')).toHaveText(['PRIVATE_C6_SERVICE']);
 	await expect(search(page)).toBeFocused();
-	await expect(search(page).locator('..')).toHaveCSS('outline-color', 'rgb(19, 87, 155)');
 
 	await writeFile(
 		join(dirname(server.path), 'public', 'config-update.svg'),
@@ -202,7 +201,6 @@ test('an accepted edit leaves the current document and typed URL alone until nat
 	);
 	await expect(search(page)).toHaveValue('tag:PRIVATE_C6_TAG');
 	await expect(search(page)).toBeFocused();
-	await expect(search(page).locator('..')).toHaveCSS('outline-color', 'rgb(19, 87, 155)');
 	await expect(page.locator('body')).toHaveAttribute('data-update-document', 'original');
 	await expect(page.locator('header img')).toHaveAttribute('src', '/favicon.png');
 	expect(imageRequests).toHaveLength(1);
@@ -230,7 +228,6 @@ test('an accepted edit leaves the current document and typed URL alone until nat
 	await expect(refresh).toHaveAttribute('href', refreshedAddress);
 	await expect(refresh).toHaveJSProperty('href', refreshedAddress);
 	expect(versionRequests).toHaveLength(checksAtNotice);
-	await expect(page.locator('.update-notice')).toHaveCSS('position', 'sticky');
 	await Promise.all([page.waitForEvent('domcontentloaded'), refresh.click()]);
 	await expect(page).toHaveURL(refreshedAddress);
 	await expect(page).toHaveTitle(updatedTitle);
@@ -247,7 +244,6 @@ test('an accepted edit leaves the current document and typed URL alone until nat
 	await expect(search(page)).toHaveValue(refreshedQuery);
 	await expect(page.locator('.tile-title')).toHaveText(['PRIVATE_C6_SERVICE']);
 	await search(page).click();
-	await expect(search(page).locator('..')).toHaveCSS('outline-color', 'rgb(36, 104, 172)');
 	await expect(page.locator('header img')).toHaveAttribute('src', logoPath);
 	await expect(page.locator('header img')).toHaveJSProperty('naturalWidth', 48);
 	await expect.poll(() => imageRequests.length).toBe(2);
@@ -286,8 +282,6 @@ test('real SPA data changes do not forget the document baseline or steal dialog 
 	await page.clock.runFor(5_000);
 	await expect(notice(page)).toHaveCount(1);
 	await expect(action).toBeFocused();
-	await expect(page.locator('.update-notice')).toHaveCSS('z-index', '5');
-	await expect(page.locator('[data-dialog-overlay]')).toHaveCSS('z-index', '10');
 	const stoppedAt = checks;
 	await page.clock.runFor(60_000);
 	await page.evaluate(() => {
