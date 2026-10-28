@@ -179,11 +179,11 @@ test('source changes retry primary URLs in place, including a repaired previousl
 		await expect
 			.poll(async () => (await server.fetch('/__data.json')).text())
 			.toContain('/public/primary-c.svg');
-		const failedPrimary = page.waitForResponse(
+		const primaryResponse = page.waitForResponse(
 			(response) => new URL(response.url()).pathname === '/public/primary-c.svg'
 		);
 		await navigateQuery(page, '/?link=valid');
-		expect((await failedPrimary).status()).toBe(404);
+		await primaryResponse;
 		await expectDecoded(image, '/bookmarks/broken/logo');
 		expect(await page.evaluate(() => Reflect.get(window, 'bookmarkNavigationMarker'))).toBe(true);
 		expect(

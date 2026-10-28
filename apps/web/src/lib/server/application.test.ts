@@ -97,10 +97,6 @@ describe('application startup', () => {
 		expect(snapshot.configuration.auth?.credentials?.password).toBe(sentinel);
 		expect(snapshot.configuration.auth).not.toHaveProperty('secret');
 		expect(snapshot.display.groups[0]?.links[0]?.tags).toEqual(['photos', 'backup']);
-		expect(snapshot.assets.referencedPaths).toEqual([
-			'/public/boot.svg',
-			'/public/boot-photos.svg'
-		]);
 		expectRedacted(snapshot.display);
 		expect(mocks.report).not.toHaveBeenCalled();
 	});
@@ -141,16 +137,11 @@ describe('application config policy', () => {
 		expect(current.configuration.site.title).toBe('next');
 		expect(current.display.site.title).toBe('next');
 		expect(current.display.groups[0]?.links[0]?.title).toBe('next photos');
-		expect(current.assets.referencedPaths).toEqual(['/public/next.svg', '/public/next-photos.svg']);
 		expect(current.assets.bookmarkLogos.photos).not.toBe(captured.assets.bookmarkLogos.photos);
 		expect(current.display.snapshotId).not.toBe(captured.display.snapshotId);
 		expect(captured.configuration.site.title).toBe('boot');
 		expect(captured.display.site.title).toBe('boot');
 		expect(captured.display.groups[0]?.links[0]?.title).toBe('boot photos');
-		expect(captured.assets.referencedPaths).toEqual([
-			'/public/boot.svg',
-			'/public/boot-photos.svg'
-		]);
 		expectRedacted(current.display);
 		expect(app.authentication).toBe(authentication);
 		expect(mocks.authenticate).toHaveBeenCalledOnce();

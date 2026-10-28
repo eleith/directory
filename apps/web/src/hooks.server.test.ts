@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import type { Authentication } from './lib/server/auth/index.js';
 import { requireSignIn } from './lib/server/auth/access.js';
 import { readMountedImage } from './lib/server/images/read-mounted-image.js';
-import { GET as mountedImage } from './routes/(protected)/(endpoints)/public/[...file]/+server.js';
+import { GET as mountedImage } from './routes/(public)/public/[...file]/+server.js';
 import { GET as bookmarkLogo } from './routes/(protected)/(endpoints)/bookmarks/[id]/logo/+server.js';
 import type { Application } from './lib/server/application.js';
 
@@ -297,9 +297,13 @@ describe('server hooks', () => {
 	);
 
 	it.each(['GET', 'HEAD'])(
-		'never reaches an image reader before authentication for %s, including the configured favicon',
+		'serves public mounted %s images but authenticates generated bookmark logos',
 		async (method) => {
 			const session = vi.fn<App.Locals['auth']>().mockResolvedValue(null);
+			vi.mocked(readMountedImage).mockResolvedValue({
+				bytes: new TextEncoder().encode('<svg/>'),
+				contentType: 'image/svg+xml'
+			});
 			const authentication: Authentication = {
 				strategy: 'credentials',
 				handle: async (input) => {
@@ -317,25 +321,17 @@ describe('server hooks', () => {
 			const hooks = await import('./hooks.server.js');
 			await hooks.init();
 			const resolve = vi.fn<Resolve>().mockImplementation(async (event) => {
-				if (event.route.id === '/(protected)/(endpoints)/public/[...file]') {
+				if (event.route.id === '/(public)/public/[...file]') {
 					return mountedImage(event as Parameters<typeof mountedImage>[0]);
 				}
 				return bookmarkLogo(event as Parameters<typeof bookmarkLogo>[0]);
 			});
 			for (const cookie of ['', 'authjs.session-token=invalid-session']) {
 				for (const [path, routeId, params] of [
-					['/public/photo.svg', '/(protected)/(endpoints)/public/[...file]', { file: 'photo.svg' }],
-					['/public/site.svg', '/(protected)/(endpoints)/public/[...file]', { file: 'site.svg' }],
-					[
-						'/%70ublic/photo.svg',
-						'/(protected)/(endpoints)/public/[...file]',
-						{ file: 'photo.svg' }
-					],
-					[
-						'/public/unknown.svg',
-						'/(protected)/(endpoints)/public/[...file]',
-						{ file: 'unknown.svg' }
-					],
+					['/public/photo.svg', '/(public)/public/[...file]', { file: 'photo.svg' }],
+					['/public/site.svg', '/(public)/public/[...file]', { file: 'site.svg' }],
+					['/%70ublic/photo.svg', '/(public)/public/[...file]', { file: 'photo.svg' }],
+					['/public/unknown.svg', '/(public)/public/[...file]', { file: 'unknown.svg' }],
 					[
 						'/bookmarks/photos/logo',
 						'/(protected)/(endpoints)/bookmarks/[id]/logo',
@@ -356,33 +352,28 @@ describe('server hooks', () => {
 						isDataRequest: false,
 						locals: {}
 					} as unknown as RequestEvent;
-					expect((await hooks.handle({ event: request, resolve })).status).toBe(401);
+					expect((await hooks.handle({ event: request, resolve })).status).toBe(
+						routeId === '/(public)/public/[...file]' ? 200 : 401
+					);
 					expect(request.locals.publicDir).toBe(ready.publicDir);
 				}
 			}
-			expect(session).toHaveBeenCalledTimes(12);
-			expect(resolve).not.toHaveBeenCalled();
-			expect(readMountedImage).not.toHaveBeenCalled();
+			expect(session).toHaveBeenCalledTimes(4);
+			expect(resolve).toHaveBeenCalledTimes(8);
+			expect(readMountedImage).toHaveBeenCalledTimes(8);
 
 			session.mockResolvedValue({ user: { name: 'Directory' }, expires: '2030-01-01' });
-			vi.mocked(readMountedImage).mockResolvedValue({
-				bytes: new TextEncoder().encode('<svg/>'),
-				contentType: 'image/svg+xml'
-			});
-			const url = new URL('https://directory.example/public/photo.svg');
+			const url = new URL('https://directory.example/bookmarks/photos/logo');
 			const authorized = {
 				url,
 				request: new Request(url, { method }),
-				route: { id: '/(protected)/(endpoints)/public/[...file]' },
-				params: { file: 'photo.svg' },
+				route: { id: '/(protected)/(endpoints)/bookmarks/[id]/logo' },
+				params: { id: 'photos' },
 				isDataRequest: false,
 				locals: {}
 			} as unknown as RequestEvent;
 			expect((await hooks.handle({ event: authorized, resolve })).status).toBe(200);
-			expect(readMountedImage).toHaveBeenCalledExactlyOnceWith(
-				ready.publicDir,
-				'/public/photo.svg'
-			);
+			expect(readMountedImage).toHaveBeenCalledTimes(8);
 		}
 	);
 

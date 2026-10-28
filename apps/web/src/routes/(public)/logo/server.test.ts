@@ -97,7 +97,7 @@ describe('public selected-logo alias', () => {
 		captured.locals.snapshot = {
 			...captured.locals.snapshot,
 			display: snapshot('/public/display.svg').display,
-			assets: { referencedPaths: [], brandingPaths: [], bookmarkLogos: {} }
+			assets: { bookmarkLogos: {} }
 		};
 		const replacement = event('GET', snapshot('/public/replacement.png'));
 		await GET(captured);

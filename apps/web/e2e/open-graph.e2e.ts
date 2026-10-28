@@ -14,7 +14,7 @@ const generatedPath = '/images/og.png';
 const svgPath = '/public/share.svg';
 const nextPath = '/public/next.svg';
 const svg = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h32v32H0z"/></svg>';
-const privatePaths = [
+const mountedPaths = [
 	'/public/logo.svg',
 	'/public/link.svg',
 	'/public/tab.svg',
@@ -27,16 +27,16 @@ function brandedConfiguration(image: string) {
 	return configuration()
 		.replace(
 			'site:\n',
-			`site:\n  og_image_path: ${image}\n  logo_path: ${privatePaths[0]}\n  favicon_path: ${privatePaths[2]}\n`
+			`site:\n  og_image_path: ${image}\n  logo_path: ${mountedPaths[0]}\n  favicon_path: ${mountedPaths[2]}\n`
 		)
 		.replace(
 			'  household:\n',
-			`  household:\n    group: PRIVATE_OG_GROUP\n    logo_path: ${privatePaths[1]}\n`
+			`  household:\n    group: PRIVATE_OG_GROUP\n    logo_path: ${mountedPaths[1]}\n`
 		);
 }
 
 function expectNoPrivateData(text: string) {
-	for (const value of [...privateSentinels, 'PRIVATE_OG_GROUP', ...privatePaths, publicDir]) {
+	for (const value of [...privateSentinels, 'PRIVATE_OG_GROUP', ...mountedPaths, publicDir]) {
 		expect(text).not.toContain(value);
 	}
 }
@@ -84,17 +84,13 @@ async function expectStatic(server: TestServer, path: string) {
 	expect(await response.text()).toBe(svg);
 }
 
-async function expectPrivateImages(server: TestServer, extra: string[] = []) {
-	for (const path of [...privatePaths, '/bookmarks/household/logo', ...extra]) {
-		for (const method of ['GET', 'HEAD']) {
-			const response = await server.fetch(path, { method });
-			expect(response.status, `${method} ${path}`).toBe(401);
-			expect(response.headers.has('location')).toBe(false);
-			const body = await response.text();
-			if (method === 'HEAD') expect(body).toBe('');
-			expectNoPrivateData(body);
-		}
+async function expectPublicAssets(server: TestServer) {
+	for (const path of [...mountedPaths, svgPath, nextPath]) {
+		await expectStatic(server, path);
 	}
+	const generatedLogo = await server.fetch('/bookmarks/household/logo');
+	expect(generatedLogo.status).toBe(401);
+	expectNoPrivateData(await generatedLogo.text());
 }
 
 test.setTimeout(60_000);
@@ -102,7 +98,7 @@ test.beforeEach(async () => {
 	directory = await mkdtemp(join(tmpdir(), 'directory-open-graph-'));
 	publicDir = join(directory, 'public');
 	await mkdir(publicDir);
-	for (const path of [...privatePaths, nextPath]) {
+	for (const path of [...mountedPaths, nextPath]) {
 		await writeFile(join(publicDir, path.slice('/public/'.length)), svg);
 	}
 });
@@ -146,7 +142,7 @@ test('auth redirects home while sign-in SSR and generated PNG GET/HEAD remain pu
 	}
 });
 
-test('missing static image recovers without reload; one reload moves only its public access', async () => {
+test('missing static image recovers without reload; selection changes metadata, not public file access', async () => {
 	const server = await startServer({ configuration: brandedConfiguration(svgPath), publicDir });
 	try {
 		await server.ready();
@@ -160,16 +156,14 @@ test('missing static image recovers without reload; one reload moves only its pu
 		});
 		expect(metadata(html)).not.toHaveProperty('og:image:width');
 		expect(metadata(html)).not.toHaveProperty('og:image:height');
-		await expectStatic(server, svgPath);
-		await expectPrivateImages(server, [nextPath]);
+		await expectPublicAssets(server);
 
 		await server.replace(brandedConfiguration(nextPath));
 		await expect
 			.poll(async () => metadata(await ssr(server))['og:image'])
 			.toBe(`${server.origin}${nextPath}`);
-		await expectStatic(server, nextPath);
-		// Selecting another OG image must not widen the static-image privacy scope.
-		await expectPrivateImages(server, [svgPath]);
+		// Both selected and unselected mounted files remain public.
+		await expectPublicAssets(server);
 	} finally {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
 	}

@@ -130,7 +130,7 @@ async function stopOidc(server: TestServer, issuer: TestIssuer) {
 	}
 }
 
-test('enabled authentication gates HTML, actual Kit data, HEAD, unknown routes and future assets', async () => {
+test('enabled authentication gates HTML, actual Kit data, HEAD and unknown routes', async () => {
 	const server = await startServer({ configuration: configuration() });
 	try {
 		await server.ready();
@@ -145,7 +145,6 @@ test('enabled authentication gates HTML, actual Kit data, HEAD, unknown routes a
 			'/',
 			'/__data.json?x-sveltekit-invalidated=11',
 			'/unknown',
-			'/public/private.svg',
 			'/healthz/extra',
 			'/signin/extra',
 			'/favicon-missing.svg'
@@ -203,9 +202,11 @@ test('enabled authentication gates HTML, actual Kit data, HEAD, unknown routes a
 				expectPublic(body);
 			}
 		}
-		const missingScript = await server.fetch('/_app/immutable/missing.js');
-		expect(missingScript.status).toBe(404);
-		expectPublic(await missingScript.text());
+		for (const path of ['/_app/immutable/missing.js', '/public/private.svg']) {
+			const missing = await server.fetch(path);
+			expect(missing.status).toBe(404);
+			expectPublic(await missing.text());
+		}
 		expectSafeLogs(server);
 	} finally {
 		expect(await server.stop()).toEqual({ code: 0, signal: null });
@@ -241,7 +242,8 @@ test('native routes reject unsupported verbs instead of serving public or privat
 						method,
 						headers: { origin: server.origin, cookie: session }
 					});
-					expect(response.status).toBe(session ? 405 : 401);
+					const expectedStatus = session || path.startsWith('/public/') ? 405 : 401;
+					expect(response.status).toBe(expectedStatus);
 					expectPublic(await response.text());
 				}
 			}

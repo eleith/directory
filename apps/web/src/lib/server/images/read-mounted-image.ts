@@ -2,7 +2,6 @@ import { constants } from 'node:fs';
 import { open, realpath, stat, type FileHandle } from 'node:fs/promises';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { BigIntStats } from 'node:fs';
-import { matchesImageFormat } from './image-format.js';
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -96,7 +95,6 @@ export async function readMountedImage(
 			return undefined;
 		}
 		const bytes = buffer.subarray(0, length);
-		if (!matchesImageFormat(bytes, extension)) return undefined;
 		image = { bytes: new Uint8Array(bytes), contentType };
 	} catch {
 		return undefined;

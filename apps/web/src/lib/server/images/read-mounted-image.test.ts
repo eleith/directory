@@ -80,6 +80,14 @@ describe('bounded mounted images', () => {
 		}
 	);
 
+	it('returns file bytes unchanged with an extension-based MIME type', async () => {
+		const bytes = Buffer.from('mounted file bytes\xff', 'latin1');
+		await put('icon.svg', bytes);
+		const image = await readMountedImage(root, '/public/icon.svg');
+		expect(image?.contentType).toBe('image/svg+xml');
+		expect(image?.bytes).toEqual(new Uint8Array(bytes));
+	});
+
 	it('accepts decoded Unicode/spaces, and nested paths without decoding again', async () => {
 		await mkdir(join(root, 'family'));
 		await put('family/café icon.svg');
@@ -160,6 +168,8 @@ describe('bounded mounted images', () => {
 		'rejects an ordinary concurrent %s on the same opened descriptor',
 		async (change) => {
 			await put('icon.svg');
+			// Same-size writes can share a filesystem clock tick.
+			if (change === 'rewrite') await fs.utimes(join(root, 'icon.svg'), 0, 0);
 			const normalOpen = vi.mocked(open).getMockImplementation()!;
 			vi.mocked(open).mockImplementationOnce(async (...args) => {
 				const file = await normalOpen(...args);
@@ -304,29 +314,6 @@ describe('bounded mounted images', () => {
 			vi.spyOn(file, 'stat').mockRejectedValueOnce(new Error('stat failed'));
 			return file;
 		});
-		expect(await readMountedImage(root, '/public/icon.svg')).toBeUndefined();
-	});
-});
-
-describe('image format checks during file reads', () => {
-	it.each([
-		['icon.png', svg],
-		['icon.svg', png],
-		['icon.svg', Buffer.from('<!DOCTYPE svg><svg/>')]
-	] as const)('rejects mismatched bytes or unsupported SVG markup in %s', async (name, bytes) => {
-		await put(name, bytes);
-		expect(await readMountedImage(root, `/public/${name}`)).toBeUndefined();
-	});
-
-	it('rejects invalid UTF-8 and bounded long non-SVG prefixes', async () => {
-		await put(
-			'icon.svg',
-			Buffer.concat([Buffer.from('<svg>'), Buffer.from([0xff]), Buffer.from('</svg>')])
-		);
-		expect(await readMountedImage(root, '/public/icon.svg')).toBeUndefined();
-		await put('icon.svg', ' '.repeat(MAX_IMAGE_BYTES - 6) + '<html>');
-		expect(await readMountedImage(root, '/public/icon.svg')).toBeUndefined();
-		await put('icon.svg', '<svg' + ' '.repeat(MAX_IMAGE_BYTES - 4));
 		expect(await readMountedImage(root, '/public/icon.svg')).toBeUndefined();
 	});
 });

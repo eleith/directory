@@ -209,7 +209,7 @@ describe('public generated Open Graph image', () => {
 		captured.locals.snapshot = {
 			...captured.locals.snapshot,
 			display: replacement.locals.snapshot.display,
-			assets: { referencedPaths: [], brandingPaths: [], bookmarkLogos: {} }
+			assets: { bookmarkLogos: {} }
 		};
 		const replacementFavicon = { bytes: new Uint8Array([1, 2, 3]), contentType: 'image/png' };
 		vi.mocked(readMountedImage).mockImplementationOnce(async () => {

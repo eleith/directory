@@ -60,7 +60,7 @@ export async function requireSignIn(
 	event.locals.session = null;
 	const routeId = event.route.id ?? '';
 	const publicRoute = routeId === '/(public)' || routeId.startsWith('/(public)/');
-	if (publicRoute || isConfiguredShareImage(event)) return resolve(event);
+	if (publicRoute) return resolve(event);
 	try {
 		event.locals.session = await event.locals.auth();
 	} catch {
@@ -78,15 +78,6 @@ export async function requireSignIn(
 		});
 	}
 	return denied(401);
-}
-
-function isConfiguredShareImage(event: RequestEvent): boolean {
-	if (event.route.id !== '/(protected)/(endpoints)/public/[...file]') return false;
-	if (event.isDataRequest) return false;
-	if (!['GET', 'HEAD'].includes(event.request.method)) return false;
-	const selectedPath = event.locals.snapshot.configuration.site.og_image_path;
-	if (selectedPath === undefined) return false;
-	return selectedPath === `/public/${event.params.file}`;
 }
 
 function isUnsafeMethod(event: RequestEvent): boolean {

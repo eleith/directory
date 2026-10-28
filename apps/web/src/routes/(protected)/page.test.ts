@@ -127,8 +127,6 @@ describe('directory page data', () => {
 		for (const field of [
 			'configuration',
 			'assets',
-			'referencedPaths',
-			'brandingPaths',
 			'session',
 			'authentication',
 			'auth',
@@ -181,13 +179,11 @@ describe('directory page data', () => {
 			...privateSnapshot,
 			display,
 			assets: {
-				referencedPaths: ['PRIVATE_ASSET_BYTES'],
-				brandingPaths: [],
 				bookmarkLogos: { photos: 'PRIVATE_SVG_BYTES' }
 			}
 		};
 		expect(load(event)).toEqual({ directory: display, selectedLinkId: 'photos', signedIn: false });
-		for (const id of ['hidden', 'PRIVATE_ASSET_BYTES']) {
+		for (const id of ['hidden', 'PRIVATE_SVG_BYTES']) {
 			event.url.search = `?link=${id}`;
 			expect(() => load(event)).toThrowError(notFound);
 		}

@@ -6,8 +6,15 @@ import { credentialsAuth, password, username } from './support/configuration.js'
 import { startServer, type TestServer } from './support/server.js';
 
 const siteDescription = 'Useful services with familiar images.';
-const privateLogo =
-	'<svg xmlns="http://www.w3.org/2000/svg"><text>PRIVATE_IMAGE_BYTES</text></svg>';
+const privateLogo = `<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Illustrator export -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [
+  <!ENTITY ns_ai "http://ns.adobe.com/AdobeIllustrator/10.0/">
+]>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:i="&ns_ai;" viewBox="0 0 128 128">
+  <g i:extraneous="self"><rect width="128" height="128" fill="#91bdce"/><text>PRIVATE_IMAGE_BYTES</text></g>
+  <i:aipgf><![CDATA[opaque Illustrator editing metadata]]></i:aipgf>
+</svg>`;
 const privateBrand =
 	'<svg xmlns="http://www.w3.org/2000/svg"><text>PRIVATE_BRAND_BYTES</text></svg>';
 const replacementImage =
@@ -57,6 +64,9 @@ async function fixtures() {
 		await writeFile(join(publicDir, 'brand logo.svg'), privateBrand);
 		await writeFile(join(publicDir, 'photo.svg'), privateLogo);
 		await writeFile(join(publicDir, 'photo.png'), png);
+		await writeFile(join(publicDir, 'unreferenced.svg'), privateLogo);
+		await mkdir(join(publicDir, 'images', 'bookmarks'), { recursive: true });
+		await writeFile(join(publicDir, 'images', 'bookmarks', 'test-ling.svg'), privateLogo);
 		return { directory, publicDir };
 	} catch (error) {
 		await rm(directory, { recursive: true, force: true });
@@ -99,7 +109,7 @@ async function stop(server: TestServer, directory: string) {
 	}
 }
 
-test('mounted files and generated bookmark logos require a real session, including encoded HTML requests', async () => {
+test('mounted files are public while generated bookmark logos require a session, including encoded HTML requests', async () => {
 	const fixture = await fixtures();
 	const server = await startServer({
 		configuration: configuration(),
@@ -109,14 +119,28 @@ test('mounted files and generated bookmark logos require a real session, includi
 		await server.ready();
 		for (const method of ['GET', 'HEAD']) {
 			for (const cookie of ['', 'authjs.session-token=invalid-session']) {
+				for (const [path, contentType, bytes] of [
+					['/public/photo.svg', 'image/svg+xml', Buffer.from(privateLogo)],
+					['/public/photo.png', 'image/png', png],
+					['/public/brand%20logo.svg', 'image/svg+xml', Buffer.from(privateBrand)],
+					['/%70ublic/photo.svg', 'image/svg+xml', Buffer.from(privateLogo)],
+					['/public/photo%2Esvg', 'image/svg+xml', Buffer.from(privateLogo)],
+					['/public/unreferenced.svg', 'image/svg+xml', Buffer.from(privateLogo)],
+					['/public/images/bookmarks/test-ling.svg', 'image/svg+xml', Buffer.from(privateLogo)]
+				] as const) {
+					const image = await server.fetch(path, {
+						method,
+						headers: { accept: 'text/html', cookie }
+					});
+					expect(image.status).toBe(200);
+					expectPrivateHeaders(image);
+					expect(image.headers.get('content-type')).toBe(contentType);
+					expect(image.headers.get('content-length')).toBe(String(bytes.length));
+					expect(Buffer.from(await image.arrayBuffer())).toEqual(
+						method === 'HEAD' ? Buffer.alloc(0) : bytes
+					);
+				}
 				for (const path of [
-					'/public/photo.svg',
-					'/public/photo.png',
-					'/public/brand%20logo.svg',
-					'/%70ublic/photo.svg',
-					'/public/photo%2Esvg',
-					'/public/unknown.svg',
-					'/public',
 					'/bookmarks/photos/logo',
 					'/bookmarks/missing/logo',
 					'/%62ookmarks/photos/logo',
@@ -140,11 +164,12 @@ test('mounted files and generated bookmark logos require a real session, includi
 			expect(response.status).toBe(200);
 			await expectNoPrivateData(response);
 		}
-		for (const path of ['/__data.json', '/public/photo.svg/__data.json']) {
-			const denied = await server.fetch(path);
-			expect(denied.status).toBe(401);
-			await expectNoPrivateData(denied);
-		}
+		const denied = await server.fetch('/__data.json');
+		expect(denied.status).toBe(401);
+		await expectNoPrivateData(denied);
+		const imageData = await server.fetch('/public/photo.svg/__data.json');
+		expect(imageData.status).toBe(404);
+		await expectNoPrivateData(imageData);
 
 		const cookie = await signIn(server);
 		for (const path of [
@@ -180,23 +205,18 @@ test('mounted files and generated bookmark logos require a real session, includi
 	}
 });
 
-test('open mode serves only exact contained image references, with MIME and bodyless HEAD responses', async () => {
+test('open mode serves contained images regardless of references, with MIME and bodyless HEAD responses', async () => {
 	const fixture = await fixtures();
 	await writeFile(join(fixture.directory, 'outside.svg'), privateLogo);
 	await symlink(join(fixture.directory, 'outside.svg'), join(fixture.publicDir, 'escape.svg'));
 	await symlink(join(fixture.publicDir, 'photo.svg'), join(fixture.publicDir, 'inside.svg'));
-	await writeFile(join(fixture.publicDir, 'not-image.png'), '<html>PRIVATE_IMAGE_BYTES</html>');
-	await writeFile(join(fixture.publicDir, 'unreferenced.svg'), privateLogo);
+	await writeFile(join(fixture.publicDir, 'unsupported.txt'), 'PRIVATE_IMAGE_BYTES');
 	await writeFile(join(fixture.publicDir, '家 icon.svg'), replacementImage);
 	const extra = `
   extra:
     title: Extra
     url: https://extra.example.test
     logo_path: /public/escape.svg
-  invalid-image:
-    title: Invalid image
-    url: https://invalid-image.example.test
-    logo_path: /public/not-image.png
   inside:
     title: Inside
     url: https://inside.example.test
@@ -215,6 +235,7 @@ test('open mode serves only exact contained image references, with MIME and body
 		for (const [path, bytes, contentType] of [
 			['/public/photo.svg', Buffer.from(privateLogo), 'image/svg+xml'],
 			['/public/photo.png', png, 'image/png'],
+			['/public/unreferenced.svg', Buffer.from(privateLogo), 'image/svg+xml'],
 			['/public/inside.svg', Buffer.from(privateLogo), 'image/svg+xml'],
 			['/public/%E5%AE%B6%20icon.svg', Buffer.from(replacementImage), 'image/svg+xml']
 		] as const) {
@@ -242,9 +263,9 @@ test('open mode serves only exact contained image references, with MIME and body
 		}
 		for (const path of [
 			'/public/escape.svg',
-			'/public/not-image.png',
-			'/public/unreferenced.svg',
+			'/public/unsupported.txt',
 			'/public/missing.svg',
+			'/public',
 			'/public/PHOTO.svg',
 			'/bookmarks/missing/logo',
 			'/bookmarks/constructor/logo',
@@ -274,65 +295,52 @@ test('open mode serves only exact contained image references, with MIME and body
 	}
 });
 
-test('accepted reloads replace exact references; invalid and auth-changing candidates keep last-good images', async () => {
+test('config reloads update generated logos but never gate mounted files on references', async () => {
 	const fixture = await fixtures();
 	await writeFile(join(fixture.publicDir, 'replacement.svg'), replacementImage);
 	const server = await startServer({
 		configuration: configuration(),
 		publicDir: fixture.publicDir
 	});
+	async function expectPublicFiles() {
+		for (const [path, bytes] of [
+			['/public/photo.svg', privateLogo],
+			['/public/replacement.svg', replacementImage]
+		] as const) {
+			const response = await server.fetch(path);
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe(bytes);
+		}
+	}
 	try {
 		await server.ready();
 		const cookie = await signIn(server);
-		const original = await (
-			await server.fetch('/bookmarks/photos/logo', { headers: { cookie } })
-		).text();
+		const bookmarkLogo = async () =>
+			(await server.fetch('/bookmarks/photos/logo', { headers: { cookie } })).text();
+		const original = await bookmarkLogo();
+		await expectPublicFiles();
 		const replacement = configuration()
 			.replace('/public/photo.svg', '/public/replacement.svg')
 			.replace('title: Photos', 'title: Updated Photos');
 		await server.replace(replacement);
-		await expect
-			.poll(
-				async () => (await server.fetch('/public/replacement.svg', { headers: { cookie } })).status
-			)
-			.toBe(200);
-		expect((await server.fetch('/public/photo.svg', { headers: { cookie } })).status).toBe(404);
-		const changed = await (
-			await server.fetch('/bookmarks/photos/logo', { headers: { cookie } })
-		).text();
+		await expect.poll(bookmarkLogo).toContain('>UP</text>');
+		const changed = await bookmarkLogo();
 		expect(changed).not.toBe(original);
-		expect(changed).toContain('>UP</text>');
+		await expectPublicFiles();
 
 		await server.replace('version: [invalid');
 		await expect.poll(() => server.output()).toContain('load_failed');
-		expect(
-			await (await server.fetch('/public/replacement.svg', { headers: { cookie } })).text()
-		).toBe(replacementImage);
-		expect((await server.fetch('/public/photo.svg', { headers: { cookie } })).status).toBe(404);
-		expect(
-			await (await server.fetch('/bookmarks/photos/logo', { headers: { cookie } })).text()
-		).toBe(changed);
+		await expectPublicFiles();
+		expect(await bookmarkLogo()).toBe(changed);
 
 		await server.replace(configuration().replace(password, 'CHANGED_PASSWORD'));
 		await expect.poll(() => server.output()).toContain('restart_required');
-		expect(
-			await (await server.fetch('/public/replacement.svg', { headers: { cookie } })).text()
-		).toBe(replacementImage);
-		expect((await server.fetch('/public/photo.svg', { headers: { cookie } })).status).toBe(404);
-		expect(
-			await (await server.fetch('/bookmarks/photos/logo', { headers: { cookie } })).text()
-		).toBe(changed);
+		await expectPublicFiles();
+		expect(await bookmarkLogo()).toBe(changed);
 
 		await server.replace(configuration());
-		await expect
-			.poll(async () => (await server.fetch('/public/photo.svg', { headers: { cookie } })).status)
-			.toBe(200);
-		expect((await server.fetch('/public/replacement.svg', { headers: { cookie } })).status).toBe(
-			404
-		);
-		expect(
-			await (await server.fetch('/bookmarks/photos/logo', { headers: { cookie } })).text()
-		).toBe(original);
+		await expect.poll(bookmarkLogo).toBe(original);
+		await expectPublicFiles();
 	} finally {
 		await stop(server, fixture.directory);
 	}
@@ -363,7 +371,7 @@ test('missing and atomically replaced bytes recover without changing the prepare
 	}
 });
 
-test('a missing public directory is valid at startup and recovers when its referenced file appears', async () => {
+test('a missing public directory is valid at startup and recovers when an image appears', async () => {
 	const fixture = await fixtures();
 	await rm(fixture.publicDir, { recursive: true });
 	const server = await startServer({

@@ -71,7 +71,6 @@ describe('private prepared snapshots', () => {
 		expect(Object.isFrozen(snapshot.configuration.auth?.credentials)).toBe(true);
 		expect(Object.isFrozen(snapshot.display)).toBe(true);
 		expect(Object.isFrozen(snapshot.assets)).toBe(true);
-		expect(Object.isFrozen(snapshot.assets.referencedPaths)).toBe(true);
 		expect(Object.isFrozen(snapshot.assets.bookmarkLogos)).toBe(true);
 		expect(Reflect.set(snapshot.assets.bookmarkLogos, 'photos', 'Changed')).toBe(false);
 		input.site.title = 'Changed';
@@ -84,16 +83,8 @@ describe('private prepared snapshots', () => {
 		expect(Reflect.set(snapshot.configuration.site, 'title', 'Changed')).toBe(false);
 	});
 
-	it('collects only site images and primary logos, deduplicating shared branding references', () => {
+	it('retains configured image paths in display while preparing generated bookmark logos', () => {
 		const snapshot = prepareSnapshot(configuration());
-		expect(snapshot.assets.brandingPaths).toEqual(['/public/home.svg', '/public/site-icon.png']);
-		expect(snapshot.assets.referencedPaths).toEqual([
-			'/public/home.svg',
-			'/public/site-icon.png',
-			'/public/photos.svg',
-			'/public/shared.png',
-			'/public/photos-icon.png'
-		]);
 		const links = snapshot.display.groups.flatMap((group) => group.links);
 		expect(links).toHaveLength(4);
 		expect(Object.keys(snapshot.assets.bookmarkLogos)).toEqual([
@@ -102,8 +93,6 @@ describe('private prepared snapshots', () => {
 			'album',
 			'home'
 		]);
-		expect(snapshot.assets.brandingPaths).not.toContain('/public/shared.png');
-		expect(snapshot.assets.brandingPaths).not.toContain('/public/photos-icon.png');
 		for (const link of links) {
 			expect(link.logo_path).toBe(snapshot.configuration.links[link.id]!.logo_path);
 			expect(link).not.toHaveProperty('favicon_path');
@@ -111,12 +100,11 @@ describe('private prepared snapshots', () => {
 		}
 	});
 
-	it('tracks a configured Open Graph image as branding without adding its path to display data', () => {
+	it('keeps a configured Open Graph image in configuration, not directory display data', () => {
 		const config = configuration();
 		config.site.og_image_path = '/public/share.png';
 		const snapshot = prepareSnapshot(config);
-		expect(snapshot.assets.brandingPaths).toContain('/public/share.png');
-		expect(snapshot.assets.referencedPaths).toContain('/public/share.png');
+		expect(snapshot.configuration.site.og_image_path).toBe('/public/share.png');
 		expect(JSON.stringify(snapshot.display)).not.toContain('/public/share.png');
 	});
 
@@ -162,12 +150,10 @@ describe('private prepared snapshots', () => {
 	});
 
 	it.each([{}, { logo_path: '/favicon.png', favicon_path: '/favicon.png' }])(
-		'excludes default and explicit bundled site images from mounted assets: %j',
+		'retains default and explicit bundled site images in display: %j',
 		(site) => {
 			const snapshot = prepareSnapshot(validateConfig({ site, links: {} }, { env: {} }));
 			expect(snapshot.assets).toEqual({
-				referencedPaths: [],
-				brandingPaths: [],
 				bookmarkLogos: {}
 			});
 			expect(snapshot.display.site.logo_path).toBe('/favicon.png');
@@ -177,7 +163,7 @@ describe('private prepared snapshots', () => {
 		}
 	);
 
-	it('captures only mounted references when site selections mix bundled and mounted images', () => {
+	it('retains selected paths when site images mix bundled and mounted images', () => {
 		const snapshot = prepareSnapshot(
 			validateConfig(
 				{
@@ -190,8 +176,6 @@ describe('private prepared snapshots', () => {
 				{ env: {} }
 			)
 		);
-		expect(snapshot.assets.brandingPaths).toEqual(['/public/site.png']);
-		expect(snapshot.assets.referencedPaths).toEqual(['/public/site.png', '/public/photos.png']);
 		expect(snapshot.display.groups[0]?.links[0]?.logo_path).toBe('/public/photos.png');
 		expect(snapshot.display.groups[0]?.links[1]?.logo_path).toBe('/bookmarks/plain/logo');
 	});

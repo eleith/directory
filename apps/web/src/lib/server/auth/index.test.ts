@@ -4,7 +4,6 @@ import { isHttpError, isRedirect, redirect, type Handle, type RequestEvent } fro
 import type { Session, SvelteKitAuthConfig } from '@auth/sveltekit';
 import { validateConfig } from '@directory/config';
 import { prepareSnapshot } from '../directory/snapshot.js';
-import { GET as mountedImage } from '../../../routes/(protected)/(endpoints)/public/[...file]/+server.js';
 import { createAuthentication } from './index.js';
 
 const mocks = vi.hoisted(() => ({
@@ -163,111 +162,25 @@ describe('bookmark logo API access', () => {
 	});
 });
 
-describe('mounted image access', () => {
+describe('public mounted image access', () => {
 	it.each(['GET', 'HEAD'])(
-		'requires a session for every mounted %s path, even configured site favicons and HTML Accept',
+		'lets configured and unreferenced %s images reach the public route without reading a session',
 		async (method) => {
 			for (const path of [
 				'/public/site.svg',
 				'/public/site-logo.svg',
 				'/public/logos/photos.svg',
-				'/public/bookmark-favicon.svg',
 				'/public/unreferenced.svg',
-				'/public',
-				'/public/'
+				'/%70ublic/site.svg',
+				'/public/site%2Esvg'
 			]) {
-				const response = await responseFor(
-					eventFor(path, { method, routeId: '/(protected)/(endpoints)/public/[...file]' })
-				);
-				expect(response.status).toBe(401);
-				expect(response.headers.has('location')).toBe(false);
+				const event = eventFor(path, { method, routeId: '/(public)/public/[...file]' });
+				const response = await responseFor(event);
+				expect(response.status).toBe(200);
 				expect(response.headers.get('cache-control')).toBe('private, no-store');
+				expect(mocks.resolve).toHaveBeenLastCalledWith(event);
 			}
-			expect(mocks.resolve).not.toHaveBeenCalled();
-		}
-	);
-
-	it.each(['GET', 'HEAD'])(
-		'uses the matched mounted route for encoded %s aliases',
-		async (method) => {
-			for (const path of ['/%70ublic/site.svg', '/public/site%2Esvg', '/public/caf%C3%A9.svg']) {
-				const event = eventFor(path, { method });
-				event.route.id = '/(protected)/(endpoints)/public/[...file]';
-				expect((await responseFor(event)).status).toBe(401);
-			}
-			expect(mocks.resolve).not.toHaveBeenCalled();
-		}
-	);
-
-	it.each(['GET', 'HEAD'])(
-		'keeps an unreferenced former bookmark favicon private, then returns 404 after sign-in for %s',
-		async (method) => {
-			const path = '/public/bookmark-favicon.svg';
-			expect(snapshot.assets.referencedPaths).not.toContain(path);
-			const event = eventFor(path, {
-				method,
-				routeId: '/(protected)/(endpoints)/public/[...file]'
-			});
-			event.params = { file: 'bookmark-favicon.svg' };
-			mocks.resolve.mockImplementation((current: RequestEvent) =>
-				mountedImage(current as Parameters<typeof mountedImage>[0])
-			);
-			expect((await responseFor(event)).status).toBe(401);
-			expect(mocks.resolve).not.toHaveBeenCalled();
-			mocks.session.mockResolvedValueOnce(signedIn);
-			expect((await responseFor(event)).status).toBe(404);
-			expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith(event);
-		}
-	);
-
-	it.each(['/public/site.svg', '/public/logos/photos.svg'])(
-		'permits a signed-in request for %s',
-		async (path) => {
-			mocks.session.mockResolvedValueOnce(signedIn);
-			const event = eventFor(path);
-			event.route.id = '/(protected)/(endpoints)/public/[...file]';
-			expect((await responseFor(event)).status).toBe(200);
-			expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith(event);
-		}
-	);
-});
-
-describe('configured public share image access', () => {
-	it.each(['GET', 'HEAD'])(
-		'permits the selected static OG image for %s without a session',
-		async (method) => {
-			const event = eventFor('/public/images/share.svg?ignored=1', {
-				method,
-				routeId: '/(protected)/(endpoints)/public/[...file]'
-			});
-			event.params = { file: 'images/share.svg' };
-			event.locals.snapshot = prepareSnapshot(
-				validateConfig(
-					{ site: { og_image_path: '/public/images/share.svg' }, links: {} },
-					{ env: {} }
-				)
-			);
-			expect((await responseFor(event)).status).toBe(200);
-			expect(mocks.resolve).toHaveBeenCalledExactlyOnceWith(event);
 			expect(mocks.session).not.toHaveBeenCalled();
-		}
-	);
-
-	it.each(['other.svg', 'images/share.svg/other'])(
-		'keeps %s outside the public selection',
-		async (file) => {
-			const event = eventFor(`/public/${file}`, {
-				routeId: '/(protected)/(endpoints)/public/[...file]'
-			});
-			event.params = { file };
-			event.locals.snapshot = prepareSnapshot(
-				validateConfig(
-					{ site: { og_image_path: '/public/images/share.svg' }, links: {} },
-					{ env: {} }
-				)
-			);
-			expect((await responseFor(event)).status).toBe(401);
-			expect(mocks.resolve).not.toHaveBeenCalled();
 		}
 	);
 });

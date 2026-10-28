@@ -120,34 +120,6 @@ async function expectNotFound(server: TestServer) {
 	}
 }
 
-async function expectRawPrivate(server: TestServer) {
-	for (const method of ['GET', 'HEAD']) {
-		for (const cookie of ['', 'authjs.session-token=invalid-favicon-cookie']) {
-			for (const path of [
-				encodeURI(sourceA),
-				sourceB,
-				'/public/private-brand.svg',
-				'/%70ublic/book.png',
-				'/public/book%2Epng',
-				'/public/unlisted.svg',
-				'/bookmarks/book/logo',
-				'/__data.json'
-			]) {
-				const response = await server.fetch(path, {
-					method,
-					headers: { cookie, accept: 'text/html' }
-				});
-				expect(response.status, path).toBe(401);
-				expectPrivateHeaders(response);
-				expect(response.headers.has('location')).toBe(false);
-				const text = await response.text();
-				if (method === 'HEAD') expect(text).toBe('');
-				expectNoPrivateData(text);
-			}
-		}
-	}
-}
-
 async function signIn(server: TestServer) {
 	const response = await server.fetch('/signin', {
 		method: 'POST',
@@ -174,7 +146,7 @@ for (const [source, bytes, contentType] of [
 	[sourceA, Buffer.from(svg), 'image/svg+xml'],
 	[sourceB, png, 'image/png']
 ] as const) {
-	test(`selected ${contentType} is public only through the alias, including before sign-in without JS`, async ({
+	test(`selected ${contentType} is public through the alias, including before sign-in without JS`, async ({
 		browser
 	}) => {
 		const fixture = await fixtures();
@@ -205,7 +177,6 @@ for (const [source, bytes, contentType] of [
 			for (const session of ['', 'authjs.session-token=invalid-favicon-cookie', cookie]) {
 				await expectImage(server, bytes, contentType, session);
 			}
-			await expectRawPrivate(server);
 			for (const query of [
 				'?file=/public/private-brand.svg&source=/public/book.png',
 				'?path=%2Fpublic%2Finvalid.png&publicDir=%2Foutside',
@@ -257,7 +228,6 @@ test('valid reloads keep the alias but change bytes; invalid and auth-changing c
 			.poll(async () => (await server.fetch('/favicon')).headers.get('content-type'))
 			.toBe('image/png');
 		await expectImage(server, png, 'image/png');
-		await expectRawPrivate(server);
 		const page = await context.newPage();
 		await page.goto(`${server.url}/signin`);
 		await expect(page.locator('head link[rel="icon"]')).toHaveAttribute('href', '/favicon');
@@ -268,7 +238,6 @@ test('valid reloads keep the alias but change bytes; invalid and auth-changing c
 		await server.replace(configuration(sourceA, true, 'REJECTED_FAVICON_PASSWORD'));
 		await expect.poll(() => server.output()).toContain('restart_required');
 		await expectImage(server, png, 'image/png');
-		await expectRawPrivate(server);
 		expectNoPrivateData(server.output(), ['REJECTED_FAVICON_PASSWORD']);
 
 		await server.replace(configuration());
@@ -279,7 +248,6 @@ test('valid reloads keep the alias but change bytes; invalid and auth-changing c
 		const bundled = await server.fetch('/favicon.png');
 		expect(bundled.status).toBe(200);
 		expect(bundled.headers.get('content-type')).toContain('image/png');
-		await expectRawPrivate(server);
 	} finally {
 		await context.close();
 		await stop(server, fixture.directory);
