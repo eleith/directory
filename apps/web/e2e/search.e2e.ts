@@ -54,6 +54,7 @@ test('search finds a bookmark, opens its details and clears back to browsing', a
 	await results.getByRole('link').press('Enter');
 	const details = page.getByRole('dialog', { name: 'Family photos', exact: true });
 	await expect(details).toBeVisible();
+	await expect(details.getByRole('button', { name: /^(Previous|Next) bookmark$/ })).toHaveCount(0);
 	await expect(
 		details.getByRole('link', { name: 'Open Family photos (opens in a new tab)', exact: true })
 	).toHaveAttribute('href', 'https://photos.example.test/');
@@ -91,5 +92,10 @@ for (const { filter, query, titles } of [
 		await expect(page).toHaveURL(`${server.url}/?${new URLSearchParams({ q: query })}`);
 		await expect(results.getByRole('link')).toHaveCount(titles.length);
 		await expect(results.getByRole('link')).toContainText(titles);
+
+		await results.getByRole('link').first().click();
+		await page.getByRole('button', { name: 'Next bookmark', exact: true }).click();
+		await expect(page.getByRole('dialog', { name: titles[1]!, exact: true })).toBeVisible();
+		await expect(page).toHaveURL((url) => url.searchParams.get('q') === query);
 	});
 }

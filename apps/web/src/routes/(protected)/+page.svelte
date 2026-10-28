@@ -24,6 +24,7 @@
 	let searchStatus = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
 	let searchInput = $state<HTMLInputElement>();
 	let resultList = $state<HTMLUListElement>();
+	let groupsElement = $state<HTMLDivElement>();
 	let mounted = $state(false);
 	let isClosingDetails = false;
 	let pendingFilterQuery: string | undefined;
@@ -44,6 +45,12 @@
 		data.directory.groups.find((group) => group.links.some((link) => link.id === selectedId))
 	);
 	const selectedLink = $derived(selectedGroup?.links.find((link) => link.id === selectedId));
+	const detailOrder = $derived.by(() => {
+		if (searchQuery.trim() && searchStatus !== 'ready') return [];
+		if (searchResults !== null) return searchResults.map((result) => result.link.id);
+		return data.directory.groups.flatMap((group) => group.links.map((link) => link.id));
+	});
+	const detailIndex = $derived(detailOrder.indexOf(selectedId ?? ''));
 
 	$effect(() => {
 		if (selectedLink) {
@@ -68,8 +75,8 @@
 		return `/?${parameters}`;
 	}
 
-	function findResultLink(id: string) {
-		const links = resultList?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? [];
+	function findBookmarkTile(id: string) {
+		const links = groupsElement?.querySelectorAll<HTMLAnchorElement>('a.tile') ?? [];
 		return Array.from(links).find((link) => new URL(link.href).searchParams.get('link') === id);
 	}
 
@@ -135,6 +142,18 @@
 		pushState(href, { ...page.state, directoryDetail: { id, fromGrid: true } });
 	}
 
+	function navigateDetails(step: -1 | 1) {
+		if (isClosingDetails || detailIndex < 0) return;
+		const id = detailOrder[detailIndex + step];
+		if (!id) return;
+		returnTile = findBookmarkTile(id);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute.
+		replaceState(detailURL(id), {
+			...page.state,
+			directoryDetail: { id, fromGrid: page.state.directoryDetail?.fromGrid ?? false }
+		});
+	}
+
 	function closeDetails() {
 		if (isClosingDetails) return;
 		isClosingDetails = true;
@@ -168,7 +187,7 @@
 	function restoreDirectoryFocus() {
 		if (returnTile && !returnTile.isConnected) {
 			const id = new URL(returnTile.href).searchParams.get('link');
-			if (id) returnTile = findResultLink(id);
+			if (id) returnTile = findBookmarkTile(id);
 		}
 		if (returnTile?.isConnected) {
 			returnTile.focus({ preventScroll: true });
@@ -237,6 +256,9 @@
 			link={selectedLink}
 			groupLabel={selectedGroup?.label}
 			openLinksInNewTab={data.directory.site.open_links_in_new_tab}
+			hasPrevious={detailIndex > 0}
+			hasNext={detailIndex >= 0 && detailIndex < detailOrder.length - 1}
+			onNavigate={navigateDetails}
 			onClose={closeDetails}
 			onClosed={handleDetailsClosed}
 			onFilterSelect={selectDetailFilter}
@@ -296,7 +318,7 @@
 		{/if}
 	</div>
 
-	<div class="groups">
+	<div class="groups" bind:this={groupsElement}>
 		{#if searchResults !== null}
 			{#if searchResults.length > 0}
 				<ul
