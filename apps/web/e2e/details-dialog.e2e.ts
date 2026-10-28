@@ -75,7 +75,9 @@ test('direct SSR enhances details once after hydration, without flashing plain d
 	}
 });
 
-test('focus trap, dismissal, history and return focus work together', async ({ page }) => {
+test('focus trap, URL selection, dismissal, history and return focus work together', async ({
+	page
+}) => {
 	await page.goto(server.url);
 	await hydrated(page);
 	const tile = page.locator('a[href="/?link=beta"]');
@@ -88,6 +90,12 @@ test('focus trap, dismissal, history and return focus work together', async ({ p
 	await expect(close).toBeFocused();
 	await page.keyboard.press('Tab');
 	await expect(destination).toBeFocused();
+	const destinationLength = (await destination.inputValue()).length;
+	await expect(destination).toHaveJSProperty('selectionStart', 0);
+	await expect(destination).toHaveJSProperty('selectionEnd', destinationLength);
+	await destination.click();
+	await expect(destination).toHaveJSProperty('selectionStart', 0);
+	await expect(destination).toHaveJSProperty('selectionEnd', destinationLength);
 	await page.keyboard.press('Tab');
 	await expect(external).toBeFocused();
 	await page.keyboard.press('Shift+Tab');

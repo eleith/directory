@@ -42,7 +42,7 @@ links:
   photos:
     title: Photos
     url: https://photos.example.com
-    description: |
+    description: >-
       Family photos and videos, all in one place.
       Install your photo service's mobile app for automatic uploads.
     tags: [photos, videos, memories]

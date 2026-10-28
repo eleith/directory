@@ -79,6 +79,9 @@
 					id={`destination-${link.id}`}
 					type="url"
 					value={link.url}
+					onfocus={(event) => event.currentTarget.select()}
+					onmouseup={(event) => event.preventDefault()}
+					onclick={(event) => event.currentTarget.select()}
 					readonly
 					spellcheck="false"
 				/>
