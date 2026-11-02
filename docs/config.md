@@ -84,18 +84,6 @@ Use `credentials` for a basic username and password or `oidc` to turn it up to
 | `oidc.client_id`       | Client ID registered with your provider.                                          | Required for OIDC         |
 | `oidc.client_secret`   | Secret, or `'${DIRECTORY_OIDC_CLIENT_SECRET}'`.                                   | Required for OIDC         |
 
-With auth enabled, `site.url` must use HTTPS, except for local testing at
-`http://localhost:3000` (or your dev port).
-OIDC's callback is your `site.url` followed by `/auth/callback/oidc`.
-
-By default, restarting Directory signs everyone out. Set `secret` if you'd rather
-keep sessions; generate it once with `openssl rand -base64 32`. Changing it signs
-everyone out again. Ordinary config reloads keep the current session secret.
-
-Passwords and client secrets can go directly in YAML. Keep that file private.
-The [example](directory.example.yaml) has commented setups for both auth methods.
-Restart Directory after changing auth settings.
-
 ## Images
 
 Put `photos.png` in `public/` beside your Compose file and use

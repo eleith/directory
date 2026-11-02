@@ -13,7 +13,7 @@ for sign-in and SSO. See [configuration](config.md) for all the juicy options.
 docker compose up -d
 ```
 
-you can edit most configurations without having to restart
+you can edit most configurations without having to restart.
 
 ## inspect logs
 

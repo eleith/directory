@@ -22,7 +22,8 @@ appearance:
 #     username: admin
 #     password: replace-with-your-own-password
 
-# Or SSO. Register this callback with your provider:
+# Or SSO. Your provider must return an email for each identity.
+# Register the client for client_secret_basic authentication and this callback:
 # https://directory.example.com/auth/callback/oidc
 # auth:
 #   oidc:
@@ -30,8 +31,9 @@ appearance:
 #     client_id: directory
 #     client_secret: replace-with-your-client-secret
 
-# Restarts sign everyone out unless you set auth.secret. To keep sessions,
-# generate a value once with: openssl rand -base64 32
+# Sessions expire seven days after sign-in, without renewal.
+# Restarts sign everyone out unless you set auth.secret. To keep unexpired sessions
+# across restarts, generate a value once with: openssl rand -base64 32
 # Add it inside your chosen auth block as: secret: 'your-generated-value'
 # Passwords and secrets can also use '${VAR}' from an optional .env file.
 # Keep files containing secrets private.
