@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DirectoryContent, DisplayGroup, DisplayLink } from '$lib/display/types.js';
+import type { DirectoryContent, DisplayGroup, DisplayLink } from '#lib/display/types.js';
 import { createSearch } from './engine.js';
 
 function link(id: string, fields: Partial<DisplayLink> = {}): DisplayLink {

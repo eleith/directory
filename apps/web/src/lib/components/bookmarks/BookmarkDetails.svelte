@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
-	import type { DisplayLink } from '$lib/display/types.js';
+	import type { DisplayLink } from '#lib/display/types.js';
 	import BookmarkLogo from './BookmarkLogo.svelte';
 	import ButtonLink from '../ui/ButtonLink.svelte';
 	import Chip from '../ui/Chip.svelte';

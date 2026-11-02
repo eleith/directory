@@ -1,7 +1,6 @@
-import { building, dev } from '$app/environment';
+import { building, dev } from '$app/env';
 import { env } from '$env/dynamic/private';
-import type { Handle, ServerInit } from '@sveltejs/kit';
-import { sequence } from '@sveltejs/kit/hooks';
+import { sequence, type Handle, type ServerInit } from '@sveltejs/kit/hooks';
 import { themeStyleTag } from './lib/server/appearance.js';
 import type { ServerState } from './lib/server/application.js';
 import { startDevelopment } from './lib/server/lifecycle/development.js';

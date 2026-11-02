@@ -2,18 +2,18 @@
 	import { onMount } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import IconSignOut from 'virtual:icons/ph/sign-out';
-	import { beforeNavigate, pushState, replaceState } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import BookmarkLogo from '$lib/components/bookmarks/BookmarkLogo.svelte';
-	import BookmarkDetails from '$lib/components/bookmarks/BookmarkDetails.svelte';
-	import BookmarkDetailsDialog from '$lib/components/bookmarks/BookmarkDetailsDialog.svelte';
-	import Logo from '$lib/components/Logo.svelte';
-	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	import BookmarkSearch from '$lib/components/search/BookmarkSearch.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
-	import { nextResultIndex } from '$lib/search/result-navigation.js';
-	import type { DisplayLink } from '$lib/display/types.js';
-	import type { SearchResult } from '$lib/search/engine.js';
+	import BookmarkLogo from '#lib/components/bookmarks/BookmarkLogo.svelte';
+	import BookmarkDetails from '#lib/components/bookmarks/BookmarkDetails.svelte';
+	import BookmarkDetailsDialog from '#lib/components/bookmarks/BookmarkDetailsDialog.svelte';
+	import Logo from '#lib/components/Logo.svelte';
+	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
+	import BookmarkSearch from '#lib/components/search/BookmarkSearch.svelte';
+	import Button from '#lib/components/ui/Button.svelte';
+	import { nextResultIndex } from '#lib/search/result-navigation.js';
+	import type { DisplayLink } from '#lib/display/types.js';
+	import type { SearchResult } from '#lib/search/engine.js';
 	import type { PageData } from './$types.js';
 
 	let { data }: { data: PageData } = $props();
@@ -66,7 +66,11 @@
 		if (query) parameters.set('q', query);
 		const url = parameters.size ? `/?${parameters}` : '/';
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Query URLs stay absolute in this root-only directory.
-		replaceState(url, { ...page.state, directoryQuery: query });
+		goto(url, {
+			shallow: true,
+			replace: true,
+			state: { ...page.state, directoryQuery: query }
+		});
 	}
 
 	function detailURL(id: string) {
@@ -139,7 +143,10 @@
 		pendingFilterQuery = undefined;
 		isClosingDetails = false;
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- This absolute href comes from the real tile anchor.
-		pushState(href, { ...page.state, directoryDetail: { id, fromGrid: true } });
+		goto(href, {
+			shallow: true,
+			state: { ...page.state, directoryDetail: { id, fromGrid: true } }
+		});
 	}
 
 	function navigateDetails(step: -1 | 1) {
@@ -148,9 +155,13 @@
 		if (!id) return;
 		returnTile = findBookmarkTile(id);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute.
-		replaceState(detailURL(id), {
-			...page.state,
-			directoryDetail: { id, fromGrid: page.state.directoryDetail?.fromGrid ?? false }
+		goto(detailURL(id), {
+			shallow: true,
+			replace: true,
+			state: {
+				...page.state,
+				directoryDetail: { id, fromGrid: page.state.directoryDetail?.fromGrid ?? false }
+			}
 		});
 	}
 
@@ -162,7 +173,11 @@
 			return;
 		}
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute.
-		replaceState(directoryURL, { ...page.state, directoryDetail: null });
+		goto(directoryURL, {
+			shallow: true,
+			replace: true,
+			state: { ...page.state, directoryDetail: null }
+		});
 	}
 
 	function selectDetailFilter(query: string) {
@@ -196,7 +211,9 @@
 		directoryHeading?.focus({ preventScroll: true });
 	}
 
-	beforeNavigate(() => {
+	beforeNavigate(({ shallow, type }) => {
+		if (shallow && type === 'goto') return;
+
 		isClosingDetails = false;
 		pendingFilterQuery = undefined;
 		returnTile = undefined;

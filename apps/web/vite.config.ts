@@ -1,7 +1,13 @@
+import adapter from '@sveltejs/adapter-node';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, loadEnv } from 'vite';
 import { prepareRuntimeEnvironment } from './src/lib/server/runtime-environment.js';
 import Icons from 'unplugin-icons/vite';
+
+const connectSources = ['self'];
+
+if (process.env.NODE_ENV === 'development') connectSources.push('ws:', 'wss:');
 
 export default defineConfig(({ command, mode, isPreview }) => {
 	const development = command === 'serve' && !isPreview;
@@ -27,7 +33,25 @@ export default defineConfig(({ command, mode, isPreview }) => {
 					}
 				}
 			},
-			sveltekit(),
+
+			sveltekit({
+				preprocess: vitePreprocess(),
+				adapter: adapter(),
+				csp: {
+					// OIDC form redirects cross origins; state-changing requests are checked server-side.
+					directives: {
+						'default-src': ['self'],
+						'script-src': ['self'],
+						'style-src': ['self', 'unsafe-inline'],
+						'img-src': ['self'],
+						'font-src': ['self'],
+						'connect-src': connectSources,
+						'object-src': ['none'],
+						'base-uri': ['self'],
+						'frame-ancestors': ['none']
+					}
+				}
+			}),
 			Icons({ compiler: 'svelte' }),
 			// Kit's SSR loader does not run import.meta.hot.dispose.
 			{

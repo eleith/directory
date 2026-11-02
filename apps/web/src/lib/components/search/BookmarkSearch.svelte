@@ -1,8 +1,8 @@
 <script module lang="ts">
-	let engineImport: Promise<typeof import('$lib/search/engine.js')> | undefined;
+	let engineImport: Promise<typeof import('#lib/search/engine.js')> | undefined;
 
 	function loadEngine() {
-		engineImport ??= import('$lib/search/engine.js').catch((error: unknown) => {
+		engineImport ??= import('#lib/search/engine.js').catch((error: unknown) => {
 			engineImport = undefined;
 			throw error;
 		});
@@ -17,8 +17,8 @@
 	import Button from '../ui/Button.svelte';
 	import Input from '../ui/Input.svelte';
 	import { beforeNavigate, afterNavigate } from '$app/navigation';
-	import type { DirectoryContent } from '$lib/display/types.js';
-	import type { SearchResult } from '$lib/search/engine.js';
+	import type { DirectoryContent } from '#lib/display/types.js';
+	import type { SearchResult } from '#lib/search/engine.js';
 
 	let {
 		directory,
@@ -41,7 +41,7 @@
 	let navigating = $state(false);
 	let activated = $state(false);
 	let completedQuery: string | undefined;
-	let searchBookmarks: ReturnType<typeof import('$lib/search/engine.js').createSearch> | undefined;
+	let searchBookmarks: ReturnType<typeof import('#lib/search/engine.js').createSearch> | undefined;
 	let indexedSnapshotId: string | undefined;
 	let searchRequestVersion = 0;
 	let searchUnavailable = false;
@@ -112,11 +112,16 @@
 		};
 	});
 
-	beforeNavigate(() => {
+	beforeNavigate(({ shallow, type }) => {
+		if (shallow && type === 'goto') return;
+
 		navigating = true;
 		searchRequestVersion++;
 	});
-	afterNavigate(() => {
+
+	afterNavigate(({ shallow, type }) => {
+		if (shallow && type === 'goto') return;
+
 		navigating = false;
 		if (query.trim()) activated = true;
 	});

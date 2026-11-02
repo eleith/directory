@@ -1,5 +1,6 @@
+import type { Handle } from '@sveltejs/kit/hooks';
+import type { RequestEvent } from '@sveltejs/kit';
 import { beforeEach, expect, it, vi } from 'vitest';
-import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { protectAuthRequest, requireSignIn, type AccessPolicy } from './access.js';
 import { logger } from '../logger.js';
 

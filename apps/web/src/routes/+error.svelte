@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import ButtonLink from '$lib/components/ui/ButtonLink.svelte';
+	import ButtonLink from '#lib/components/ui/ButtonLink.svelte';
 </script>
 
 <svelte:head>

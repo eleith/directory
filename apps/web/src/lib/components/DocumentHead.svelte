@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DocumentMetadata } from '$lib/server/document.js';
+	import type { DocumentMetadata } from '#lib/server/document.js';
 
 	let { metadata, faviconPath }: { metadata: DocumentMetadata; faviconPath: string } = $props();
 </script>

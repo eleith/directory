@@ -2,9 +2,9 @@
 	import { onMount } from 'svelte';
 	import IconWarningCircle from 'virtual:icons/ph/warning-circle';
 	import IconSignIn from 'virtual:icons/ph/sign-in';
-	import Logo from '$lib/components/Logo.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
+	import Logo from '#lib/components/Logo.svelte';
+	import Button from '#lib/components/ui/Button.svelte';
+	import Input from '#lib/components/ui/Input.svelte';
 	import type { PageData } from './$types.js';
 
 	let { data }: { data: PageData } = $props();

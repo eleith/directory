@@ -1,8 +1,8 @@
+import type { RequestEvent } from '@sveltejs/kit';
 import { randomBytes } from 'node:crypto';
 import { betterAuth, type BetterAuthOptions } from 'better-auth/minimal';
 import { isAuthPath } from 'better-auth/svelte-kit';
-import { sequence } from '@sveltejs/kit/hooks';
-import type { Handle, RequestEvent } from '@sveltejs/kit';
+import { sequence, type Handle } from '@sveltejs/kit/hooks';
 import type { DirectoryAuth } from '@directory/config/types';
 import { logger } from '../logger.js';
 import { protectAuthRequest, requireSignIn } from './access.js';

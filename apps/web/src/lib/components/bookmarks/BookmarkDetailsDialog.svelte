@@ -4,7 +4,7 @@
 	import IconX from 'virtual:icons/ph/x';
 	import IconCaretLeft from 'virtual:icons/ph/caret-left';
 	import IconCaretRight from 'virtual:icons/ph/caret-right';
-	import type { DisplayLink } from '$lib/display/types.js';
+	import type { DisplayLink } from '#lib/display/types.js';
 	import BookmarkDetails from './BookmarkDetails.svelte';
 	import Button from '../ui/Button.svelte';
 

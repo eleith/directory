@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import Button from '$lib/components/ui/Button.svelte';
+	import Button from '#lib/components/ui/Button.svelte';
 	import IconMoon from 'virtual:icons/ph/moon';
 	import IconSunDim from 'virtual:icons/ph/sun-dim';
 	import IconFaders from 'virtual:icons/ph/faders';

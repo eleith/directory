@@ -1,5 +1,5 @@
 import Fuse from 'fuse.js';
-import type { DirectoryContent, DisplayLink } from '$lib/display/types.js';
+import type { DirectoryContent, DisplayLink } from '#lib/display/types.js';
 
 export interface SearchResult {
 	readonly link: DisplayLink;

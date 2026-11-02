@@ -1,4 +1,5 @@
-import { isRedirect, type Handle, type RequestEvent } from '@sveltejs/kit';
+import { isRedirect, type RequestEvent } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
 import { logger } from '../logger.js';
 import { isSignInError, localRedirect, signInLocation } from './redirect.js';
 import { hasExpectedOrigin } from './request.js';

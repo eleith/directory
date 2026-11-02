@@ -1,5 +1,6 @@
+import type { Handle } from '@sveltejs/kit/hooks';
+import type { RequestEvent } from '@sveltejs/kit';
 import { validateConfig } from '@directory/config';
-import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { themeStyleTag } from './lib/server/appearance.js';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { Authentication } from './lib/server/auth/index.js';
@@ -329,9 +330,13 @@ describe('server hooks', () => {
 			for (const cookie of ['', 'unrelated-cookie=opaque']) {
 				for (const [path, routeId, params] of [
 					['/public/photo.svg', '/(public)/public/[...file]', { file: 'photo.svg' }],
+
 					['/public/site.svg', '/(public)/public/[...file]', { file: 'site.svg' }],
+
 					['/%70ublic/photo.svg', '/(public)/public/[...file]', { file: 'photo.svg' }],
+
 					['/public/unknown.svg', '/(public)/public/[...file]', { file: 'unknown.svg' }],
+
 					[
 						'/bookmarks/photos/logo',
 						'/(protected)/(endpoints)/bookmarks/[id]/logo',
@@ -423,10 +428,12 @@ describe('server hooks', () => {
 				const themedHead = await transform({ html: head, done: false });
 				expect(themedHead).toBe(`\t${themeStyleTag(captured.display.appearance)}\n${head}`);
 				expect(await transform({ html: ending, done: true })).toBe(ending);
+
 				return new Response(opening + themedHead + ending, {
 					headers: { 'content-type': 'text/html' }
 				});
 			});
+
 			const response = await hooks.handle({ event: request, resolve });
 			const html = await response.text();
 			expect(html.match(/<style>/g)).toHaveLength(1);
