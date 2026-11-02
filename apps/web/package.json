@@ -21,6 +21,7 @@
 		"@directory/config": "workspace:*",
 		"@takumi-rs/core": "2.18.2",
 		"@takumi-rs/helpers": "2.18.2",
+		"better-auth": "1.7.14",
 		"bits-ui": "catalog:",
 		"fuse.js": "catalog:",
 		"tslog": "5.2.0"
