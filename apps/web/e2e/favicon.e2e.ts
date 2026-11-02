@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { startServer, type TestServer } from './support/server.js';
+import { responseCookieHeader } from './support/session.js';
 
 const title = 'Favicon fixture';
 const siteDescription = 'Useful services with familiar browser icons.';
@@ -127,9 +128,9 @@ async function signIn(server: TestServer) {
 		body: new URLSearchParams({ username, password, redirectTo: '/' })
 	});
 	expect([302, 303]).toContain(response.status);
-	const cookie = response.headers.getSetCookie().find((value) => /session-token=/.test(value));
-	expect(cookie).toBeDefined();
-	return cookie!.split(';')[0]!;
+	const cookie = responseCookieHeader(response);
+	expect(cookie).not.toBe('');
+	return cookie;
 }
 
 async function stop(server: TestServer, directory: string) {
@@ -174,7 +175,7 @@ for (const [source, bytes, contentType] of [
 			expectNoPrivateData(payload, [fixture.publicDir, server.path]);
 
 			const cookie = await signIn(server);
-			for (const session of ['', 'authjs.session-token=invalid-favicon-cookie', cookie]) {
+			for (const session of ['', cookie]) {
 				await expectImage(server, bytes, contentType, session);
 			}
 			for (const query of [

@@ -1,693 +1,210 @@
-import { randomBytes } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isHttpError, isRedirect, redirect, type Handle, type RequestEvent } from '@sveltejs/kit';
-import type { Session, SvelteKitAuthConfig } from '@auth/sveltekit';
-import { validateConfig } from '@directory/config';
-import { prepareSnapshot } from '../directory/snapshot.js';
-import { createAuthentication } from './index.js';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { isRedirect, type RequestEvent } from '@sveltejs/kit';
+import { setRequestCookie } from 'better-auth/cookies';
+import type { DirectoryAuth } from '@directory/config/types';
+import { signInAction, signOutAction } from './actions.js';
+import { createAuth, createSessionReader, type Auth } from './index.js';
 
-const mocks = vi.hoisted(() => ({
-	constructor: vi.fn(),
-	sequence: vi.fn(),
-	handle: vi.fn(),
-	signIn: vi.fn(),
-	signOut: vi.fn(),
-	session: vi.fn(),
-	resolve: vi.fn(),
-	logError: vi.fn(),
-	logWarn: vi.fn()
+vi.hoisted(() => vi.stubEnv('NODE_ENV', 'production'));
+vi.mock('../logger.js', () => ({
+	logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }
 }));
-
-vi.mock('node:crypto', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('node:crypto')>();
-	return { ...actual, randomBytes: vi.fn(actual.randomBytes) };
-});
-
-vi.mock('@auth/sveltekit', () => ({
-	SvelteKitAuth: mocks.constructor
-}));
-vi.mock('../logger.js', () => ({ logger: { error: mocks.logError, warn: mocks.logWarn } }));
-// Native sequence needs Kit's request store; real HTTP tests exercise that integration.
-vi.mock('@sveltejs/kit/hooks', () => ({ sequence: mocks.sequence }));
 
 const origin = 'https://directory.example';
-const secret = ' x'.repeat(32) + ' ';
-const credentials = { username: 'family', password: 'private-password' };
-const signedIn: Session = { user: { name: 'Directory' }, expires: '2030-01-01T00:00:00.000Z' };
-const snapshot = prepareSnapshot(
-	validateConfig(
-		{
-			site: { favicon_path: '/public/site.svg', logo_path: '/public/site-logo.svg' },
-			links: {
-				photos: {
-					title: 'Photos',
-					url: 'https://photos.example',
-					logo_path: '/public/logos/photos.svg'
-				}
-			}
-		},
-		{ env: {} }
-	)
-);
+const secret = 'configured-session-secret-with-at-least-32-characters';
+const credentials = { username: 'family', password: 'correct café ☕' };
+const config = { secret, credentials };
+let cookieHeaders: Headers;
+let client = 0;
+let address: string;
 
-function eventFor(
-	path = '/',
-	options: {
-		method?: string;
-		headers?: HeadersInit;
-		body?: BodyInit;
-		data?: boolean;
-		routeId?: RequestEvent['route']['id'];
-	} = {}
+beforeEach(() => {
+	vi.stubEnv('NODE_ENV', 'production');
+	vi.useFakeTimers({ toFake: ['Date'] });
+	vi.setSystemTime(new Date('2030-01-01T12:00:00Z'));
+	cookieHeaders = new Headers();
+	address = `192.0.2.${++client}`;
+});
+
+afterEach(() => {
+	vi.useRealTimers();
+	vi.unstubAllGlobals();
+	vi.unstubAllEnvs();
+});
+
+function authentication(settings: DirectoryAuth = config): Auth {
+	const auth = createAuth(settings, origin);
+	if (!auth) throw new Error('Expected enabled authentication.');
+	return auth;
+}
+
+function formEvent(
+	path: string,
+	fields: Record<string, string> | URLSearchParams,
+	browserOrigin = origin
 ): RequestEvent {
-	const method = options.method ?? 'GET';
-	const headers = new Headers({ accept: 'text/html', ...options.headers });
+	const headers = new Headers(cookieHeaders);
+	headers.set('origin', browserOrigin);
 	const request = new Request(new URL(path, origin), {
-		method,
+		method: 'POST',
 		headers,
-		...(options.body === undefined ? {} : { body: options.body })
+		body: new URLSearchParams(fields)
 	});
-	const pathname = new URL(request.url).pathname;
-	let routeId: RequestEvent['route']['id'] = null;
-	if (pathname === '/' || pathname === '/__data.json') routeId = '/(protected)';
-	if (pathname === '/signin') routeId = '/(public)/signin';
-	if (pathname === '/healthz') routeId = '/(public)/healthz';
-	if (options.routeId !== undefined) routeId = options.routeId;
 	return {
-		url: new URL(request.url),
 		request,
-		locals: { snapshot, publicDir: '/mounted/public' },
-		route: { id: routeId },
-		isDataRequest: options.data ?? false,
-		cookies: { set: vi.fn(), get: vi.fn() }
+		url: new URL(request.url),
+		getClientAddress: () => address,
+		cookies: {
+			set(name: string, value: string) {
+				// Model only Kit forwarding cookies into the next browser request.
+				setRequestCookie(cookieHeaders, name, value);
+			}
+		}
 	} as unknown as RequestEvent;
 }
 
-function authenticate() {
-	return createAuthentication({ origin, secret, credentials });
-}
-
-async function responseFor(event: RequestEvent) {
-	return authenticate().handle({ event, resolve: mocks.resolve });
-}
-
-function authJsConfig(): SvelteKitAuthConfig {
-	return mocks.constructor.mock.calls[0]?.[0] as SvelteKitAuthConfig;
-}
-
-beforeEach(() => {
-	vi.resetAllMocks();
-	mocks.sequence.mockImplementation((...handlers: Handle[]): Handle => {
-		return ({ event, resolve }) => {
-			const run = (index: number, current: RequestEvent): ReturnType<Handle> => {
-				const handler = handlers[index];
-				return handler
-					? handler({ event: current, resolve: (next) => Promise.resolve(run(index + 1, next)) })
-					: resolve(current);
-			};
-			return run(0, event);
-		};
-	});
-	mocks.constructor.mockReturnValue({
-		handle: mocks.handle,
-		signIn: mocks.signIn,
-		signOut: mocks.signOut
-	});
-	mocks.handle.mockImplementation(async ({ event, resolve }) => {
-		event.locals.auth = mocks.session;
-		if (event.url.pathname === '/auth/callback/oidc') {
-			return new Response(null, { status: 302, headers: { location: '/' } });
-		}
-		return resolve(event);
-	});
-	mocks.session.mockResolvedValue(null);
-	mocks.resolve.mockResolvedValue(new Response('private-page'));
-});
-
-describe('bookmark logo API access', () => {
-	it.each(['GET', 'HEAD'])('requires a session for %s even with HTML Accept', async (method) => {
-		for (const path of ['/bookmarks/photos/logo', '/bookmarks/missing/logo']) {
-			const response = await responseFor(
-				eventFor(path, { method, routeId: '/(protected)/(endpoints)/bookmarks/[id]/logo' })
-			);
-			expect(response.status).toBe(401);
-			expect(response.headers.get('cache-control')).toBe('private, no-store');
-		}
-		expect(mocks.resolve).not.toHaveBeenCalled();
-	});
-
-	it.each(['GET', 'HEAD'])(
-		'uses the matched logo API route for encoded %s aliases',
-		async (method) => {
-			for (const path of [
-				'/%62ookmarks/photos/logo',
-				'/bookmarks/%70hotos/logo',
-				'/bookmarks/photos/%6cogo'
-			]) {
-				const event = eventFor(path, { method });
-				event.route.id = '/(protected)/(endpoints)/bookmarks/[id]/logo';
-				expect((await responseFor(event)).status).toBe(401);
-				expect(mocks.resolve).not.toHaveBeenCalled();
-			}
-		}
-	);
-
-	it('lets an authenticated request reach the prepared SVG route', async () => {
-		mocks.session.mockResolvedValueOnce(signedIn);
-		const event = eventFor('/bookmarks/photos/logo', {
-			routeId: '/(protected)/(endpoints)/bookmarks/[id]/logo'
-		});
-		expect((await responseFor(event)).status).toBe(200);
-		expect(mocks.resolve).toHaveBeenCalledOnce();
-	});
-});
-
-describe('public mounted image access', () => {
-	it.each(['GET', 'HEAD'])(
-		'lets configured and unreferenced %s images reach the public route without reading a session',
-		async (method) => {
-			for (const path of [
-				'/public/site.svg',
-				'/public/site-logo.svg',
-				'/public/logos/photos.svg',
-				'/public/unreferenced.svg',
-				'/%70ublic/site.svg',
-				'/public/site%2Esvg'
-			]) {
-				const event = eventFor(path, { method, routeId: '/(public)/public/[...file]' });
-				const response = await responseFor(event);
-				expect(response.status).toBe(200);
-				expect(response.headers.get('cache-control')).toBe('private, no-store');
-				expect(mocks.resolve).toHaveBeenLastCalledWith(event);
-			}
-			expect(mocks.session).not.toHaveBeenCalled();
-		}
-	);
-});
-
-describe('boot factory', () => {
-	it('constructs one SDK instance and seven-day native JWT pipeline per application', async () => {
-		const authentication = authenticate();
-		expect(authentication.strategy).toBe('credentials');
-		expect(randomBytes).not.toHaveBeenCalled();
-		expect(JSON.stringify(authentication)).not.toContain(secret);
-		expect(authJsConfig()).toMatchObject({
-			secret,
-			trustHost: true,
-			basePath: '/auth',
-			redirectProxyUrl: '',
-			session: { strategy: 'jwt', maxAge: 604800 },
-			pages: { signIn: '/signin', error: '/signin' }
-		});
-		for (let index = 0; index < 2; index++) {
-			await authentication.handle({ event: eventFor('/signin'), resolve: mocks.resolve });
-		}
-		expect(mocks.constructor).toHaveBeenCalledTimes(1);
-		expect(mocks.sequence).toHaveBeenCalledTimes(1);
-	});
-
-	it('passes fresh cryptographic bytes to each SDK instance without changing config', () => {
-		const config = Object.freeze({ origin, credentials });
-		createAuthentication(config);
-		createAuthentication(config);
-		expect(vi.mocked(randomBytes).mock.calls).toEqual([[32], [32]]);
-		const secrets = mocks.constructor.mock.calls.map(([settings]) => settings.secret);
-		const generated = vi
-			.mocked(randomBytes)
-			.mock.results.map(({ value }) => (value as Buffer).toString('base64'));
-		expect(secrets).toEqual(generated);
-		expect(config).not.toHaveProperty('secret');
-	});
-
-	it('pins redirect callbacks and does not emit raw SDK diagnostics', async () => {
-		authenticate();
-		const callback = authJsConfig().callbacks?.redirect;
-		expect(await callback?.({ url: 'https://evil.example/token', baseUrl: origin })).toBe(
-			`${origin}/`
-		);
-		expect(await callback?.({ url: '/safe?a=1', baseUrl: 'https://evil.example' })).toBe(
-			`${origin}/safe?a=1`
-		);
-		const authJsLogger = authJsConfig().logger;
-		authJsLogger?.error?.(new Error('secret/token/issuer sentinel'));
-		authJsLogger?.warn?.('env-url-basepath-redundant');
-		expect(mocks.logWarn).not.toHaveBeenCalled();
-		authJsLogger?.warn?.('env-url-basepath-mismatch');
-		authJsLogger?.debug?.('sensitive debug', { token: 'raw-token' });
-		expect(mocks.logError.mock.calls).toEqual([['Auth.js failed (authjs_error).']]);
-		expect(mocks.logWarn.mock.calls).toEqual([['Auth.js warning (authjs_warning).']]);
-	});
-});
-
-describe('whole-directory gate', () => {
-	it.each([
-		['/(public)/future', 200],
-		['/(public)', 200],
-		['/(publicity)/future', 303],
-		['/(public)-other/future', 303],
-		['/(protected)', 303],
-		['/(protected)/future', 303],
-		['/(protected)/(endpoints)/future', 401],
-		['/(protected)/(endpoints)', 401],
-		['/(protected)/(endpoints-other)/future', 303],
-		['/(other)/future', 303],
-		[null, 303]
-	] as const)('uses route-group boundaries, not URL ownership: %s', async (routeId, status) => {
-		const response = await responseFor(
-			eventFor('/future', { routeId: routeId as RequestEvent['route']['id'] })
-		);
-		expect(response.status).toBe(status);
-		if (status === 200) {
-			expect(mocks.session).not.toHaveBeenCalled();
-			expect(mocks.resolve).toHaveBeenCalledOnce();
-		} else {
-			expect(mocks.session).toHaveBeenCalledOnce();
-			expect(mocks.resolve).not.toHaveBeenCalled();
-		}
-	});
-
-	it.each(['/signin', '/healthz', '/favicon.png', '/_app/immutable/missing.js'])(
-		'does not make unresolved URLs public: %s',
-		async (path) => {
-			const response = await responseFor(
-				eventFor(path, {
-					routeId: null,
-					headers: { accept: 'application/json' }
-				})
-			);
-			expect(response.status).toBe(401);
-			expect(mocks.resolve).not.toHaveBeenCalled();
-		}
-	);
-
-	it.each([
-		['/', '/signin?callbackUrl=%2F'],
-		['/private?tag=1', '/signin?callbackUrl=%2Fprivate%3Ftag%3D1'],
-		['/bookmarks', '/signin?callbackUrl=%2Fbookmarks'],
-		['/bookmarks/photos', '/signin?callbackUrl=%2Fbookmarks%2Fphotos'],
-		['/bookmarks/photos/other', '/signin?callbackUrl=%2Fbookmarks%2Fphotos%2Fother']
-	])(
-		'redirects only unauthenticated HTML navigation with a local callback: %s',
-		async (path, location) => {
-			const response = await responseFor(eventFor(path));
-			expect(response.status).toBe(303);
-			expect(response.headers.get('location')).toBe(location);
-			expect(await response.text()).not.toContain('private-page');
-			expect(mocks.resolve).not.toHaveBeenCalled();
-		}
-	);
-
-	it.each([
-		['/', { data: true }],
-		['/private', { headers: { accept: 'application/json' } }],
-		['/private', { headers: { accept: 'text/html;q=0' } }],
-		['/private', { headers: { accept: '*/*' } }],
-		['/private', { method: 'HEAD' }],
-		['/private', { method: 'POST', headers: { origin } }],
-		['/private', { method: 'OPTIONS' }],
-		['/public/private.svg', { headers: { accept: 'image/svg+xml' } }],
-		['/unknown', { headers: { accept: '' } }]
-	])('denies private non-navigation requests: %s %j', async (path, options) => {
-		const response = await responseFor(eventFor(path, options));
-		expect(response.status).toBe(401);
-		expect(await response.text()).toBe('Access denied');
-		expect(mocks.resolve).not.toHaveBeenCalled();
-	});
-
-	it.each([
-		['text/html;q=0.000', 401],
-		['text/html; q=0.0 ; charset=utf-8', 401],
-		['text/html;q=0.5', 303],
-		['text/plain, text/html; charset=utf-8', 303],
-		['text/html;q=0, text/html;q=0.8', 303],
-		['text/html;q=1, application/json;q=0', 401]
-	])('preserves navigation Accept policy for %s', async (accept, status) => {
-		const response = await responseFor(eventFor('/private', { headers: { accept } }));
-		expect(response.status).toBe(status);
-		expect(mocks.resolve).not.toHaveBeenCalled();
-	});
-
-	it.each([
-		['/signin', 'GET', false],
-		['/signin', 'GET', true],
-		['/signin', 'POST', false],
-		['/healthz', 'GET', false],
-		['/healthz', 'HEAD', false]
-	])('lets public routes handle their requests: %s %s', async (path, method, data) => {
-		const response = await responseFor(eventFor(path, { method, data, headers: { origin } }));
-		expect(response.status).toBe(200);
-		expect(mocks.resolve).toHaveBeenCalledOnce();
-		expect(mocks.session).not.toHaveBeenCalled();
-	});
-
-	it.each([
-		'/auth',
-		'/auth/',
-		'/auth/session',
-		'/auth/providers',
-		'/auth/csrf',
-		'/auth/signout',
-		'/auth/callback/credentials',
-		'/auth/signin/oidc',
-		'/auth/error'
-	])('blocks unused raw SDK route %s even with a session', async (path) => {
-		mocks.session.mockResolvedValue(signedIn);
-		for (const method of ['GET', 'POST']) {
-			const response = await responseFor(eventFor(path, { method, headers: { origin } }));
-			expect(response.status).toBe(404);
-		}
-		expect(mocks.handle).not.toHaveBeenCalled();
-		expect(mocks.resolve).not.toHaveBeenCalled();
-	});
-
-	it('permits only the configured OIDC GET callback, including cross-site navigation', async () => {
-		const authentication = createAuthentication({
-			origin,
-			secret,
-			oidc: {
-				issuer: 'https://issuer.example',
-				client_id: 'client',
-				client_secret: 'secret'
-			}
-		});
-		const callback = eventFor('/auth/callback/oidc?state=test', {
-			headers: { origin: 'https://issuer.example' }
-		});
-		expect((await authentication.handle({ event: callback, resolve: mocks.resolve })).status).toBe(
-			302
-		);
-		expect(mocks.resolve).not.toHaveBeenCalled();
-		expect((await responseFor(callback)).status).toBe(404);
-		const post = eventFor('/auth/callback/oidc', { method: 'POST', headers: { origin } });
-		expect((await authentication.handle({ event: post, resolve: mocks.resolve })).status).toBe(404);
-		const data = eventFor('/auth/callback/oidc', { data: true });
-		expect((await authentication.handle({ event: data, resolve: mocks.resolve })).status).toBe(404);
-	});
-
-	it('caches the native SDK session for the root UI without exposing it in data', async () => {
-		mocks.session.mockResolvedValue(signedIn);
-		const event = eventFor('/');
-		expect((await responseFor(event)).status).toBe(200);
-		expect(event.locals.session).toBe(signedIn);
-		expect(mocks.session).toHaveBeenCalledOnce();
-	});
-
-	it('does not authorize a session without a user', async () => {
-		mocks.session.mockResolvedValue({ expires: '2099-01-01T00:00:00.000Z' });
-		const response = await responseFor(eventFor('/__data.json', { data: true }));
-		expect(response.status).toBe(401);
-		expect(mocks.resolve).not.toHaveBeenCalled();
-	});
-
-	it('denies protected-route session errors without logging causes', async () => {
-		mocks.session.mockRejectedValue(new Error('token sentinel'));
-		const response = await responseFor(eventFor('/'));
-		expect(response.status).toBe(401);
-		expect(mocks.resolve).not.toHaveBeenCalled();
-		expect(mocks.logError).toHaveBeenCalledWith(
-			'Authentication session failed (auth_session_failed).'
-		);
-	});
-
-	it('adds private caching and safe locations to immutable SDK redirects', async () => {
-		mocks.handle.mockResolvedValue(
-			Response.redirect(`${origin}/signin?error=RawSDKCode&code=secret`, 302)
-		);
-		const response = await responseFor(eventFor('/signin'));
-		expect(response.headers.get('cache-control')).toBe('private, no-store');
-		expect(response.headers.get('location')).toBe('/signin?callbackUrl=%2F&error=signin');
-	});
-
-	it('preserves multiple native SDK cookie headers when applying private caching', async () => {
-		const headers = new Headers({ location: '/' });
-		headers.append('set-cookie', 'one=opaque; Path=/; HttpOnly');
-		headers.append('set-cookie', 'two=opaque; Path=/; HttpOnly');
-		mocks.handle.mockResolvedValue(new Response(null, { status: 302, headers }));
-		const response = await responseFor(eventFor('/signin'));
-		expect(response.headers.getSetCookie()).toEqual(headers.getSetCookie());
-	});
-
-	it('preserves a safe callback while normalizing generic action-error redirects', async () => {
-		mocks.handle.mockImplementation(() =>
-			redirect(303, '/signin?callbackUrl=%2Fsafe&error=signin')
-		);
-		const response = await responseFor(eventFor('/signin'));
-		expect(response.headers.get('location')).toBe('/signin?callbackUrl=%2Fsafe&error=signin');
-	});
-
-	it('denies unexpected SDK exceptions without returning private content or raw errors', async () => {
-		mocks.handle.mockRejectedValue(new Error('raw token sentinel'));
-		const response = await responseFor(eventFor('/signin'));
-		expect(response.status).toBe(500);
-		expect(await response.text()).toBe('Access denied');
-		expect(mocks.resolve).not.toHaveBeenCalled();
-	});
-});
-
-describe('trusted origin boundary', () => {
-	it('rejects inconsistently constructed event and request origins before calling SDK', async () => {
-		const event = eventFor('/');
-		event.url = new URL('https://evil.example/');
-		expect((await responseFor(event)).status).toBe(403);
-		const other = eventFor('https://evil.example/');
-		other.url = new URL(origin);
-		expect((await responseFor(other)).status).toBe(403);
-		expect(mocks.handle).not.toHaveBeenCalled();
-	});
-
-	it.each(['application/x-www-form-urlencoded', 'application/json', 'text/plain'])(
-		'requires exact Origin for POST regardless of %s',
-		async (contentType) => {
-			for (const badOrigin of [undefined, 'null', 'https://evil.example', `${origin}/`]) {
-				const response = await responseFor(
-					eventFor('/signin', {
-						method: 'POST',
-						headers: {
-							'content-type': contentType,
-							...(badOrigin === undefined ? {} : { origin: badOrigin })
-						},
-						body: 'username=family'
-					})
-				);
-				expect(response.status).toBe(403);
-			}
-			expect(mocks.handle).not.toHaveBeenCalled();
-		}
-	);
-
-	it('passes the original Kit event and attacker headers directly to the native SDK', async () => {
-		const event = eventFor('/signin', {
-			headers: {
-				host: 'evil.example',
-				'x-forwarded-host': 'evil.example',
-				'x-forwarded-proto': 'http',
-				'x-forwarded-port': '80',
-				forwarded: 'host=evil.example;proto=http',
-				'x-auth-return-redirect': '1'
-			}
-		});
-		const originalRequest = event.request;
-		const originalHeaders = [...event.request.headers];
-		await responseFor(event);
-		const nativeEvent = mocks.handle.mock.calls[0]?.[0].event as RequestEvent;
-		expect(nativeEvent).toBe(event);
-		expect(nativeEvent.request).toBe(originalRequest);
-		expect([...nativeEvent.request.headers]).toEqual(originalHeaders);
-		expect(nativeEvent.url).toBe(event.url);
-		expect(nativeEvent.cookies).toBe(event.cookies);
-		expect(nativeEvent.locals).toBe(event.locals);
-		expect(mocks.resolve.mock.calls[0]?.[0]).toBe(event);
-		expect(event.cookies.set).not.toHaveBeenCalled();
-	});
-});
-
-describe('native action wrappers', () => {
-	function actionEvent(body: BodyInit, contentType = 'application/x-www-form-urlencoded') {
-		return eventFor('/signin', {
-			method: 'POST',
-			headers: { origin, 'content-type': contentType },
-			body
-		});
+async function destination(action: Promise<void>): Promise<URL> {
+	try {
+		await action;
+	} catch (result) {
+		if (!isRedirect(result)) throw result;
+		expect(result.status).toBe(303);
+		return new URL(result.location, origin);
 	}
+	throw new Error('Expected an action redirect.');
+}
 
-	it('selects configured credentials and allowlists the entire SDK action body', async () => {
-		const body = new URLSearchParams({
-			username: credentials.username,
-			password: credentials.password,
-			redirectTo: '/safe?q=1',
-			providerId: 'evil',
-			redirect: 'false',
-			'authorizationParams-prompt': 'evil',
-			token: 'secret'
-		});
-		const event = actionEvent(body);
-		await authenticate().signIn(event);
-		const normalized = mocks.signIn.mock.calls[0]?.[0] as RequestEvent;
-		expect(Object.fromEntries(await normalized.request.formData())).toEqual({
-			providerId: 'credentials',
-			...credentials,
-			redirectTo: '/safe?q=1'
-		});
-		expect(normalized.cookies).toBe(event.cookies);
-		expect(await event.request.text()).toBe(body.toString());
-	});
+function signIn(auth: Auth, fields = credentials) {
+	return signInAction(formEvent('/signin', fields), auth, origin, 'credentials');
+}
 
-	it.each(['signIn', 'signOut'] as const)(
-		'copies only the allowlisted %s body, preserving native Kit context and headers',
-		async (kind) => {
-			const event = eventFor('/signin', {
-				method: 'POST',
-				headers: {
-					origin,
-					'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
-					'content-length': '16',
-					host: 'evil.example',
-					'x-forwarded-host': 'evil.example',
-					'x-forwarded-proto': 'http',
-					'x-forwarded-port': '80',
-					forwarded: 'host=evil.example;proto=http',
-					'x-auth-return-redirect': '1'
-				},
-				body: 'redirectTo=/safe'
-			});
-			const originalHeaders = [...event.request.headers];
-			await authenticate()[kind](event);
-			const formEvent = mocks[kind].mock.calls[0]?.[0] as RequestEvent;
-			expect(formEvent).not.toBe(event);
-			expect(formEvent.request).not.toBe(event.request);
-			expect(formEvent.request.url).toBe(event.request.url);
-			expect(formEvent.url).toBe(event.url);
-			expect(formEvent.cookies).toBe(event.cookies);
-			expect(formEvent.locals).toBe(event.locals);
-			const expectedHeaders = new Headers(event.request.headers);
-			expectedHeaders.set('content-type', 'application/x-www-form-urlencoded');
-			expectedHeaders.delete('content-length');
-			expect([...formEvent.request.headers]).toEqual([...expectedHeaders]);
-			expect([...event.request.headers]).toEqual(originalHeaders);
-		}
-	);
-
-	it('selects configured OIDC without forwarding credential or authorization overrides', async () => {
-		const authentication = createAuthentication({
+it('keeps native form login/logout local and propagates their session cookies', async () => {
+	const auth = authentication();
+	const login = await destination(
+		signInAction(
+			formEvent('/signin', {
+				...credentials,
+				redirectTo: 'https://another.example/private',
+				providerId: 'unconfigured-provider'
+			}),
+			auth,
 			origin,
-			secret,
-			oidc: {
-				issuer: 'https://issuer.example',
-				client_id: 'client',
-				client_secret: 'secret'
-			}
-		});
-		await authentication.signIn(
-			actionEvent(
-				new URLSearchParams({
-					...credentials,
-					redirectTo: '//evil.example',
-					providerId: 'credentials'
-				})
-			)
-		);
-		const normalized = mocks.signIn.mock.calls[0]?.[0] as RequestEvent;
-		expect(Object.fromEntries(await normalized.request.formData())).toEqual({
-			providerId: 'oidc',
-			redirectTo: '/'
-		});
-	});
-
-	it('sanitizes sign-out return paths and drops every other field', async () => {
-		await authenticate().signOut(
-			actionEvent(
-				new URLSearchParams({
-					redirectTo: 'https://evil.example/token',
-					redirect: 'false',
-					'authorizationParams-state': 'secret'
-				})
-			)
-		);
-		const normalized = mocks.signOut.mock.calls[0]?.[0] as RequestEvent;
-		expect(Object.fromEntries(await normalized.request.formData())).toEqual({ redirectTo: '/' });
-	});
-
-	it('rejects duplicate fields rather than selecting an attacker-controlled occurrence', async () => {
-		await authenticate().signIn(
-			actionEvent(
-				'username=family&username=evil&password=one&password=two&redirectTo=/one&redirectTo=/two'
-			)
-		);
-		const normalized = mocks.signIn.mock.calls[0]?.[0] as RequestEvent;
-		expect(Object.fromEntries(await normalized.request.formData())).toEqual({
-			providerId: 'credentials',
-			username: '',
-			password: '',
-			redirectTo: '/'
-		});
-	});
-
-	it('does not stringify uploaded credential fields or accept an uploaded return path', async () => {
-		const body = new FormData();
-		body.set('username', new File(['family'], 'username.txt'));
-		body.set('password', new File(['private-password'], 'password.txt'));
-		body.set('redirectTo', new File(['/safe'], 'return.txt'));
-		await authenticate().signIn(eventFor('/signin', { method: 'POST', headers: { origin }, body }));
-		const normalized = mocks.signIn.mock.calls[0]?.[0] as RequestEvent;
-		expect(Object.fromEntries(await normalized.request.formData())).toEqual({
-			providerId: 'credentials',
-			username: '',
-			password: '',
-			redirectTo: '/'
-		});
-	});
-
-	it('preserves legitimate native Kit redirects and cookie context', async () => {
-		mocks.signIn.mockImplementation(async (event: RequestEvent) => {
-			event.cookies.set('native-session', 'opaque', { path: '/' });
-			redirect(302, 'https://issuer.example/authorize?state=opaque');
-		});
-		const event = actionEvent('redirectTo=/safe');
-		const result = await authenticate()
-			.signIn(event)
-			.catch((error: unknown) => error);
-		expect(isRedirect(result) && result.location).toBe(
-			'https://issuer.example/authorize?state=opaque'
-		);
-		expect(event.cookies.set).toHaveBeenCalledWith('native-session', 'opaque', { path: '/' });
-	});
-
-	it.each(['signIn', 'signOut'] as const)(
-		'maps %s SDK failures to a generic safe redirect',
-		async (kind) => {
-			mocks[kind].mockRejectedValue(new Error('raw token / issuer URL sentinel'));
-			const result = await authenticate()
-				[kind](actionEvent('redirectTo=%2Fsafe'))
-				.catch((error: unknown) => error);
-			expect(isRedirect(result) && result.location).toBe(
-				'/signin?callbackUrl=%2Fsafe&error=signin'
-			);
-			expect(mocks.logError.mock.calls).toEqual([
-				['Authentication action failed (auth_action_failed).']
-			]);
-		}
+			'credentials'
+		)
 	);
+	expect(login.origin).toBe(origin);
+	expect(login.pathname).toBe('/');
+	expect(await createSessionReader(auth, cookieHeaders)()).not.toBeNull();
 
-	it('sanitizes SDK error redirects while preserving safe form callback', async () => {
-		mocks.signIn.mockImplementation(() =>
-			redirect(302, `${origin}/signin?error=CredentialsSignin&code=raw`)
-		);
-		const result = await authenticate()
-			.signIn(actionEvent('redirectTo=%2Fsafe'))
-			.catch((error: unknown) => error);
-		expect(isRedirect(result) && result.location).toBe('/signin?callbackUrl=%2Fsafe&error=signin');
-	});
+	const logout = await destination(
+		signOutAction(formEvent('/?/signout', { redirectTo: '/signin' }), auth, origin)
+	);
+	expect(logout.pathname).toBe('/signin');
+	expect(await createSessionReader(auth, cookieHeaders)()).toBeNull();
+});
 
-	it('handles malformed bodies generically and validates direct action invocation origins', async () => {
-		let result = await authenticate()
-			.signIn(actionEvent('{"token":"sentinel"}', 'application/json'))
-			.catch((error: unknown) => error);
-		expect(isRedirect(result) && result.location).toBe('/signin?callbackUrl=%2F&error=signin');
-		result = await authenticate()
-			.signOut(eventFor('/', { method: 'POST' }))
-			.catch((error: unknown) => error);
-		expect(isHttpError(result) && result.status).toBe(403);
-		expect(mocks.signIn).not.toHaveBeenCalled();
-		expect(mocks.signOut).not.toHaveBeenCalled();
+it('rejects wrong credentials without creating a session', async () => {
+	const auth = authentication();
+	const location = await destination(signIn(auth, { ...credentials, password: 'incorrect' }));
+	expect(location.pathname).toBe('/signin');
+	expect(location.searchParams.get('error')).toBe('credentials');
+	expect(await createSessionReader(auth, cookieHeaders)()).toBeNull();
+});
+
+it('rejects duplicate credential fields instead of choosing an occurrence', async () => {
+	const auth = authentication();
+	const fields = new URLSearchParams(credentials);
+	fields.append('username', credentials.username);
+	const location = await destination(
+		signInAction(formEvent('/signin', fields), auth, origin, 'credentials')
+	);
+	expect(location.pathname).toBe('/signin');
+	expect(await createSessionReader(auth, cookieHeaders)()).toBeNull();
+});
+
+it('rejects a cross-origin native form before it can sign in', async () => {
+	const auth = authentication();
+	await expect(
+		signInAction(
+			formEvent('/signin', credentials, 'https://another.example'),
+			auth,
+			origin,
+			'credentials'
+		)
+	).rejects.toMatchObject({ status: 403 });
+	expect(await createSessionReader(auth, cookieHeaders)()).toBeNull();
+});
+
+it('expires an active session at the original seven-day deadline without renewal', async () => {
+	const auth = authentication();
+	await destination(signIn(auth));
+	const initial = await createSessionReader(auth, cookieHeaders)();
+	expect(initial?.expires).toBe('2030-01-08T12:00:00.000Z');
+
+	vi.setSystemTime(new Date('2030-01-08T11:00:00Z'));
+	expect((await createSessionReader(auth, cookieHeaders)())?.expires).toBe(initial?.expires);
+	vi.setSystemTime(new Date('2030-01-08T12:00:01Z'));
+	expect(await createSessionReader(auth, cookieHeaders)()).toBeNull();
+});
+
+it('keeps YAML keys authoritative across restarts and invalidates sessions on rotation', async () => {
+	vi.stubEnv('BETTER_AUTH_SECRETS', '99:ambient-session-secret-that-must-not-override-yaml');
+	await destination(signIn(authentication()));
+
+	vi.stubEnv('BETTER_AUTH_SECRETS', '99:another-ambient-secret-that-must-not-override-yaml');
+	expect(await createSessionReader(authentication(), cookieHeaders)()).not.toBeNull();
+	const rotated = authentication({
+		...config,
+		secret: 'replacement-session-secret-with-at-least-32-characters'
 	});
+	expect(await createSessionReader(rotated, cookieHeaders)()).toBeNull();
+});
+
+it('generates a process-local key when omitted, without inheriting ambient auth secrets', async () => {
+	vi.stubEnv('BETTER_AUTH_SECRET', secret);
+	vi.stubEnv('AUTH_SECRET', secret);
+	const auth = authentication({ credentials });
+	await destination(signIn(auth));
+	expect(await createSessionReader(auth, cookieHeaders)()).not.toBeNull();
+	expect(await createSessionReader(authentication({ credentials }), cookieHeaders)()).toBeNull();
+});
+
+it('leaves public mode independent of authentication configuration', async () => {
+	vi.stubEnv('BETTER_AUTH_SECRET', 'invalid');
+	expect(createAuth(undefined, '')).toBeUndefined();
+	expect(await createSessionReader(undefined, new Headers())()).toBeNull();
+});
+
+it('starts OIDC through the configured provider and existing callback without a browser SDK', async () => {
+	const issuer = 'https://identity.example';
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () =>
+			Response.json({
+				issuer,
+				authorization_endpoint: `${issuer}/authorize`,
+				token_endpoint: `${issuer}/token`,
+				userinfo_endpoint: `${issuer}/userinfo`,
+				jwks_uri: `${issuer}/jwks`,
+				id_token_signing_alg_values_supported: ['RS256']
+			})
+		)
+	);
+	const auth = authentication({
+		secret,
+		oidc: { issuer, client_id: 'directory', client_secret: 'configured-client-secret' }
+	});
+	const location = await destination(
+		signInAction(
+			formEvent('/signin', { redirectTo: '/', provider: 'unconfigured-provider' }),
+			auth,
+			origin,
+			'oidc'
+		)
+	);
+	expect(location.origin).toBe(issuer);
+	expect(location.pathname).toBe('/authorize');
+	expect(location.searchParams.get('redirect_uri')).toBe(`${origin}/auth/callback/oidc`);
+	// Callback completion remains covered by the existing local-issuer browser flow at cutover.
+	expect(cookieHeaders.has('cookie')).toBe(true);
 });

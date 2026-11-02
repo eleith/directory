@@ -14,7 +14,7 @@ const adapterEvents: NodeJS.EventEmitter = process;
 const mocks = vi.hoisted(() => ({
 	building: false,
 	dev: false,
-	env: { ORIGIN: 'https://directory.example.com', AUTH_URL: 'https://directory.example.com' },
+	env: { ORIGIN: 'https://directory.example.com' },
 	boot: vi.fn<typeof import('./lib/server/boot.js').bootApp>(),
 	report: vi.fn<typeof import('./lib/server/logger.js').reportStartupFailure>(),
 	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
@@ -326,7 +326,7 @@ describe('server hooks', () => {
 				}
 				return bookmarkLogo(event as Parameters<typeof bookmarkLogo>[0]);
 			});
-			for (const cookie of ['', 'authjs.session-token=invalid-session']) {
+			for (const cookie of ['', 'unrelated-cookie=opaque']) {
 				for (const [path, routeId, params] of [
 					['/public/photo.svg', '/(public)/public/[...file]', { file: 'photo.svg' }],
 					['/public/site.svg', '/(public)/public/[...file]', { file: 'site.svg' }],

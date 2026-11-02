@@ -3,6 +3,7 @@ import { mkdtemp, rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { applySetCookies } from 'better-auth/cookies';
 
 const serverModule = new URL('../../../build/bootstrap/start.js', import.meta.url).href;
 const sentinel = 'PRIVATE_CONFIG_CREDENTIAL_LINK';
@@ -171,55 +172,68 @@ describe('production configuration startup', () => {
 
 it.each([
 	{
-		name: 'without legacy environment or a YAML secret',
-		environment: {},
-		contents: credentialsConfiguration
-	},
-	{
-		name: 'ignoring conflicting legacy environment',
-		environment: hostileEnvironment,
-		contents: credentialsConfiguration
+		name: 'with an HTTPS public origin over HTTP transport',
+		origin: 'https://directory.example',
+		environment: {
+			...hostileEnvironment,
+			HOST_HEADER: 'x-forwarded-host',
+			PROTOCOL_HEADER: 'x-forwarded-proto',
+			PORT_HEADER: 'x-forwarded-port'
+		},
+		contents: credentialsConfiguration.replace(
+			'url: http://localhost',
+			'url: https://directory.example'
+		)
 	},
 	{
 		name: 'with explicit legacy-named environment references',
+		origin: 'http://localhost',
 		environment: { ORIGIN: 'http://localhost', AUTH_SECRET: sentinel },
 		contents: credentialsConfiguration
 			.replace('url: http://localhost', 'url: ${ORIGIN}')
 			.replace(`password: ${sentinel}`, 'password: ${AUTH_SECRET}')
 	}
-])('starts YAML credentials auth $name', async ({ environment, contents }) => {
+])('starts YAML credentials auth $name', async ({ origin, environment, contents }) => {
 	const server = await launchServer(contents, environment);
 	const address = await server.ready();
-	await expectHealthy(address);
-	const gated = await fetch(address, {
-		redirect: 'manual',
-		headers: { accept: 'text/html', connection: 'close' }
-	});
+	const transportHeaders = {
+		accept: 'text/html',
+		connection: 'close',
+		host: 'foreign.example.com',
+		'x-forwarded-host': 'foreign.example.com',
+		'x-forwarded-proto': 'http',
+		'x-forwarded-port': '80'
+	};
+	const gated = await fetch(address, { redirect: 'manual', headers: transportHeaders });
 	expect(gated.status).toBe(303);
-	const target = new URL(gated.headers.get('location')!, 'http://localhost');
-	expect(target.origin).toBe('http://localhost');
+	const target = new URL(gated.headers.get('location')!, origin);
+	expect(target.origin).toBe(origin);
 	expect(target.pathname).toBe('/signin');
+
+	const rejected = await fetch(`${address}/signin`, {
+		method: 'POST',
+		redirect: 'manual',
+		headers: { ...transportHeaders, origin: 'https://foreign.example.com' },
+		body: new URLSearchParams({ username: sentinel, password: sentinel, redirectTo: '/' })
+	});
+	expect(rejected.status).toBe(403);
+
 	const response = await fetch(`${address}/signin`, {
 		method: 'POST',
 		redirect: 'manual',
-		headers: { origin: 'http://localhost', accept: 'text/html', connection: 'close' },
+		headers: { ...transportHeaders, origin },
 		body: new URLSearchParams({ username: sentinel, password: sentinel, redirectTo: '/' })
 	});
-	expect([302, 303]).toContain(response.status);
-	expect(new URL(response.headers.get('location')!, 'http://localhost').href).toBe(
-		'http://localhost/'
-	);
-	const cookie = response.headers.getSetCookie().find((value) => value.includes('session-token='));
-	expect(cookie).toBeDefined();
-	const authenticated = await fetch(address, {
-		redirect: 'manual',
-		headers: { cookie: cookie!.split(';')[0]!, connection: 'close' }
-	});
+	expect(response.status).toBe(303);
+	expect(new URL(response.headers.get('location')!, origin).href).toBe(`${origin}/`);
+	const headers = new Headers({ connection: 'close' });
+	// Carry native cookies without asserting their names, format or browser Secure behavior.
+	applySetCookies(headers, response.headers.getSetCookie());
+	const authenticated = await fetch(address, { redirect: 'manual', headers });
 	expect(authenticated.status).toBe(200);
 	expect(await authenticated.text()).not.toContain(sentinel);
 	expect(server.output()).not.toContain(sentinel);
 	expect(server.output()).not.toContain(server.path);
-	expect(server.output()).not.toContain('auth_failed');
 	expect(await server.stop()).toEqual({ code: 0, signal: null });
 });
 

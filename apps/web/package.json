@@ -27,7 +27,6 @@
 		"tslog": "5.2.0"
 	},
 	"devDependencies": {
-		"@auth/sveltekit": "1.11.3",
 		"@iconify-json/ph": "catalog:",
 		"@playwright/test": "catalog:",
 		"@sveltejs/adapter-node": "catalog:",

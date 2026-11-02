@@ -39,11 +39,16 @@ export async function protectAuthRequest(
 	const headers = new Headers(response.headers);
 	const location = headers.get('location');
 	if (location && isSignInError(location, policy.origin)) {
-		const callbackUrl = localRedirect(
-			new URL(location, policy.origin).searchParams.get('callbackUrl'),
-			policy.origin
-		);
-		headers.set('location', signInLocation(callbackUrl, true));
+		const destination = new URL(location, policy.origin);
+		const callbackUrl = localRedirect(destination.searchParams.get('callbackUrl'), policy.origin);
+		let error = 'signin';
+		if (
+			policy.strategy === 'credentials' &&
+			destination.searchParams.get('error') === 'credentials'
+		) {
+			error = 'credentials';
+		}
+		headers.set('location', `${signInLocation(callbackUrl)}&error=${error}`);
 	}
 	headers.set('cache-control', 'private, no-store');
 	return new Response(response.body, {

@@ -26,7 +26,7 @@ vi.mock('./auth/index.js', () => ({ createAuthentication: mocks.auth }));
 const path = '/config/directory.yaml';
 const sentinel = 'PRIVATE-config-credential';
 const origin = 'https://directory.example.com';
-const frameworkEnv = { ORIGIN: origin, AUTH_URL: origin };
+const frameworkEnv = { ORIGIN: origin };
 const auth = { credentials: { username: 'family', password: sentinel } };
 const authentication: Authentication = {
 	strategy: 'credentials',
@@ -42,7 +42,6 @@ function configuration(title = 'Home', enabled = false): DirectoryConfiguration 
 beforeEach(() => {
 	vi.resetAllMocks();
 	vi.stubEnv('ORIGIN', origin);
-	vi.stubEnv('AUTH_URL', origin);
 	mocks.path.mockReturnValue(path);
 	mocks.publicDir.mockReturnValue('/mounted/public');
 	mocks.load.mockResolvedValue(configuration());
@@ -106,7 +105,7 @@ describe('application boot wiring', () => {
 		expect(ready).toHaveBeenCalledOnce();
 	});
 
-	it('constructs auth before monitoring and uses Kit private URLs, not interpolation values', async () => {
+	it('constructs auth before monitoring from the prepared origin, not legacy auth settings', async () => {
 		vi.stubEnv('ORIGIN', origin);
 		vi.stubEnv('AUTH_URL', 'https://not-kit.example.com');
 		mocks.load.mockResolvedValueOnce(configuration('Home', true));
@@ -141,11 +140,6 @@ describe('application boot wiring', () => {
 				name: 'Kit private ORIGIN differs',
 				prepared: origin,
 				privateEnv: { ...frameworkEnv, ORIGIN: sentinel }
-			},
-			{
-				name: 'Kit private AUTH_URL differs',
-				prepared: origin,
-				privateEnv: { ...frameworkEnv, AUTH_URL: sentinel }
 			},
 			{
 				name: 'site.url changed after preparation',

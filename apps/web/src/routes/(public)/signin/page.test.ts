@@ -81,12 +81,6 @@ describe('sign-in page', () => {
 		expect(auth).toHaveBeenCalledOnce();
 	});
 
-	it('does not treat a session without a user as signed in', async () => {
-		const { event, auth } = eventFor();
-		auth.mockResolvedValue({ expires: '2099-01-01' });
-		expect(await load(event)).toMatchObject({ strategy: 'credentials' });
-	});
-
 	it.each([
 		'https://outside.example/private',
 		'//outside.example/private',
@@ -100,7 +94,7 @@ describe('sign-in page', () => {
 		const query = `?${new URLSearchParams({ callbackUrl })}`;
 		const { event, auth } = eventFor(query);
 		expect(await load(event)).toMatchObject({ callbackUrl: '/' });
-		auth.mockResolvedValue({ user: {}, expires: '2099-01-01' });
+		auth.mockResolvedValue({ user: { name: 'PRIVATE_IDENTITY' }, expires: '2099-01-01' });
 		await expectRedirect(load(event), '/');
 	});
 

@@ -127,7 +127,11 @@ export async function startIssuer() {
 			const params = await body(request);
 			const authorization = authorizations.find((entry) => entry.code === params.get('code'));
 			const verifier = params.get('code_verifier') ?? '';
-			const basic = `Basic ${Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`).toString('base64')}`;
+			// OAuth Basic credentials use form encoding (including ! and spaces), not URI encoding.
+			const encodedCredentials = [clientId, clientSecret]
+				.map((value) => new URLSearchParams({ value }).toString().slice('value='.length))
+				.join(':');
+			const basic = `Basic ${Buffer.from(encodedCredentials).toString('base64')}`;
 			if (
 				request.headers.authorization !== basic ||
 				params.get('grant_type') !== 'authorization_code' ||

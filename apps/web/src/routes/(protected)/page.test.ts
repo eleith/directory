@@ -105,7 +105,7 @@ describe('directory page data', () => {
 	it('includes authorized bookmark metadata but not credentials, identities, assets or root paths', () => {
 		const event = eventFor('?link=photos', true);
 		event.locals.session = {
-			user: { name: 'PRIVATE_IDENTITY', email: 'PRIVATE_EMAIL' },
+			user: { name: 'PRIVATE_IDENTITY' },
 			expires: '2099-01-01'
 		};
 		Object.assign(event.locals, {

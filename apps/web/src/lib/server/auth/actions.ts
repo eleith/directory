@@ -1,13 +1,13 @@
 import { isRedirect, redirect, type RequestEvent } from '@sveltejs/kit';
 import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies';
-import { logger } from '../../logger.js';
+import { logger } from '../logger.js';
 import type { Auth } from './index.js';
-import { localRedirect, signInLocation } from '../redirect.js';
-import { authenticationHeaders, requireActionOrigin } from '../request.js';
+import { localRedirect, signInLocation } from './redirect.js';
+import { authenticationHeaders, requireActionOrigin } from './request.js';
 
 export async function signInAction(
 	event: RequestEvent,
-	auth: Auth,
+	auth: Pick<Auth, 'handler'>,
 	origin: string,
 	strategy: 'credentials' | 'oidc'
 ): Promise<void> {
@@ -50,7 +50,7 @@ export async function signInAction(
 
 export async function signOutAction(
 	event: RequestEvent,
-	auth: Auth,
+	auth: Pick<Auth, 'handler'>,
 	origin: string
 ): Promise<void> {
 	requireActionOrigin(event, origin);
@@ -68,7 +68,7 @@ export async function signOutAction(
 
 async function submitAuth(
 	event: RequestEvent,
-	auth: Auth,
+	auth: Pick<Auth, 'handler'>,
 	origin: string,
 	path: string,
 	body: Record<string, string>

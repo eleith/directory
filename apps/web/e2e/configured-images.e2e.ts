@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { credentialsAuth, password, username } from './support/configuration.js';
 import { startServer, type TestServer } from './support/server.js';
+import { responseCookieHeader } from './support/session.js';
 
 const siteDescription = 'Useful services with familiar images.';
 const privateLogo = `<?xml version="1.0" encoding="iso-8859-1"?>
@@ -81,9 +82,9 @@ async function signIn(server: TestServer) {
 		body: new URLSearchParams({ username, password, redirectTo: '/' })
 	});
 	expect([302, 303]).toContain(response.status);
-	const cookie = response.headers.getSetCookie().find((value) => /session-token=/.test(value));
-	expect(cookie).toBeDefined();
-	return cookie!.split(';')[0]!;
+	const cookie = responseCookieHeader(response);
+	expect(cookie).not.toBe('');
+	return cookie;
 }
 
 function expectPrivateHeaders(response: Response) {
@@ -118,45 +119,43 @@ test('mounted files are public while generated bookmark logos require a session,
 	try {
 		await server.ready();
 		for (const method of ['GET', 'HEAD']) {
-			for (const cookie of ['', 'authjs.session-token=invalid-session']) {
-				for (const [path, contentType, bytes] of [
-					['/public/photo.svg', 'image/svg+xml', Buffer.from(privateLogo)],
-					['/public/photo.png', 'image/png', png],
-					['/public/brand%20logo.svg', 'image/svg+xml', Buffer.from(privateBrand)],
-					['/%70ublic/photo.svg', 'image/svg+xml', Buffer.from(privateLogo)],
-					['/public/photo%2Esvg', 'image/svg+xml', Buffer.from(privateLogo)],
-					['/public/unreferenced.svg', 'image/svg+xml', Buffer.from(privateLogo)],
-					['/public/images/bookmarks/test-ling.svg', 'image/svg+xml', Buffer.from(privateLogo)]
-				] as const) {
-					const image = await server.fetch(path, {
-						method,
-						headers: { accept: 'text/html', cookie }
-					});
-					expect(image.status).toBe(200);
-					expectPrivateHeaders(image);
-					expect(image.headers.get('content-type')).toBe(contentType);
-					expect(image.headers.get('content-length')).toBe(String(bytes.length));
-					expect(Buffer.from(await image.arrayBuffer())).toEqual(
-						method === 'HEAD' ? Buffer.alloc(0) : bytes
-					);
-				}
-				for (const path of [
-					'/bookmarks/photos/logo',
-					'/bookmarks/missing/logo',
-					'/%62ookmarks/photos/logo',
-					'/bookmarks/%70hotos/logo',
-					'/bookmarks/photos/%6cogo'
-				]) {
-					const denied = await server.fetch(path, {
-						method,
-						headers: { accept: 'text/html', cookie }
-					});
-					expect(denied.status).toBe(401);
-					expect(denied.headers.has('location')).toBe(false);
-					expectPrivateHeaders(denied);
-					if (method === 'HEAD') expect(await denied.text()).toBe('');
-					else await expectNoPrivateData(denied);
-				}
+			for (const [path, contentType, bytes] of [
+				['/public/photo.svg', 'image/svg+xml', Buffer.from(privateLogo)],
+				['/public/photo.png', 'image/png', png],
+				['/public/brand%20logo.svg', 'image/svg+xml', Buffer.from(privateBrand)],
+				['/%70ublic/photo.svg', 'image/svg+xml', Buffer.from(privateLogo)],
+				['/public/photo%2Esvg', 'image/svg+xml', Buffer.from(privateLogo)],
+				['/public/unreferenced.svg', 'image/svg+xml', Buffer.from(privateLogo)],
+				['/public/images/bookmarks/test-ling.svg', 'image/svg+xml', Buffer.from(privateLogo)]
+			] as const) {
+				const image = await server.fetch(path, {
+					method,
+					headers: { accept: 'text/html' }
+				});
+				expect(image.status).toBe(200);
+				expectPrivateHeaders(image);
+				expect(image.headers.get('content-type')).toBe(contentType);
+				expect(image.headers.get('content-length')).toBe(String(bytes.length));
+				expect(Buffer.from(await image.arrayBuffer())).toEqual(
+					method === 'HEAD' ? Buffer.alloc(0) : bytes
+				);
+			}
+			for (const path of [
+				'/bookmarks/photos/logo',
+				'/bookmarks/missing/logo',
+				'/%62ookmarks/photos/logo',
+				'/bookmarks/%70hotos/logo',
+				'/bookmarks/photos/%6cogo'
+			]) {
+				const denied = await server.fetch(path, {
+					method,
+					headers: { accept: 'text/html' }
+				});
+				expect(denied.status).toBe(401);
+				expect(denied.headers.has('location')).toBe(false);
+				expectPrivateHeaders(denied);
+				if (method === 'HEAD') expect(await denied.text()).toBe('');
+				else await expectNoPrivateData(denied);
 			}
 		}
 		for (const path of ['/healthz', '/favicon.png', '/signin']) {

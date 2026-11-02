@@ -18,11 +18,7 @@ export function localRedirect(
 export function isSignInError(location: string, origin: string): boolean {
 	try {
 		const url = new URL(location, origin);
-		return (
-			url.origin === origin &&
-			(url.pathname === '/signin' || url.pathname === '/auth/error') &&
-			url.searchParams.has('error')
-		);
+		return url.origin === origin && url.pathname === '/signin' && url.searchParams.has('error');
 	} catch {
 		return false;
 	}

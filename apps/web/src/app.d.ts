@@ -1,6 +1,5 @@
-import type { Session } from '@auth/sveltekit';
 import type { DirectoryContent } from './lib/display/types.js';
-import type { Authentication } from './lib/server/auth/index.js';
+import type { Authentication, DirectorySession } from './lib/server/auth/index.js';
 import type { PreparedSnapshot } from './lib/server/directory/snapshot.js';
 
 declare global {
@@ -24,7 +23,8 @@ declare global {
 			snapshot: PreparedSnapshot;
 			publicDir: string;
 			authentication: Authentication | undefined;
-			session: Session | null;
+			session: DirectorySession | null;
+			auth(): Promise<DirectorySession | null>;
 		}
 	}
 }

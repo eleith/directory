@@ -113,9 +113,6 @@ test('version is private and opaque; only accepted changes advance the real watc
 		}
 		const page = await context.newPage();
 		await signIn(page, false);
-		expect((await context.cookies()).some((cookie) => /session-token$/.test(cookie.name))).toBe(
-			true
-		);
 		const original = await readVersion(context.request);
 		expect(await readVersion(context.request, 'text/html')).toBe(original);
 

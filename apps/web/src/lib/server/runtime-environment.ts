@@ -15,8 +15,6 @@ export async function prepareRuntimeEnvironment(
 		});
 	}
 
+	// adapter-node 5 still captures ORIGIN before Kit starts; authentication uses site.url directly.
 	env.ORIGIN = origin;
-	env.AUTH_URL = origin;
-	env.NEXTAUTH_URL = '';
-	env.AUTH_REDIRECT_PROXY_URL = '';
 }

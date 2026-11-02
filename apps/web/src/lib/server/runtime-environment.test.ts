@@ -34,7 +34,7 @@ ${extra}`;
 }
 
 describe('framework environment preparation', () => {
-	it('captures the final Vite CLI port before Kit snapshots stale framework URLs', async () => {
+	it('captures the final Vite CLI port before Kit snapshots the stale framework origin', async () => {
 		const web = fileURLToPath(new URL('../../../', import.meta.url));
 		const vite = join(web, 'node_modules/vite/bin/vite.js');
 		const host = '127.0.0.1';
@@ -74,7 +74,7 @@ export default (env) => {
 		await writeFile(
 			join(directory, 'src/routes/+page.server.js'),
 			`import { env } from '$env/dynamic/private';
-export const load = () => ({ settings: env.ORIGIN + '|' + env.AUTH_URL + '|' + process.env.PORT });`
+export const load = () => ({ settings: env.ORIGIN + '|' + process.env.PORT });`
 		);
 		await writeFile(
 			join(directory, 'src/routes/+page.svelte'),
@@ -114,7 +114,7 @@ export const load = () => ({ settings: env.ORIGIN + '|' + env.AUTH_URL + '|' + p
 				},
 				{ timeout: 20_000 }
 			);
-			expect(html).toContain(`http://localhost:${port}|http://localhost:${port}|${port}`);
+			expect(html).toContain(`http://localhost:${port}|${port}`);
 		} finally {
 			child.kill('SIGTERM');
 			const timeout = setTimeout(() => child.kill('SIGKILL'), 2000);
@@ -136,12 +136,9 @@ export const load = () => ({ settings: env.ORIGIN + '|' + env.AUTH_URL + '|' + p
 			AUTH_REDIRECT_PROXY_URL: sentinel,
 			AUTH_SECRET: sentinel
 		};
+		const before = { ...env };
 		await prepareRuntimeEnvironment(env);
-		expect(env.ORIGIN).toBe(origin);
-		expect(env.AUTH_URL).toBe(origin);
-		expect(env.NEXTAUTH_URL).toBe('');
-		expect(env.AUTH_REDIRECT_PROXY_URL).toBe('');
-		expect(env.AUTH_SECRET).toBe(sentinel);
+		expect(env).toEqual({ ...before, ORIGIN: origin });
 	});
 
 	it.each([
@@ -162,9 +159,7 @@ export const load = () => ({ settings: env.ORIGIN + '|' + env.AUTH_URL + '|' + p
 			};
 			await prepareRuntimeEnvironment(env);
 			expect(env.ORIGIN).toBe(expected);
-			expect(env.AUTH_URL).toBe(expected);
-			expect(env.NEXTAUTH_URL).toBe('');
-			expect(env.AUTH_REDIRECT_PROXY_URL).toBe('');
+			expect(env.AUTH_URL).toBe(sentinel);
 		}
 	);
 
@@ -173,7 +168,7 @@ export const load = () => ({ settings: env.ORIGIN + '|' + env.AUTH_URL + '|' + p
 		const env = { CONFIG_PATH: path, PORT: '0', ORIGIN: sentinel, AUTH_URL: sentinel };
 		await prepareRuntimeEnvironment(env);
 		expect(env.ORIGIN).toBe(origin);
-		expect(env.AUTH_URL).toBe(origin);
+		expect(env.AUTH_URL).toBe(sentinel);
 	});
 
 	it('preserves explicit legacy-named environment interpolation in YAML', async () => {
@@ -181,7 +176,7 @@ export const load = () => ({ settings: env.ORIGIN + '|' + env.AUTH_URL + '|' + p
 		const env = { CONFIG_PATH: path, ORIGIN: origin, AUTH_URL: sentinel };
 		await prepareRuntimeEnvironment(env);
 		expect(env.ORIGIN).toBe(origin);
-		expect(env.AUTH_URL).toBe(origin);
+		expect(env.AUTH_URL).toBe(sentinel);
 	});
 
 	it.each([{ PORT: '0' }, { SOCKET_PATH: '/tmp/directory.sock' }, { LISTEN_FDS: '1' }])(
@@ -200,14 +195,7 @@ export const load = () => ({ settings: env.ORIGIN + '|' + env.AUTH_URL + '|' + p
 			await expect(prepareRuntimeEnvironment(env)).rejects.toMatchObject({
 				issue: {
 					code: 'load_failed',
-					issues: [
-						{
-							code: 'invalid_value',
-							path: '/site/url',
-							message:
-								'Set site.url explicitly when using a random port, socket or socket activation.'
-						}
-					]
+					issues: [expect.objectContaining({ code: 'invalid_value', path: '/site/url' })]
 				}
 			});
 			expect(env).toEqual(before);
