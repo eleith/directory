@@ -4,7 +4,15 @@ import svelte from 'eslint-plugin-svelte';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
-import svelteConfig from './apps/web/svelte.config.js';
+import { loadConfig } from '@sveltejs/load-config';
+import { fileURLToPath } from 'node:url';
+
+const loadedConfig = await loadConfig(fileURLToPath(new URL('./apps/web', import.meta.url)), {
+	traverse: false
+});
+if (!loadedConfig) throw new Error('Svelte configuration not found');
+if ('error' in loadedConfig) throw loadedConfig.error;
+const svelteConfig = loadedConfig.config;
 
 export default defineConfig(
 	{

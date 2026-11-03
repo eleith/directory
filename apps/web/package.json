@@ -29,8 +29,8 @@
 	"devDependencies": {
 		"@iconify-json/ph": "catalog:",
 		"@playwright/test": "catalog:",
-		"@sveltejs/adapter-node": "^6.0.0",
-		"@sveltejs/kit": "^3.0.0",
+		"@sveltejs/adapter-node": "catalog:",
+		"@sveltejs/kit": "catalog:",
 		"@sveltejs/vite-plugin-svelte": "catalog:",
 		"@types/node": "catalog:",
 		"@vitest/coverage-v8": "catalog:",
@@ -42,7 +42,6 @@
 		"vitest": "catalog:"
 	},
 	"imports": {
-		"#lib": "./src/lib/index.js",
 		"#lib/*": "./src/lib/*"
 	}
 }

@@ -5,16 +5,16 @@ import {
 	resolvePublicDir,
 	startConfigReloading
 } from '@directory/config';
-import type { ConfigEnvironment, DirectoryConfiguration } from '@directory/config/types';
+import type { DirectoryConfiguration } from '@directory/config/types';
 import { createApplication, type Application } from './application.js';
 import { DirectoryError } from './directory-error.js';
 import { reportConfigError } from './logger.js';
+import { getRuntimeEnvironment, type RuntimeEnvironment } from './runtime-environment.js';
 
 export async function bootApp(
-	env: ConfigEnvironment = process.env,
-	frameworkEnv: ConfigEnvironment = process.env
+	runtime: RuntimeEnvironment = getRuntimeEnvironment()
 ): Promise<Application> {
-	const options = { env };
+	const options = { env: runtime.env };
 	let path: string;
 	let publicDir: string;
 	let config: DirectoryConfiguration;
@@ -30,7 +30,7 @@ export async function bootApp(
 	}
 
 	// Reject changes between framework URL preparation and the initial application load.
-	if (config.site.url !== process.env.ORIGIN || config.site.url !== frameworkEnv.ORIGIN) {
+	if (config.site.url !== runtime.origin) {
 		throw new DirectoryError({ code: 'auth_failed' });
 	}
 

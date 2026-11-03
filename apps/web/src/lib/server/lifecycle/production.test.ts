@@ -44,7 +44,7 @@ describe('production lifecycle', () => {
 		const ready = application('Production');
 		mocks.boot.mockResolvedValueOnce(ready);
 		await startProduction(server);
-		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith(undefined, undefined);
+		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
 		expect(server.application).toBe(ready);
 		expect(listeners.mock.calls.filter(([name]) => name === 'directory:dev-stop')).toEqual([]);
 		const shutdown = listeners.mock.calls.find(([name]) => name === 'sveltekit:shutdown')![1];

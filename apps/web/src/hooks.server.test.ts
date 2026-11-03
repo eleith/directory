@@ -15,7 +15,6 @@ const adapterEvents: NodeJS.EventEmitter = process;
 const mocks = vi.hoisted(() => ({
 	building: false,
 	dev: false,
-	env: { ORIGIN: 'https://directory.example.com' },
 	boot: vi.fn<typeof import('./lib/server/boot.js').bootApp>(),
 	report: vi.fn<typeof import('./lib/server/logger.js').reportStartupFailure>(),
 	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
@@ -23,8 +22,7 @@ const mocks = vi.hoisted(() => ({
 	prepare: vi.fn<typeof import('./lib/server/directory/snapshot.js').prepareSnapshot>()
 }));
 
-vi.mock('$env/dynamic/private', () => ({ env: mocks.env }));
-vi.mock('$app/environment', () => ({
+vi.mock('$app/env', () => ({
 	get building() {
 		return mocks.building;
 	},
@@ -173,7 +171,7 @@ describe('server hooks', () => {
 		expect(ready.currentSnapshot).not.toHaveBeenCalled();
 		pending.resolve(ready);
 		await startup;
-		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith(undefined, mocks.env);
+		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
 		expect((await hooks.handle({ event: event(), resolve })).status).toBe(200);
 		adapterEvents.emit('sveltekit:shutdown');
 		expect((await hooks.handle({ event: event(), resolve })).status).toBe(503);
@@ -186,7 +184,7 @@ describe('server hooks', () => {
 		await hooks.init();
 		expect(development).toHaveBeenCalledOnce();
 		expect(production).not.toHaveBeenCalled();
-		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith(undefined, mocks.env);
+		expect(mocks.boot).toHaveBeenCalledExactlyOnceWith();
 		process.emit('directory:dev-stop');
 	});
 

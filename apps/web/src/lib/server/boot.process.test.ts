@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { applySetCookies } from 'better-auth/cookies';
+import { PUBLIC_AUTHORITY_HEADER, PUBLIC_PROTOCOL_HEADER } from './runtime-environment.js';
 
 const serverModule = new URL('../../../build/bootstrap/start.js', import.meta.url).href;
 const sentinel = 'PRIVATE_CONFIG_CREDENTIAL_LINK';
@@ -38,8 +39,8 @@ async function launchServer(contents: string | undefined, environment: NodeJS.Pr
 	const script = `
 import { once } from 'node:events';
 const { server } = await import(${JSON.stringify(serverModule)});
-if (!server.server.listening) await once(server.server, 'listening');
-process.send(server.server.address().port);
+if (!server.listening) await once(server, 'listening');
+process.send(server.address().port);
 `;
 	const child = spawn(process.execPath, ['--input-type=module', '--eval', script], {
 		cwd: temporary,
@@ -202,7 +203,9 @@ it.each([
 		host: 'foreign.example.com',
 		'x-forwarded-host': 'foreign.example.com',
 		'x-forwarded-proto': 'http',
-		'x-forwarded-port': '80'
+		'x-forwarded-port': '80',
+		[PUBLIC_PROTOCOL_HEADER]: 'http',
+		[PUBLIC_AUTHORITY_HEADER]: 'foreign.example.com:80'
 	};
 	const gated = await fetch(address, { redirect: 'manual', headers: transportHeaders });
 	expect(gated.status).toBe(303);
@@ -231,18 +234,26 @@ it.each([
 	applySetCookies(headers, response.headers.getSetCookie());
 	const authenticated = await fetch(address, { redirect: 'manual', headers });
 	expect(authenticated.status).toBe(200);
-	expect(await authenticated.text()).not.toContain(sentinel);
+	const html = await authenticated.text();
+	expect(html).toContain(`property="og:url" content="${origin}/"`);
+	expect(html).not.toContain(sentinel);
 	expect(server.output()).not.toContain(sentinel);
 	expect(server.output()).not.toContain(server.path);
 	expect(await server.stop()).toEqual({ code: 0, signal: null });
 });
 
 it('keeps application environment references and fallbacks stable across bootstrap and reloads', async () => {
-	const fallbackTitle = '${DIRECTORY_TITLE} ${MISSING_TITLE:-Fallback}';
-	const title = 'Configured Fallback';
+	const fallbackTitle =
+		'${DIRECTORY_TITLE} ${MISSING_TITLE:-Fallback} ${ORIGIN} ${HOST_HEADER} ${PROTOCOL_HEADER} ${PORT_HEADER}';
+	const title =
+		'Configured Fallback http://localhost original-host original-protocol original-port';
 	const server = await launchServer(source(fallbackTitle), {
 		...hostileEnvironment,
-		DIRECTORY_TITLE: 'Configured'
+		DIRECTORY_TITLE: 'Configured',
+		ORIGIN: 'http://localhost',
+		HOST_HEADER: 'original-host',
+		PROTOCOL_HEADER: 'original-protocol',
+		PORT_HEADER: 'original-port'
 	});
 	const address = await server.ready();
 	await expectPage(address, title);

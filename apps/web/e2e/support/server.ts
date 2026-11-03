@@ -71,8 +71,8 @@ export async function startServer(options: ServerOptions) {
 		const script = `
 import { once } from 'node:events';
 const { server } = await import(${JSON.stringify(serverModule)});
-if (!server.server.listening) await once(server.server, 'listening');
-process.send({ ready: server.server.address().port });
+if (!server.listening) await once(server, 'listening');
+process.send({ ready: server.address().port });
 `;
 		const child = spawn(process.execPath, ['--input-type=module', '--eval', script], {
 			cwd: temporary,

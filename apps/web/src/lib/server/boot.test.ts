@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
 	load: vi.fn<typeof import('@directory/config').loadConfigFile>(),
 	monitor: vi.fn<typeof import('@directory/config').startConfigReloading>(),
 	auth: vi.fn<typeof import('./auth/index.js').createAuthentication>(),
-	stop: vi.fn<() => void>()
+	stop: vi.fn<() => void>(),
+	runtime: vi.fn<typeof import('./runtime-environment.js').getRuntimeEnvironment>()
 }));
 vi.mock('@directory/config', async (importOriginal) => ({
 	...(await importOriginal<typeof import('@directory/config')>()),
@@ -22,11 +23,11 @@ vi.mock('@directory/config', async (importOriginal) => ({
 	startConfigReloading: mocks.monitor
 }));
 vi.mock('./auth/index.js', () => ({ createAuthentication: mocks.auth }));
+vi.mock('./runtime-environment.js', () => ({ getRuntimeEnvironment: mocks.runtime }));
 
 const path = '/config/directory.yaml';
 const sentinel = 'PRIVATE-config-credential';
 const origin = 'https://directory.example.com';
-const frameworkEnv = { ORIGIN: origin };
 const auth = { credentials: { username: 'family', password: sentinel } };
 const authentication: Authentication = {
 	strategy: 'credentials',
@@ -41,7 +42,7 @@ function configuration(title = 'Home', enabled = false): DirectoryConfiguration 
 
 beforeEach(() => {
 	vi.resetAllMocks();
-	vi.stubEnv('ORIGIN', origin);
+	mocks.runtime.mockReturnValue({ env: process.env, origin });
 	mocks.path.mockReturnValue(path);
 	mocks.publicDir.mockReturnValue('/mounted/public');
 	mocks.load.mockResolvedValue(configuration());
@@ -56,7 +57,7 @@ describe('application boot wiring', () => {
 		const pending = Promise.withResolvers<DirectoryConfiguration>();
 		mocks.load.mockReturnValueOnce(pending.promise);
 		const env = { CONFIG_PATH: path, DIRECTORY_PUBLIC_DIR: '/mounted/public' };
-		const startup = bootApp(env);
+		const startup = bootApp({ env, origin });
 		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env });
 		expect(mocks.publicDir).toHaveBeenCalledExactlyOnceWith(path, { env });
 		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env });
@@ -106,11 +107,11 @@ describe('application boot wiring', () => {
 	});
 
 	it('constructs auth before monitoring from the prepared origin, not legacy auth settings', async () => {
-		vi.stubEnv('ORIGIN', origin);
+		vi.stubEnv('ORIGIN', 'https://not-kit.example.com');
 		vi.stubEnv('AUTH_URL', 'https://not-kit.example.com');
 		mocks.load.mockResolvedValueOnce(configuration('Home', true));
 		const env = { ORIGIN: sentinel, AUTH_URL: sentinel };
-		const app = await bootApp(env, frameworkEnv);
+		const app = await bootApp({ env, origin });
 		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env });
 		expect(mocks.auth).toHaveBeenCalledExactlyOnceWith({ ...auth, origin });
 		expect(mocks.auth.mock.invocationCallOrder[0]).toBeLessThan(
@@ -122,51 +123,30 @@ describe('application boot wiring', () => {
 	describe.each([false, true])('canonical URL consistency (auth enabled: %s)', (enabled) => {
 		it('boots with the prepared canonical URL regardless of auth state', async () => {
 			mocks.load.mockResolvedValueOnce(configuration('Home', enabled));
-			const app = await bootApp({}, frameworkEnv);
+			const app = await bootApp({ env: {}, origin });
 			expect(app.currentSnapshot().configuration.site.url).toBe(origin);
 			expect(app.authentication).toBe(enabled ? authentication : undefined);
 		});
 
-		it.each([
-			{ name: 'process ORIGIN missing', prepared: undefined, privateEnv: frameworkEnv },
-			{ name: 'process ORIGIN empty', prepared: '', privateEnv: frameworkEnv },
-			{
-				name: 'prepared process origin changed',
-				prepared: 'https://other.example.com',
-				privateEnv: frameworkEnv
-			},
-			{ name: 'Kit private URLs missing', prepared: origin, privateEnv: {} },
-			{
-				name: 'Kit private ORIGIN differs',
-				prepared: origin,
-				privateEnv: { ...frameworkEnv, ORIGIN: sentinel }
-			},
-			{
-				name: 'site.url changed after preparation',
-				prepared: origin,
-				privateEnv: frameworkEnv,
-				url: 'https://other.example.com'
-			}
-		])(
-			'fails closed when $name before auth or monitoring',
-			async ({ prepared, privateEnv, ...change }) => {
-				vi.stubEnv('ORIGIN', prepared);
-				const config = configuration('Home', enabled);
-				if ('url' in change && change.url) config.site.url = change.url;
-				mocks.load.mockResolvedValueOnce(config);
-				await expect(bootApp({}, privateEnv)).rejects.toMatchObject({
-					issue: { code: 'auth_failed' }
-				});
-				expect(mocks.auth).not.toHaveBeenCalled();
-				expect(mocks.monitor).not.toHaveBeenCalled();
-			}
-		);
+		it('rejects a changed site.url before auth or monitoring', async () => {
+			const config = configuration('Home', enabled);
+			config.site.url = 'https://other.example.com';
+			mocks.load.mockResolvedValueOnce(config);
+			await expect(bootApp({ env: {}, origin })).rejects.toMatchObject({
+				issue: { code: 'auth_failed' }
+			});
+			expect(mocks.auth).not.toHaveBeenCalled();
+			expect(mocks.monitor).not.toHaveBeenCalled();
+		});
 	});
 
-	it('uses the process environment when no environments are injected', async () => {
+	it('uses the captured environment rather than the modified process environment', async () => {
+		const env = { CONFIG_PATH: path, HOST_HEADER: 'original-host-header' };
+		mocks.runtime.mockReturnValue({ env, origin });
+		vi.stubEnv('HOST_HEADER', 'changed-by-adapter-preparation');
 		await bootApp();
-		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env: process.env });
-		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env: process.env });
+		expect(mocks.path).toHaveBeenCalledExactlyOnceWith({ env });
+		expect(mocks.load).toHaveBeenCalledExactlyOnceWith(path, { env });
 	});
 
 	it('retains safe loader diagnostics without starting monitoring', async () => {
@@ -196,12 +176,11 @@ describe('application boot wiring', () => {
 	);
 
 	it('does not start monitoring when authentication initialization fails', async () => {
-		vi.stubEnv('ORIGIN', origin);
 		mocks.load.mockResolvedValueOnce(configuration('Home', true));
 		mocks.auth.mockImplementationOnce(() => {
 			throw new Error(sentinel);
 		});
-		await expect(bootApp({}, frameworkEnv)).rejects.toMatchObject({
+		await expect(bootApp({ env: {}, origin })).rejects.toMatchObject({
 			issue: { code: 'auth_failed' }
 		});
 		expect(mocks.monitor).not.toHaveBeenCalled();
