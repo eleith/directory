@@ -1,5 +1,6 @@
 import { ConfigError, configurationVersion, loadConfigFile } from '@directory/config';
 import { cli, define, type CommandContext } from 'gunshi';
+import packageJson from '../package.json' with { type: 'json' };
 
 interface CliOutput {
 	stdout: (text: string) => void;
@@ -44,6 +45,7 @@ export async function runCli(args: readonly string[], output: CliOutput): Promis
 	try {
 		const result = await cli(forwarded, rootCommand, {
 			name: 'directory-cli',
+			version: packageJson.version,
 			usageSilent: true,
 			renderHeader: async () => header,
 			renderValidationErrors: null,

@@ -1,6 +1,7 @@
 import { ConfigError, loadConfigFile, validateConfig } from '@directory/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { runCli } from './cli.js';
+import packageJson from '../package.json' with { type: 'json' };
 
 vi.mock('@directory/config', async (importOriginal) => ({
 	...(await importOriginal<typeof import('@directory/config')>()),
@@ -16,7 +17,16 @@ beforeEach(() => {
 	vi.mocked(loadConfigFile).mockResolvedValue(validateConfig({ links: {} }));
 });
 
-describe('directory-cli config validate', () => {
+describe('directory-cli', () => {
+	it('reports the release version without loading configuration', async () => {
+		const output = createOutput();
+
+		expect(await runCli(['--version'], output)).toBe(0);
+		expect(output.stdout).toHaveBeenCalledExactlyOnceWith(`${packageJson.version}\n`);
+		expect(output.stderr).not.toHaveBeenCalled();
+		expect(loadConfigFile).not.toHaveBeenCalled();
+	});
+
 	it.each([['--help'], ['config', 'validate', '--help']])(
 		'shows help without loading configuration: %j',
 		async (...args) => {
