@@ -22,9 +22,11 @@ COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/home/app/store pnpm install --offline --frozen-lockfile
 # Only generated output and caches are writable; source binds stay read-only.
 RUN mkdir -p /m/packages/config/dist /m/apps/web/.svelte-kit \
+        '/m/apps/web/node_modules/$app' \
         /m/apps/web/node_modules/.vite /m/apps/web/node_modules/.vite-temp \
     && chown -R ${LOCAL_UID}:${LOCAL_GID} /home/app /m/packages/config/dist \
-        /m/apps/web/.svelte-kit /m/apps/web/node_modules/.vite /m/apps/web/node_modules/.vite-temp
+        /m/apps/web/.svelte-kit '/m/apps/web/node_modules/$app' \
+        /m/apps/web/node_modules/.vite /m/apps/web/node_modules/.vite-temp
 USER ${LOCAL_UID}:${LOCAL_GID}
 WORKDIR /m/apps/web
 EXPOSE 5173

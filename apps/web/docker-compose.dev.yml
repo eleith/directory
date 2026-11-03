@@ -26,7 +26,6 @@ services:
       - ./static:/m/apps/web/static:ro
       - ./config:/m/apps/web/config:ro
       - ./public:/m/apps/web/public:ro
-      - ./svelte.config.js:/m/apps/web/svelte.config.js:ro
       - ./vite.config.ts:/m/apps/web/vite.config.ts:ro
       - ./tsconfig.json:/m/apps/web/tsconfig.json:ro
       - ../../packages/config/src:/m/packages/config/src:ro
