@@ -99,9 +99,11 @@ it('rejects either inconsistent request origin before resolving a route', async 
 	for (const replaceRequest of [false, true]) {
 		const input = requestFor('/');
 		const foreign = new URL('https://another.example/');
-		if (replaceRequest) input.event.request = new Request(foreign);
-		else input.event.url = foreign;
-		expect((await protectAuthRequest(input, policy)).status).toBe(403);
+		const event = {
+			...input.event,
+			...(replaceRequest ? { request: new Request(foreign) } : { url: foreign })
+		};
+		expect((await protectAuthRequest({ ...input, event }, policy)).status).toBe(403);
 		expect(input.resolve).not.toHaveBeenCalled();
 	}
 });

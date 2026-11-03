@@ -15,7 +15,6 @@ declare global {
 		}
 
 		interface PageState {
-			directoryQuery?: string;
 			directoryDetail?: { id: string; fromGrid: boolean } | null;
 		}
 

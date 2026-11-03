@@ -3,6 +3,7 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import IconSignOut from 'virtual:icons/ph/sign-out';
 	import { beforeNavigate, goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import BookmarkLogo from '#lib/components/bookmarks/BookmarkLogo.svelte';
 	import BookmarkDetails from '#lib/components/bookmarks/BookmarkDetails.svelte';
@@ -18,8 +19,10 @@
 
 	let { data }: { data: PageData } = $props();
 
-	// Kit shallow routing updates page.state, not page.url.
-	const searchQuery = $derived(page.state.directoryQuery ?? page.url.searchParams.get('q') ?? '');
+	const currentURL = $derived(page.shallow?.url ?? page.url);
+	let pendingSearchQuery = $state<string>();
+	let searchNavigation = 0;
+	const searchQuery = $derived(pendingSearchQuery ?? currentURL.searchParams.get('q') ?? '');
 	let searchResults = $state<SearchResult[] | null>(null);
 	let searchStatus = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
 	let searchInput = $state<HTMLInputElement>();
@@ -39,7 +42,7 @@
 	const directoryURL = $derived.by(() => {
 		const parameters = new SvelteURLSearchParams();
 		if (searchQuery) parameters.set('q', searchQuery);
-		return parameters.size ? `/?${parameters}` : '/';
+		return parameters.size ? resolve(`?${parameters}`) : resolve('');
 	});
 	const selectedGroup = $derived(
 		data.directory.groups.find((group) => group.links.some((link) => link.id === selectedId))
@@ -61,22 +64,29 @@
 
 	function setSearchQuery(query: string) {
 		if (query === searchQuery) return;
+		// Function-bound inputs must update before asynchronous route resolution finishes.
+		pendingSearchQuery = query;
+		const navigation = ++searchNavigation;
 		const parameters = new SvelteURLSearchParams();
 		if (selectedId !== null) parameters.set('link', selectedId);
 		if (query) parameters.set('q', query);
-		const url = parameters.size ? `/?${parameters}` : '/';
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Query URLs stay absolute in this root-only directory.
-		goto(url, {
-			shallow: true,
-			replace: true,
-			state: { ...page.state, directoryQuery: query }
-		});
+		const url = parameters.size ? resolve(`?${parameters}`) : resolve('');
+		void goto(url, { shallow: true, replace: true, state: page.state }).then(
+			() => {
+				if (navigation === searchNavigation) pendingSearchQuery = undefined;
+			},
+			() => {
+				if (navigation !== searchNavigation) return;
+				pendingSearchQuery = undefined;
+				window.location.replace(url);
+			}
+		);
 	}
 
 	function detailURL(id: string) {
 		const parameters = new SvelteURLSearchParams({ link: id });
 		if (searchQuery) parameters.set('q', searchQuery);
-		return `/?${parameters}`;
+		return resolve(`?${parameters}`);
 	}
 
 	function findBookmarkTile(id: string) {
@@ -142,20 +152,20 @@
 		returnTile = tile;
 		pendingFilterQuery = undefined;
 		isClosingDetails = false;
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- This absolute href comes from the real tile anchor.
-		goto(href, {
+		void goto(href, {
 			shallow: true,
 			state: { ...page.state, directoryDetail: { id, fromGrid: true } }
+		}).catch(() => {
+			window.location.href = href;
 		});
 	}
 
-	function navigateDetails(step: -1 | 1) {
+	async function navigateDetails(step: -1 | 1): Promise<void> {
 		if (isClosingDetails || detailIndex < 0) return;
 		const id = detailOrder[detailIndex + step];
 		if (!id) return;
 		returnTile = findBookmarkTile(id);
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute.
-		goto(detailURL(id), {
+		return goto(detailURL(id), {
 			shallow: true,
 			replace: true,
 			state: {
@@ -165,19 +175,28 @@
 		});
 	}
 
-	function closeDetails() {
+	async function closeDetails() {
 		if (isClosingDetails) return;
 		isClosingDetails = true;
 		if (page.state.directoryDetail?.fromGrid) {
 			history.back();
 			return;
 		}
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute.
-		goto(directoryURL, {
-			shallow: true,
-			replace: true,
-			state: { ...page.state, directoryDetail: null }
-		});
+		try {
+			await goto(directoryURL, {
+				shallow: true,
+				replace: true,
+				state: { ...page.state, directoryDetail: null }
+			});
+		} catch {
+			return;
+		} finally {
+			// A rejected or cancelled navigation leaves the current dialog available to retry.
+			if (selectedLink) {
+				isClosingDetails = false;
+				pendingFilterQuery = undefined;
+			}
+		}
 	}
 
 	function selectDetailFilter(query: string) {
@@ -211,8 +230,21 @@
 		directoryHeading?.focus({ preventScroll: true });
 	}
 
-	beforeNavigate(({ shallow, type }) => {
-		if (shallow && type === 'goto') return;
+	beforeNavigate((navigation) => {
+		if (navigation.shallow && navigation.type === 'goto') return;
+
+		searchNavigation++;
+		pendingSearchQuery = undefined;
+		// Kit may reconstruct this Back traversal after a query followed by a reload.
+		const returningFromGrid =
+			navigation.shallow &&
+			navigation.type === 'popstate' &&
+			navigation.delta === -1 &&
+			isClosingDetails &&
+			page.state.directoryDetail?.fromGrid &&
+			navigation.to?.route?.id === '/(protected)' &&
+			navigation.to.url.href === new URL(directoryURL, currentURL.href).href;
+		if (returningFromGrid) return;
 
 		isClosingDetails = false;
 		pendingFilterQuery = undefined;
@@ -283,8 +315,8 @@
 	{:else if selectedLink}
 		<noscript>
 			<section class="details" aria-labelledby="link-details-title">
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
-				<a class="back" href={directoryURL} data-sveltekit-preload-data="off">Back to directory</a>
+				<a class="back" href={directoryURL} data-sveltekit-preload-data="false">Back to directory</a
+				>
 				<BookmarkDetails
 					link={selectedLink}
 					groupLabel={selectedGroup?.label}
@@ -295,11 +327,10 @@
 	{/if}
 
 	{#snippet tile(link: DisplayLink, groupLabel: string | undefined, filtered = false)}
-		<!-- eslint-disable svelte/no-navigation-without-resolve -- Root-only URLs must stay absolute in SSR. -->
 		<a
 			class="tile"
 			href={detailURL(link.id)}
-			data-sveltekit-preload-data="off"
+			data-sveltekit-preload-data="false"
 			onkeydown={filtered ? navigateResults : undefined}
 			onclick={(event) => openDetails(event, link.id)}
 		>
@@ -309,7 +340,6 @@
 				<small class="group-caption">{groupLabel}</small>
 			{/if}
 		</a>
-		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 	{/snippet}
 
 	<div class="search-feedback">

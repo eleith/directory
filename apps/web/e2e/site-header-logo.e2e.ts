@@ -122,7 +122,7 @@ test('without JavaScript a broken configured header leaves title and native navi
 		await expect(page.locator('header img')).toHaveAttribute('src', sourceA);
 		await expectBroken(page.locator('header img'));
 		await expect(page.locator('header h1')).toHaveText(title);
-		await page.locator('a[href="/?link=book"]').click();
+		await page.locator('a[href$="?link=book"]').click();
 		await expect(page).toHaveURL(`${app.url}/?link=book`);
 		await expect(page.locator('header .description')).toHaveText(siteDescription);
 	} finally {

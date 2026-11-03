@@ -49,15 +49,13 @@ test('groups, bookmark titles and plain details work without JavaScript', async 
 			['router', 'Router'],
 			['notes', 'Household notes']
 		]) {
-			const link = page.locator(`a[href="/?link=${id}"]`);
-			await expect(link).toContainText(label!);
-			await expect(link).toHaveAttribute('data-sveltekit-preload-data', 'off');
+			const link = page.getByRole('link', { name: label!, exact: true });
+			await expect(link).toHaveJSProperty('href', `${server.url}/?link=${id}`);
+			await expect(link).toHaveAttribute('data-sveltekit-preload-data', 'false');
 		}
-		await expect(page.locator('a[href="/?link=photos"] img')).toHaveAttribute(
-			'src',
-			'/bookmarks/photos/logo'
-		);
-		await page.locator('a[href="/?link=photos"]').click();
+		const photos = page.getByRole('link', { name: 'Photos', exact: true });
+		await expect(photos.locator('img')).toHaveAttribute('src', '/bookmarks/photos/logo');
+		await photos.click();
 		await expect(page).toHaveURL(`${server.url}/?link=photos`);
 		await expect(page.getByRole('heading', { name: 'Photos', exact: true })).toBeVisible();
 		const details = page.getByRole('region', { name: 'Photos', exact: true });
@@ -80,7 +78,7 @@ test('groups, bookmark titles and plain details work without JavaScript', async 
 		await expect(tags).toHaveCount(1);
 		await expect(tags.getByRole('listitem')).toHaveText(['login', 'internal', 'admin']);
 		await expect(tags.getByRole('listitem').last()).toHaveAccessibleName('admin only');
-		await expect(page.locator('a[href="/?link=photos"]')).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Photos', exact: true })).toBeVisible();
 	} finally {
 		await context.close();
 		expect(await server.stop()).toEqual({ code: 0, signal: null });

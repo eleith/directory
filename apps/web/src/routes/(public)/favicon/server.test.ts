@@ -80,11 +80,14 @@ describe('public favicon alias', () => {
 			'/favicon?source=%252e%252e%252fsecret.svg',
 			'/favicon/other.svg?favicon_path=/public/other.svg'
 		]) {
-			const request = event('GET');
-			request.url = new URL(path, 'http://localhost');
-			request.request = new Request(request.url, {
-				headers: { 'x-public-dir': '/outside', range: 'bytes=0-1', 'if-none-match': '*' }
-			});
+			const url = new URL(path, 'http://localhost');
+			const request = {
+				...event('GET'),
+				url,
+				request: new Request(url, {
+					headers: { 'x-public-dir': '/outside', range: 'bytes=0-1', 'if-none-match': '*' }
+				})
+			};
 			expect((await GET(request)).status).toBe(200);
 		}
 		expect(readMountedImage).toHaveBeenCalledTimes(3);

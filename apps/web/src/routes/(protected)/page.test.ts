@@ -50,7 +50,10 @@ function eventFor(query = '', withAuth = false) {
 	>[0];
 }
 
-const notFound = expect.objectContaining({ status: 404, body: { message: 'Not found' } });
+const notFound = expect.objectContaining({
+	status: 404,
+	body: expect.objectContaining({ message: 'Not found' })
+});
 
 describe('directory page data', () => {
 	it('returns exactly the prepared display, selection and signed-in boolean in no-auth mode', () => {

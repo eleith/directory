@@ -65,7 +65,7 @@ export async function requireSignIn(
 ): Promise<Response> {
 	event.locals.session = null;
 	const routeId = event.route.id ?? '';
-	const publicRoute = routeId === '/(public)' || routeId.startsWith('/(public)/');
+	const publicRoute = isInGroup(routeId, '/(public)');
 	if (publicRoute) return resolve(event);
 	try {
 		event.locals.session = await event.locals.auth();
@@ -74,8 +74,7 @@ export async function requireSignIn(
 		return denied(401);
 	}
 	if (event.locals.session?.user) return resolve(event);
-	const endpoint =
-		routeId === '/(protected)/(endpoints)' || routeId.startsWith('/(protected)/(endpoints)/');
+	const endpoint = isInGroup(routeId, '/(protected)/(endpoints)');
 	if (!endpoint && isHtmlNavigation(event)) {
 		const callbackUrl = localRedirect(event.url.pathname + event.url.search, policy.origin);
 		return new Response(null, {
@@ -84,6 +83,10 @@ export async function requireSignIn(
 		});
 	}
 	return denied(401);
+}
+
+function isInGroup(routeId: string, group: string): boolean {
+	return routeId === group || routeId.startsWith(`${group}/`);
 }
 
 function isUnsafeMethod(event: RequestEvent): boolean {

@@ -57,14 +57,17 @@ describe('public mounted image route', () => {
 	);
 
 	it('ignores conditional and range headers', async () => {
-		const request = event('icon.svg');
-		request.request = new Request(request.request, {
-			headers: {
-				'if-none-match': '*',
-				'if-modified-since': new Date().toUTCString(),
-				range: 'bytes=0-2'
-			}
-		});
+		const captured = event('icon.svg');
+		const request = {
+			...captured,
+			request: new Request(captured.request, {
+				headers: {
+					'if-none-match': '*',
+					'if-modified-since': new Date().toUTCString(),
+					range: 'bytes=0-2'
+				}
+			})
+		};
 		const response = await GET(request);
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('<svg/>');

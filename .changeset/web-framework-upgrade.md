@@ -2,4 +2,4 @@
 '@directory/web': patch
 ---
 
-Upgrade the web app to SvelteKit 3 while keeping `site.url` runtime-configured.
+Upgrade the web app to SvelteKit 3, preserving runtime `site.url`, native sign-in and bookmark navigation.

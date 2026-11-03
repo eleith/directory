@@ -172,10 +172,12 @@ test('blocked client boot keeps controls disabled and native grid navigation usa
 	await page.goto(server.url);
 	await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toBeDisabled();
 	await expect(page.getByRole('button', { name: /theme/ })).toBeDisabled();
-	await page.locator('a[href="/?link=beta"]').click();
+	const beta = page.getByRole('link', { name: 'Beta service', exact: true });
+	await expect(beta).toHaveJSProperty('href', `${server.url}/?link=beta`);
+	await beta.click();
 	await expect(page).toHaveURL(`${server.url}/?link=beta`);
 	await expect(page.getByRole('dialog')).toHaveCount(0);
-	await page.locator('a[href="/?link=alpha"]').click();
+	await page.getByRole('link', { name: 'Alpha service', exact: true }).click();
 	await expect(page).toHaveURL(`${server.url}/?link=alpha`);
 	await expect(page.locator('.tile')).toHaveCount(2);
 });

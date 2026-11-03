@@ -47,6 +47,18 @@ test('search finds a bookmark, opens its details and clears back to browsing', a
 	await expect(results.getByRole('link')).toHaveCount(1);
 	await expect(results.getByRole('link')).toContainText('Family photos');
 	await expect(page).toHaveURL(`${server.url}/?q=photos`);
+	// Async shallow routing must not rewrite an in-place edit or move its caret to the end.
+	await search.press('End');
+	await search.press('ArrowLeft');
+	await search.press('x');
+	await expect(search).toHaveValue('photoxs');
+	await expect(page).toHaveURL(`${server.url}/?q=photoxs`);
+	await expect(search).toBeFocused();
+	await expect(search).toHaveJSProperty('selectionStart', 6);
+	await expect(search).toHaveJSProperty('selectionEnd', 6);
+	await search.press('Backspace');
+	await expect(search).toHaveValue('photos');
+	await expect(page).toHaveURL(`${server.url}/?q=photos`);
 	await page.reload();
 	await expect(search).toHaveValue('photos');
 	await expect(results.getByRole('link')).toHaveCount(1);

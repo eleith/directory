@@ -281,7 +281,11 @@ test('open mode serves contained images regardless of references, with MIME and 
 				expectPrivateHeaders(response);
 			}
 		}
-		expect((await server.fetch('/public/photo.svg', { method: 'POST' })).status).toBe(405);
+		const unsupported = await server.fetch('/public/photo.svg', {
+			method: 'POST',
+			headers: { origin: server.origin }
+		});
+		expect(unsupported.status).toBe(405);
 		const generated = await server.fetch('/bookmarks/photos/logo');
 		expect(generated.status).toBe(200);
 		expectPrivateHeaders(generated);
@@ -413,13 +417,13 @@ test('existing SSR cards and details render mounted logos and omitted-path bookm
 			['router', '/bookmarks/router/logo'],
 			['thumbnail', '/public/photo.png']
 		] as const) {
-			const image = page.locator(`a[href="/?link=${id}"] img`);
+			const image = page.locator(`a[href$="?link=${id}"] img`);
 			await expect(image).toHaveAttribute('src', path);
 			await expect
 				.poll(() => image.evaluate((node) => (node as HTMLImageElement).naturalWidth))
 				.toBeGreaterThan(0);
 		}
-		await page.locator('a[href="/?link=photos"]').click();
+		await page.getByRole('link', { name: 'Photos', exact: true }).click();
 		const details = page
 			.getByRole('region', { name: 'Photos', exact: true })
 			.locator('img[src="/public/photo.svg"]');

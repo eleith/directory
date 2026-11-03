@@ -24,7 +24,7 @@
 		openLinksInNewTab: boolean;
 		hasPrevious: boolean;
 		hasNext: boolean;
-		onNavigate: (step: -1 | 1) => void;
+		onNavigate: (step: -1 | 1) => Promise<void>;
 		onClose: () => void;
 		onClosed: () => void;
 		onFilterSelect: (query: string) => void;
@@ -51,8 +51,13 @@
 	async function navigate(event: MouseEvent, step: -1 | 1) {
 		const button = event.currentTarget as HTMLButtonElement;
 		const hadFocus = button === document.activeElement;
-		onNavigate(step);
+		try {
+			await onNavigate(step);
+		} catch {
+			return;
+		}
 		await tick();
+		if (!link || !button.isConnected) return;
 		if (scrollContent) scrollContent.scrollTop = 0;
 		if (hadFocus && button.disabled) {
 			(step === 1 ? previousButton : nextButton)?.focus({ preventScroll: true });

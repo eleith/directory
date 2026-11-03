@@ -15,10 +15,7 @@
 	let retryDelay = checkInterval;
 
 	$effect(() => {
-		// Kit shallow navigation updates page.state, not page.url.
-		void page.state;
-		void page.url;
-		const currentURL = new SvelteURL(window.location.href);
+		const currentURL = new SvelteURL((page.shallow?.url ?? page.url).href);
 		currentURL.hash = '';
 		refreshHref = currentURL.href;
 	});

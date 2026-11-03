@@ -80,11 +80,14 @@ describe('public selected-logo alias', () => {
 			'/logo?source=%252e%252e%252fsecret.svg',
 			'/logo/other.svg?logo_path=/public/other.svg'
 		]) {
-			const request = event('GET');
-			request.url = new URL(path, 'http://localhost');
-			request.request = new Request(request.url, {
-				headers: { 'x-public-dir': '/outside', range: 'bytes=0-1', 'if-none-match': '*' }
-			});
+			const url = new URL(path, 'http://localhost');
+			const request = {
+				...event('GET'),
+				url,
+				request: new Request(url, {
+					headers: { 'x-public-dir': '/outside', range: 'bytes=0-1', 'if-none-match': '*' }
+				})
+			};
 			expect((await GET(request)).status).toBe(200);
 		}
 		expect(readMountedImage).toHaveBeenCalledTimes(3);

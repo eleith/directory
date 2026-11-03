@@ -99,7 +99,9 @@ for (const view of ['card', 'details'] as const) {
 			await page.goto(`${server.url}/${view === 'details' ? '?link=broken' : ''}`, {
 				waitUntil: 'commit'
 			});
-			const cardImage = page.locator('a[href="/?link=broken"] img');
+			const cardImage = page
+				.getByRole('link', { name: 'Broken primary', exact: true })
+				.locator('img');
 			await expect(cardImage).toHaveAttribute('src', '/public/primary-a.svg');
 			await expectBroken(cardImage);
 			await expect.poll(() => heldJavaScript).toBe(true);
@@ -266,16 +268,23 @@ test('without JavaScript, good images decode and broken images leave card and de
 			['default', 'Omitted primary'],
 			['other', 'Other broken primary']
 		]) {
-			const card = page.locator(`a[href="/?link=${id}"]`);
-			await expect(card).toContainText(title!);
-			await expect(card).toHaveAttribute('data-sveltekit-preload-data', 'off');
+			const card = page.getByRole('link', { name: title!, exact: true });
+			await expect(card).toHaveJSProperty('href', `${server.url}/?link=${id}`);
+			await expect(card).toHaveAttribute('data-sveltekit-preload-data', 'false');
 		}
-		const broken = page.locator('a[href="/?link=broken"] img');
+		const brokenLink = page.getByRole('link', { name: 'Broken primary', exact: true });
+		const broken = brokenLink.locator('img');
 		await expect(broken).toHaveAttribute('src', '/public/primary-a.svg');
 		await expectBroken(broken);
-		await expectDecoded(page.locator('a[href="/?link=valid"] img'), '/public/valid.svg');
-		await expectDecoded(page.locator('a[href="/?link=default"] img'), '/bookmarks/default/logo');
-		await page.locator('a[href="/?link=broken"]').click();
+		await expectDecoded(
+			page.getByRole('link', { name: 'Valid primary', exact: true }).locator('img'),
+			'/public/valid.svg'
+		);
+		await expectDecoded(
+			page.getByRole('link', { name: 'Omitted primary', exact: true }).locator('img'),
+			'/bookmarks/default/logo'
+		);
+		await brokenLink.click();
 		const details = page.getByRole('region', { name: 'Broken primary', exact: true });
 		await expect(details.locator('img')).toHaveAttribute('src', '/public/primary-a.svg');
 		await expectBroken(details.locator('img'));
@@ -299,9 +308,9 @@ test('without JavaScript, good images decode and broken images leave card and de
 		await expect(url).toBeVisible();
 		await expect(url).toHaveValue('https://broken.example.test');
 		await expect(url).toHaveJSProperty('readOnly', true);
-		await page.locator('a[href="/?link=valid"]').click();
+		await page.getByRole('link', { name: 'Valid primary', exact: true }).click();
 		await expectDecoded(page.locator('section.details img'), '/public/valid.svg');
-		await page.locator('a[href="/?link=default"]').click();
+		await page.getByRole('link', { name: 'Omitted primary', exact: true }).click();
 		await expectDecoded(page.locator('section.details img'), '/bookmarks/default/logo');
 		await page.getByRole('link', { name: 'Back to directory' }).click();
 		await expect(page).toHaveURL(`${server.url}/`);

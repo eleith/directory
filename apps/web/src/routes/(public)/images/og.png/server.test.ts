@@ -166,21 +166,24 @@ describe('public generated Open Graph image', () => {
 				'/images/og.png?favicon_path=/public/other.svg&og_image_path=/public/other.jpg&primary_light_color=%23fff&primary_dark_color=%23000',
 				'/images/other.png?source=%252e%252e%252fsecret.svg&title=OTHER'
 			]) {
-				const request = event(method);
-				request.url = new URL(path, 'http://attacker.example');
-				request.request = new Request(request.url, {
-					method,
-					headers: {
-						'x-public-dir': '/outside',
-						'x-favicon-path': '/public/other.svg',
-						'x-title': 'HEADER_TITLE',
-						'x-primary-light-color': '#fff',
-						'x-primary-dark-color': '#000',
-						accept: 'image/jpeg',
-						range: 'bytes=0-1',
-						'if-none-match': '*'
-					}
-				});
+				const url = new URL(path, 'http://attacker.example');
+				const request = {
+					...event(method),
+					url,
+					request: new Request(url, {
+						method,
+						headers: {
+							'x-public-dir': '/outside',
+							'x-favicon-path': '/public/other.svg',
+							'x-title': 'HEADER_TITLE',
+							'x-primary-light-color': '#fff',
+							'x-primary-dark-color': '#000',
+							accept: 'image/jpeg',
+							range: 'bytes=0-1',
+							'if-none-match': '*'
+						}
+					})
+				};
 				await expectPNG(await (method === 'HEAD' ? HEAD : GET)(request), method);
 			}
 			expect(vi.mocked(readMountedImage).mock.calls).toEqual(

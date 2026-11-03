@@ -40,7 +40,7 @@ export async function signInAction(
 			if (!['https:', 'http:'].includes(destination.protocol)) {
 				throw new Error('Invalid authentication destination.');
 			}
-			redirect(303, destination.href);
+			redirect(303, destination.href, { external: true });
 		}
 		redirect(303, callbackUrl);
 	} catch (failure) {
@@ -86,10 +86,10 @@ async function submitAuth(
 	);
 	// The same native cookie helpers used by sveltekitCookies, without bypassing the router.
 	for (const [name, attributes] of parseSetCookieHeader(response.headers.get('set-cookie') ?? '')) {
-		event.cookies.set(name, attributes.value, {
-			...toCookieOptions(attributes),
-			path: attributes.path || '/'
-		});
+		const options = Object.fromEntries(
+			Object.entries(toCookieOptions(attributes)).filter(([, value]) => value !== undefined)
+		);
+		event.cookies.set(name, attributes.value, { ...options, path: attributes.path || '/' });
 	}
 	return response;
 }

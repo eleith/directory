@@ -26,14 +26,15 @@ test('bookmark logos render on cards and details without JavaScript and follow a
 		await server.ready();
 		const page = await context.newPage();
 		await page.goto(server.url);
-		const card = page.locator('a[href="/?link=photos"] img');
+		const photos = page.getByRole('link', { name: 'Family Photos', exact: true });
+		const card = photos.locator('img');
 		await expect(card).toHaveAttribute('src', '/bookmarks/photos/logo');
 		await expect(card).toHaveAttribute('width', '64');
 		await expect(card).toHaveAttribute('height', '64');
 		await expect
 			.poll(() => card.evaluate((image) => (image as HTMLImageElement).naturalWidth))
 			.toBeGreaterThan(0);
-		await page.locator('a[href="/?link=photos"]').click();
+		await photos.click();
 		const details = page.getByRole('region', { name: 'Family Photos', exact: true });
 		await expect(details.locator('img')).toHaveAttribute('src', '/bookmarks/photos/logo');
 		expect(await (await server.fetch('/bookmarks/photos/logo')).text()).toContain('>FP</text>');
